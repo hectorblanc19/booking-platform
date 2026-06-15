@@ -128,126 +128,146 @@ export default function BarberDashboard() {
   }
 
   // 🔥 CANCEL APPOINTMENT (with UI refresh)
- async function cancelAppointment(id) {
-  if (!confirm(tr.cancel)) return;
+  async function cancelAppointment(id) {
+    if (!confirm(tr.cancel)) return;
 
-  const { error } = await supabase
-    .from("appointments")
-    .delete()
-    .eq("id", id);
+    const { error } = await supabase
+      .from("appointments")
+      .delete()
+      .eq("id", id);
 
-  if (error) {
-    console.error("DELETE ERROR:", error);
-    alert("Delete failed: " + error.message);
-  } else {
-    await loadAppointments(); // 🔥 force refresh
+    if (error) {
+      console.error("DELETE ERROR:", error);
+      alert("Delete failed: " + error.message);
+    } else {
+      await loadAppointments(); // 🔥 force refresh
+    }
   }
-}
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gray-100 py-10">
+      <div className="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-6">
 
-      {/* Language Toggle */}
-      <div className="flex justify-end mb-4 gap-2 items-center">
-        <span className="text-sm">{tr.langLabel}:</span>
+        {/* Language Toggle */}
+        <div className="flex justify-end mb-4 gap-2 items-center">
+          <span className="text-sm">{tr.langLabel}:</span>
 
-        <button
-          className={`px-2 py-1 text-sm rounded ${
-            lang === "es" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setLang("es")}
-        >
-          {tr.es}
-        </button>
+          <button
+            className={`px-2 py-1 text-sm rounded ${
+              lang === "es" ? "bg-black text-white" : "bg-gray-200"
+            }`}
+            onClick={() => setLang("es")}
+          >
+            {tr.es}
+          </button>
 
-        <button
-          className={`px-2 py-1 text-sm rounded ${
-            lang === "en" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setLang("en")}
-        >
-          {tr.en}
-        </button>
+          <button
+            className={`px-2 py-1 text-sm rounded ${
+              lang === "en" ? "bg-black text-white" : "bg-gray-200"
+            }`}
+            onClick={() => setLang("en")}
+          >
+            {tr.en}
+          </button>
+        </div>
+
+        <h1 className="text-3xl font-bold mb-2">{tr.title}</h1>
+        <h2 className="text-xl mb-6">
+          {tr.barber}: {barber}
+        </h2>
+
+        {/* FILTER BUTTONS */}
+        <div className="flex gap-3 mb-6">
+          <button
+            className={`px-4 py-2 rounded ${
+              view === "today" ? "bg-black text-white" : "bg-gray-200"
+            }`}
+            onClick={() => setView("today")}
+          >
+            {tr.today}
+          </button>
+
+          <button
+            className={`px-4 py-2 rounded ${
+              view === "tomorrow" ? "bg-black text-white" : "bg-gray-200"
+            }`}
+            onClick={() => setView("tomorrow")}
+          >
+            {tr.tomorrow}
+          </button>
+
+          <button
+            className={`px-4 py-2 rounded ${
+              view === "week" ? "bg-black text-white" : "bg-gray-200"
+            }`}
+            onClick={() => setView("week")}
+          >
+            {tr.week}
+          </button>
+        </div>
+
+        {loading ? (
+          <p>{tr.loading}</p>
+        ) : appointments.length === 0 ? (
+          <p>{tr.none}</p>
+        ) : (
+          <div className="space-y-4">
+            {appointments.map((appt) => (
+              <div
+                key={appt.id}
+                className="p-4 border rounded-xl bg-white shadow-sm"
+              >
+                <p>
+                  <strong>{tr.date}:</strong> {appt.date}
+                </p>
+                <p>
+                  <strong>{tr.time}:</strong> {appt.time}
+                </p>
+                <p>
+                  <strong>{tr.service}:</strong> {appt.service}
+                </p>
+
+                <hr className="my-2" />
+
+                <p>
+                  <strong>{tr.customer}:</strong> {appt.customer_name}
+                </p>
+                <p>
+                  <strong>{tr.phone}:</strong> {appt.customer_phone}
+                </p>
+                <p>
+                  <strong>{tr.email}:</strong> {appt.customer_email || "N/A"}
+                </p>
+                <p>
+                  <strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}
+                </p>
+
+                {/* 🔥 CANCEL BUTTON */}
+                <button
+                  className="mt-3 w-full bg-red-600 text-white py-2 rounded-lg"
+                  onClick={() => cancelAppointment(appt.id)}
+                >
+                  {tr.cancel}
+                </button>
+
+                {/* 🔥 RESCHEDULE BUTTON */}
+                <button
+                  className="mt-2 w-full bg-blue-600 text-white py-2 rounded-lg"
+                  onClick={() =>
+                    (window.location.href = `/barber/${barber}/reschedule/${appt.id}`)
+                  }
+                >
+                  {tr.reschedule}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ⭐ BLOCKING PANEL */}
+        <BlockingPanel barber={barber} lang={lang} />
+
       </div>
-
-      <h1 className="text-3xl font-bold mb-2">{tr.title}</h1>
-      <h2 className="text-xl mb-6">{tr.barber}: {barber}</h2>
-
-      {/* FILTER BUTTONS */}
-      <div className="flex gap-3 mb-6">
-        <button
-          className={`px-4 py-2 rounded ${
-            view === "today" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setView("today")}
-        >
-          {tr.today}
-        </button>
-
-        <button
-          className={`px-4 py-2 rounded ${
-            view === "tomorrow" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setView("tomorrow")}
-        >
-          {tr.tomorrow}
-        </button>
-
-        <button
-          className={`px-4 py-2 rounded ${
-            view === "week" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setView("week")}
-        >
-          {tr.week}
-        </button>
-      </div>
-
-      {loading ? (
-        <p>{tr.loading}</p>
-      ) : appointments.length === 0 ? (
-        <p>{tr.none}</p>
-      ) : (
-        <div className="space-y-4">
-          {appointments.map((appt) => (
-            <div key={appt.id} className="p-4 border rounded-xl bg-white shadow-sm">
-              <p><strong>{tr.date}:</strong> {appt.date}</p>
-              <p><strong>{tr.time}:</strong> {appt.time}</p>
-              <p><strong>{tr.service}:</strong> {appt.service}</p>
-
-              <hr className="my-2" />
-
-              <p><strong>{tr.customer}:</strong> {appt.customer_name}</p>
-              <p><strong>{tr.phone}:</strong> {appt.customer_phone}</p>
-              <p><strong>{tr.email}:</strong> {appt.customer_email || "N/A"}</p>
-              <p><strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}</p>
-
-             {/* 🔥 CANCEL BUTTON */}
-<button
-  className="mt-3 w-full bg-red-600 text-white py-2 rounded-lg"
-  onClick={() => cancelAppointment(appt.id)}
->
-  {tr.cancel}
-</button>
-
-{/* 🔥 RESCHEDULE BUTTON */}
-<button
-  className="mt-2 w-full bg-blue-600 text-white py-2 rounded-lg"
-  onClick={() =>
-    (window.location.href = `/barber/${barber}/reschedule/${appt.id}`)
-  }
->
-  {tr.reschedule}
-</button>
-</div>
-))}
-</div>
-)}
-
-{/* ⭐ ADD THE BLOCKING PANEL HERE ⭐ */}
-<BlockingPanel barber={barber} lang={lang} />
-
-
-</div>
-);
+    </div>
+  );
 }

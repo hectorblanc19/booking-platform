@@ -99,6 +99,7 @@ export default function BookingPage() {
   const [selectedTime, setSelectedTime] = useState(null);
   const [customerInfo, setCustomerInfo] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [dashboardLink, setDashboardLink] = useState(null);
   const [lang, setLang] = useState("es");
 
   const tr = t[lang];
@@ -269,88 +270,120 @@ async function getAvailableSlots(barber, date) {
       )}
 
       {/* STEP 5: CUSTOMER FORM */}
-      {step === 5 && (
-        <CustomerForm
-          onSubmit={(info) => {
-            setCustomerInfo(info);
-            setStep(6);
-          }}
-          lang={lang}
-        />
-      )}
+{step === 5 && (
+  <CustomerForm
+    onSubmit={(info) => {
+      setCustomerInfo(info);
+      setStep(6);
+    }}
+    lang={lang}
+  />
+)}
 
-      {/* STEP 6: CONFIRMATION */}
-      {step === 6 && (
-        <div className="mt-6 p-4 border rounded-xl bg-white shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">{tr.confirmTitle}</h2>
+     {/* STEP 6: CONFIRMATION */}
+     {step === 6 && (
+    <div className="mt-6 p-4 border rounded-xl bg-white shadow-sm">
+    <h2 className="text-xl font-semibold mb-4">{tr.confirmTitle}</h2>
 
-          <p><strong>{tr.barber}:</strong> {selectedBarber?.name}</p>
-          <p><strong>{tr.service}:</strong> {selectedService?.name}</p>
-          <p><strong>{tr.date}:</strong> {selectedDate?.toLocaleDateString()}</p>
-          <p><strong>{tr.time}:</strong> {selectedTime}</p>
+    <p><strong>{tr.barber}:</strong> {selectedBarber?.name}</p>
+    <p><strong>{tr.service}:</strong> {selectedService?.name}</p>
+    <p><strong>{tr.date}:</strong> {selectedDate?.toLocaleDateString()}</p>
+    <p><strong>{tr.time}:</strong> {selectedTime}</p>
 
-          <p className="mt-4"><strong>{tr.name}:</strong> {customerInfo?.name}</p>
-          <p><strong>{tr.phone}:</strong> {customerInfo?.phone}</p>
-          <p><strong>{tr.email}:</strong> {customerInfo?.email || "N/A"}</p>
-          <p><strong>{tr.notes}:</strong> {customerInfo?.notes || tr.none}</p>
+    <p className="mt-4"><strong>{tr.name}:</strong> {customerInfo?.name}</p>
+    <p><strong>{tr.phone}:</strong> {customerInfo?.phone}</p>
+    <p><strong>{tr.email}:</strong> {customerInfo?.email || "N/A"}</p>
+    <p><strong>{tr.notes}:</strong> {customerInfo?.notes || tr.none}</p>
 
-          <button
-            disabled={loading}
-            onClick={async () => {
-              setLoading(true);
-              try {
-                await createAppointment({
-                  business,
-                  barber: selectedBarber.name,
-                  service: selectedService.name,
-                  date: selectedDate.toISOString().split("T")[0],
-                  time: selectedTime,
-                  customer: customerInfo,
-                });
+    <button
+      disabled={loading}
+      onClick={async () => {
+        setLoading(true);
+        try {
+          const res = await fetch("/api/book", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              business,
+              barber: selectedBarber.name,
+              service: selectedService.name,
+              date: selectedDate.toISOString().split("T")[0],
+              time: selectedTime,
+              customer_name: customerInfo.name,
+              customer_email: customerInfo.email,
+              customer_phone: customerInfo.phone,
+              notes: customerInfo.notes || "",
+            }),
+          });
 
-                setStep(7);
-              } catch (err) {
-                console.error("SUPABASE ERROR:", err);
+          const data = await res.json();
 
-                if (err?.message?.includes("duplicate key value")) {
-                  alert(tr.duplicate);
-                } else {
-                  alert(tr.error);
-                }
-              }
-              setLoading(false);
-            }}
-            className={`mt-4 w-full bg-green-600 text-white py-3 rounded-xl ${
-              loading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {loading ? tr.saving : tr.confirmButton}
-          </button>
-        </div>
-      )}
+          if (data.success) {
+            setDashboardLink(data.dashboardLink);
+            setStep(7);
+          } else {
+            alert(tr.error);
+          }
+        } catch (err) {
+          console.error("BOOKING ERROR:", err);
+          alert(tr.error);
+        }
+        setLoading(false);
+      }}
+      className={`mt-4 w-full bg-green-600 text-white py-3 rounded-xl ${
+        loading ? "opacity-50 cursor-not-allowed" : ""
+      }`}
+    >
+      {loading ? tr.saving : tr.confirmButton}
+    </button>
+  </div>
+)}
 
       {/* STEP 7: SUCCESS SCREEN */}
-      {step === 7 && (
-        <div className="mt-6 p-4 border rounded-xl bg-white shadow-sm text-center">
-          <h2 className="text-2xl font-bold mb-4">{tr.successTitle}</h2>
-          <p>{tr.successText}</p>
+{step === 7 && (
+  <div className="mt-6 p-4 border rounded-xl bg-white shadow-sm text-center">
+    <h2 className="text-2xl font-bold mb-4">{tr.successTitle}</h2>
+    <p>{tr.successText}</p>
 
-          <p className="mt-4"><strong>{tr.barber}:</strong> {selectedBarber?.name}</p>
-          <p><strong>{tr.service}:</strong> {selectedService?.name}</p>
-          <p><strong>{tr.date}:</strong> {selectedDate?.toLocaleDateString()}</p>
-          <p><strong>{tr.time}:</strong> {selectedTime}</p>
+    <p className="mt-4"><strong>{tr.barber}:</strong> {selectedBarber?.name}</p>
+    <p><strong>{tr.service}:</strong> {selectedService?.name}</p>
+    <p><strong>{tr.date}:</strong> {selectedDate?.toLocaleDateString()}</p>
+    <p><strong>{tr.time}:</strong> {selectedTime}</p>
 
-          <p className="mt-4"><strong>{tr.name}:</strong> {customerInfo?.name}</p>
-          <p><strong>{tr.phone}:</strong> {customerInfo?.phone}</p>
+    <p className="mt-4"><strong>{tr.name}:</strong> {customerInfo?.name}</p>
+    <p><strong>{tr.phone}:</strong> {customerInfo?.phone}</p>
 
-          <button
-            className="mt-6 w-full bg-black text-white py-3 rounded-xl"
-            onClick={() => (window.location.href = "/")}
-          >
-            {tr.backHome}
-          </button>
-        </div>
-      )}
+    {/* ⭐ NEW: Show customer dashboard link */}
+    {dashboardLink && (
+      <div className="mt-6 p-4 border rounded bg-gray-50">
+        <p className="font-semibold mb-1">
+          {lang === "es"
+            ? "Administra tu cita aquí:"
+            : "Manage your appointment here:"}
+        </p>
+
+        <p className="text-blue-600 underline break-all">
+          {dashboardLink}
+        </p>
+
+        <button
+          className="mt-3 px-4 py-2 bg-black text-white rounded"
+          onClick={() => navigator.clipboard.writeText(dashboardLink)}
+        >
+          {lang === "es" ? "Copiar enlace" : "Copy Link"}
+        </button>
+      </div>
+    )}
+
+    <button
+      className="mt-6 w-full bg-black text-white py-3 rounded-xl"
+      onClick={() => (window.location.href = "/")}
+    >
+      {tr.backHome}
+    </button>
+  </div>
+)}
     </div>
   );
 }
+

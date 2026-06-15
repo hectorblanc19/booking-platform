@@ -3,21 +3,27 @@
 const t = {
   es: {
     title: "Elige tu servicio",
-    currency: "RD$", // You can change to "$" if needed
+    currency: "RD$",
+    haircut: "Corte de pelo",
+    beard: "Recorte de barba",
+    combo: "Corte + Barba",
   },
   en: {
     title: "Choose your service",
     currency: "$",
+    haircut: "Haircut",
+    beard: "Beard Trim",
+    combo: "Haircut + Beard",
   },
 };
 
 export default function ServiceSelector({ business, onSelect, lang }) {
-  const tr = t[lang]; // translation shortcut
+  const tr = t[lang];
 
   const services = [
-    { id: "haircut", name: "Haircut", price: 20 },
-    { id: "beard", name: "Beard Trim", price: 15 },
-    { id: "combo", name: "Haircut + Beard", price: 30 },
+    { id: "haircut", name: tr.haircut, price: 20 },
+    { id: "beard", name: tr.beard, price: 15 },
+    { id: "combo", name: tr.combo, price: 30 },
   ];
 
   return (

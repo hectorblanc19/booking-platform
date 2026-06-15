@@ -43,7 +43,8 @@ export async function POST(req) {
       customer_email,
       customer_phone,
       notes,
-      customer_id
+      customer_id,
+      status: "confirmed"   // ⭐ REQUIRED FOR BADGE
     })
     .select()
     .single();
@@ -53,7 +54,6 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to create appointment" });
   }
 
-  // Send email if provided
   if (customer_email) {
     await resend.emails.send({
       from: "info@flowpaydr.com",

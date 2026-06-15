@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BlockingPanel from "@/components/BlockingPanel";
+import StatusBadge from "@/components/StatusBadge";
 
 // Bilingual dictionary
 const t = {
@@ -212,35 +213,39 @@ export default function BarberDashboard() {
           <p>{tr.none}</p>
         ) : (
           <div className="space-y-4">
-            {appointments.map((appt) => (
-              <div
-                key={appt.id}
-                className="p-4 border rounded-xl bg-white shadow-sm"
-              >
-                <p>
-                  <strong>{tr.date}:</strong> {appt.date}
-                </p>
-                <p>
-                  <strong>{tr.time}:</strong> {appt.time}
-                </p>
-                <p>
-                  <strong>{tr.service}:</strong> {appt.service}
-                </p>
+           {appointments.map((appt) => (
+  <div
+    key={appt.id}
+    className="p-4 border rounded-xl bg-white shadow-sm"
+  >
+    <p>
+      <strong>{tr.date}:</strong> {appt.date}
+    </p>
+    <p>
+      <strong>{tr.time}:</strong> {appt.time}
+    </p>
 
-                <hr className="my-2" />
+    {/* ⭐ STATUS DOT / BADGE */}
+    <StatusBadge status={appt.status} lang={lang} />
 
-                <p>
-                  <strong>{tr.customer}:</strong> {appt.customer_name}
-                </p>
-                <p>
-                  <strong>{tr.phone}:</strong> {appt.customer_phone}
-                </p>
-                <p>
-                  <strong>{tr.email}:</strong> {appt.customer_email || "N/A"}
-                </p>
-                <p>
-                  <strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}
-                </p>
+    <p>
+      <strong>{tr.service}:</strong> {appt.service}
+    </p>
+
+    <hr className="my-2" />
+
+    <p>
+      <strong>{tr.customer}:</strong> {appt.customer_name}
+    </p>
+    <p>
+      <strong>{tr.phone}:</strong> {appt.customer_phone}
+    </p>
+    <p>
+      <strong>{tr.email}:</strong> {appt.customer_email || "N/A"}
+    </p>
+    <p>
+      <strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}
+    </p>
 
                 {/* 🔥 CANCEL BUTTON */}
                 <button

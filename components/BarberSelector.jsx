@@ -1,22 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+
 const t = {
-  es: {
-    title: "Elige tu barbero",
-  },
-  en: {
-    title: "Choose your barber",
-  },
+  es: { title: "Elige tu barbero" },
+  en: { title: "Choose your barber" },
 };
 
-export default function BarberSelector({ business, onSelect, lang }) {
-  const tr = t[lang]; // translation shortcut
+export default function BarberSelector({ onSelect, lang }) {
+  const tr = t[lang];
+  const [barbers, setBarbers] = useState([]);
 
-  const barbers = [
-    { id: "jose", name: "Jose" },
-    { id: "luis", name: "Luis" },
-    { id: "mario", name: "Mario" },
-  ];
+  useEffect(() => {
+    loadBarbers();
+  }, []);
+
+  async function loadBarbers() {
+    const { data } = await supabase
+      .from("barbers")
+      .select("*")
+      .eq("active", true);
+
+    setBarbers(data || []);
+  }
 
   return (
     <div className="mt-6">

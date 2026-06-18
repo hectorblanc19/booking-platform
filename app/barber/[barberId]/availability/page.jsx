@@ -20,10 +20,9 @@ const DAYS = [
 ];
 
 export default function AvailabilityPage() {
-  const { barber } = useParams();
+  const { barberId } = useParams(); // FIXED
   const [availability, setAvailability] = useState([]);
 
-  // Load availability on page load
   useEffect(() => {
     loadAvailability();
   }, []);
@@ -32,7 +31,7 @@ export default function AvailabilityPage() {
     const { data, error } = await supabase
       .from("barber_availability")
       .select("*")
-      .eq("barber", barber);
+      .eq("barber", barberId); // FIXED
 
     if (error) {
       console.error("Load error:", error);
@@ -40,9 +39,9 @@ export default function AvailabilityPage() {
     }
 
     // If no rows exist, create default schedule
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
       const defaultRows = DAYS.map((day) => ({
-        barber,
+        barber: barberId, // FIXED
         day_of_week: day,
         start_time: "09:00",
         end_time: "17:00",
@@ -60,7 +59,6 @@ export default function AvailabilityPage() {
     }
   }
 
-  // Update local state when user edits fields
   function updateField(day, field, value) {
     setAvailability((prev) =>
       prev.map((row) =>
@@ -69,11 +67,16 @@ export default function AvailabilityPage() {
     );
   }
 
-  // Save all rows to Supabase
   async function saveAvailability() {
+    // Ensure barberId is included in every row
+    const rowsWithId = availability.map((row) => ({
+      ...row,
+      barber: barberId, // FIXED
+    }));
+
     const { error } = await supabase
       .from("barber_availability")
-      .upsert(availability);
+      .upsert(rowsWithId);
 
     if (error) {
       console.error("Save error:", error);
@@ -86,7 +89,7 @@ export default function AvailabilityPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">
-        Availability for {barber}
+        Availability for {barberId}
       </h1>
 
       <div className="space-y-4">

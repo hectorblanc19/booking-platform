@@ -4,7 +4,15 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BlockingPanel from "@/components/BlockingPanel";
-import StatusBadge from "@/components/StatusBadge";
+
+// Service translation dictionary
+const serviceNames = {
+  "Haircut": { es: "Corte", en: "Haircut" },
+  "Beard": { es: "Barba", en: "Beard" },
+  "Haircut + Beard": { es: "Corte + Barba", en: "Haircut + Beard" },
+  "Fade": { es: "Fade", en: "Fade" },
+  "Other": { es: "Otro", en: "Other" },
+};
 
 // Bilingual dictionary
 const t = {
@@ -24,7 +32,7 @@ const t = {
     email: "Correo",
     notes: "Notas",
     noNotes: "Ninguna",
-    cancel: "Cancelar Cita",
+    cancel: "Cancelar",
     reschedule: "Reprogramar",
     langLabel: "Idioma",
     es: "ES",
@@ -46,7 +54,7 @@ const t = {
     email: "Email",
     notes: "Notes",
     noNotes: "None",
-    cancel: "Cancel Appointment",
+    cancel: "Cancel",
     reschedule: "Reschedule",
     langLabel: "Language",
     es: "ES",
@@ -55,8 +63,9 @@ const t = {
 };
 
 export default function BarberDashboard() {
-  const { barber } = useParams();
+  const { barberId } = useParams();
 
+  const [barberData, setBarberData] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [view, setView] = useState("today");
   const [loading, setLoading] = useState(true);
@@ -64,22 +73,33 @@ export default function BarberDashboard() {
 
   const tr = t[lang];
 
-  // 🔥 REALTIME UPDATES
+  // Load barber info
+  useEffect(() => {
+    loadBarber();
+  }, []);
+
+  async function loadBarber() {
+    const { data } = await supabase
+      .from("barbers")
+      .select("*")
+      .eq("id", barberId)
+      .single();
+
+    setBarberData(data);
+  }
+
+  // Realtime updates
   useEffect(() => {
     const channel = supabase
       .channel("appointments-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "appointments" },
-        () => {
-          loadAppointments();
-        }
+        () => loadAppointments()
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, []);
 
   useEffect(() => {
@@ -113,22 +133,17 @@ export default function BarberDashboard() {
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
-      .eq("barber", barber)
+      .eq("barber_id", barberId)
       .gte("date", fromDate)
       .lte("date", toDate)
       .order("date", { ascending: true })
       .order("time", { ascending: true });
 
-    if (error) {
-      console.error("SUPABASE ERROR:", error);
-    } else {
-      setAppointments(data);
-    }
+    if (!error) setAppointments(data);
 
     setLoading(false);
   }
 
-  // 🔥 CANCEL APPOINTMENT (with UI refresh)
   async function cancelAppointment(id) {
     if (!confirm(tr.cancel)) return;
 
@@ -137,12 +152,7 @@ export default function BarberDashboard() {
       .delete()
       .eq("id", id);
 
-    if (error) {
-      console.error("DELETE ERROR:", error);
-      alert("Delete failed: " + error.message);
-    } else {
-      await loadAppointments(); // 🔥 force refresh
-    }
+    if (!error) loadAppointments();
   }
 
   return (
@@ -174,7 +184,7 @@ export default function BarberDashboard() {
 
         <h1 className="text-3xl font-bold mb-2">{tr.title}</h1>
         <h2 className="text-xl mb-6">
-          {tr.barber}: {barber}
+          {tr.barber}: {barberData?.name || "..."}
         </h2>
 
         {/* FILTER BUTTONS */}
@@ -213,65 +223,69 @@ export default function BarberDashboard() {
           <p>{tr.none}</p>
         ) : (
           <div className="space-y-4">
-           {appointments.map((appt) => (
-  <div
-    key={appt.id}
-    className="p-4 border rounded-xl bg-white shadow-sm"
-  >
-    <p>
-      <strong>{tr.date}:</strong> {appt.date}
-    </p>
-    <p>
-      <strong>{tr.time}:</strong> {appt.time}
-    </p>
 
-    {/* ⭐ STATUS DOT / BADGE */}
-    <StatusBadge status={appt.status} lang={lang} />
+            {/* ⭐ UPDATED APPOINTMENT CARD BLOCK */}
+            {appointments.map((appt) => (
+              <div key={appt.id} className="p-4 border rounded-xl bg-white shadow-sm">
 
-    <p>
-      <strong>{tr.service}:</strong> {appt.service}
-    </p>
+                {/* DATE + TIME */}
+                <p className="text-gray-700 text-sm">
+                  <strong>{tr.date}:</strong> {appt.date}
+                </p>
 
-    <hr className="my-2" />
+                <p className="text-gray-700 text-sm">
+                  <strong>{tr.time}:</strong> {appt.time}
+                </p>
 
-    <p>
-      <strong>{tr.customer}:</strong> {appt.customer_name}
-    </p>
-    <p>
-      <strong>{tr.phone}:</strong> {appt.customer_phone}
-    </p>
-    <p>
-      <strong>{tr.email}:</strong> {appt.customer_email || "N/A"}
-    </p>
-    <p>
-      <strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}
-    </p>
+                {/* SMALL STATUS WITH ICON */}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-green-600 text-lg">✔</span>
+                  <span className="font-semibold text-green-700 text-sm">
+                    {lang === "es" ? "Confirmado" : "Confirmed"}
+                  </span>
+                </div>
 
-                {/* 🔥 CANCEL BUTTON */}
-                <button
-                  className="mt-3 w-full bg-red-600 text-white py-2 rounded-lg"
-                  onClick={() => cancelAppointment(appt.id)}
-                >
-                  {tr.cancel}
-                </button>
+                {/* SERVICE WITH TRANSLATION */}
+                <p className="mt-2 text-sm">
+                  <strong>{tr.service}:</strong>{" "}
+                  {serviceNames[appt.service]?.[lang] || appt.service}
+                </p>
 
-                {/* 🔥 RESCHEDULE BUTTON */}
-                <button
-                  className="mt-2 w-full bg-blue-600 text-white py-2 rounded-lg"
-                  onClick={() =>
-                    (window.location.href = `/barber/${barber}/reschedule/${appt.id}`)
-                  }
-                >
-                  {tr.reschedule}
-                </button>
+                <hr className="my-3" />
+
+                {/* CUSTOMER INFO */}
+                <p className="text-sm"><strong>{tr.customer}:</strong> {appt.customer_name}</p>
+                <p className="text-sm"><strong>{tr.phone}:</strong> {appt.customer_phone}</p>
+                <p className="text-sm"><strong>{tr.email}:</strong> {appt.customer_email || "N/A"}</p>
+                <p className="text-sm"><strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}</p>
+
+                {/* BUTTONS */}
+                <div className="mt-4 flex gap-2">
+
+                  <button
+                    className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold"
+                    onClick={() => cancelAppointment(appt.id)}
+                  >
+                    ❌ {tr.cancel}
+                  </button>
+
+                  <button
+                    className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold"
+                    onClick={() =>
+                      (window.location.href = `/barber/${barberId}/reschedule/${appt.id}`)
+                    }
+                  >
+                    🔄 {tr.reschedule}
+                  </button>
+
+                </div>
+
               </div>
             ))}
           </div>
         )}
 
-        {/* ⭐ BLOCKING PANEL */}
-        <BlockingPanel barber={barber} lang={lang} />
-
+        <BlockingPanel barber={barberId} lang={lang} />
       </div>
     </div>
   );

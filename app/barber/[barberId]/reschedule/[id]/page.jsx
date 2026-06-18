@@ -2,15 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-export default function CustomerReschedulePage() {
-  const { id } = useParams();
+export default function ReschedulePage() {
+  const { barberId, id } = useParams(); // FIXED
 
   const [appointment, setAppointment] = useState(null);
   const [newDate, setNewDate] = useState("");
@@ -25,11 +20,12 @@ export default function CustomerReschedulePage() {
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
-      .eq("customer_id", id)
+      .eq("id", id)
       .single();
 
     if (error) {
       console.error("Error loading appointment:", error);
+      alert("Error loading appointment: " + error.message);
       return;
     }
 
@@ -39,24 +35,26 @@ export default function CustomerReschedulePage() {
 
   async function saveChanges() {
     if (!newDate || !newTime) {
-      alert("Please select a new date and time");
+      alert("Select date and time");
       return;
     }
+
+    const formattedTime = newTime + ":00";
 
     const { error } = await supabase
       .from("appointments")
       .update({
         date: newDate,
-        time: newTime,
-        status: "rescheduled",
+        time: formattedTime,
       })
-      .eq("customer_id", id);
+      .eq("id", id);
 
     if (error) {
-      alert("Error updating appointment");
+      console.error("UPDATE ERROR:", error);
+      alert("Update failed: " + error.message);
     } else {
-      alert("Appointment rescheduled!");
-      window.location.href = `/customer/${id}`;
+      // Redirect back to dashboard with fresh reload
+      window.location.href = `/barber/${barberId}/dashboard?refresh=${Date.now()}`;
     }
   }
 
@@ -88,7 +86,7 @@ export default function CustomerReschedulePage() {
       </div>
 
       <button
-        className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl"
+        className="mt-6 w-full bg-green-600 text-white py-3 rounded-xl"
         onClick={saveChanges}
       >
         Save Changes

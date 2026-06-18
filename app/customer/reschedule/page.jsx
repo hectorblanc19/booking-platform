@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function ReschedulePage() {
-  const { barber, id } = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const secret = searchParams.get("secret");
 
   const [appointment, setAppointment] = useState(null);
   const [newDate, setNewDate] = useState("");
@@ -20,22 +23,19 @@ export default function ReschedulePage() {
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
-      .eq("id", id)
+      .eq("secret_link", secret)
       .single();
 
-    if (error) {
-      console.error("Error loading appointment:", error);
-      alert("Error loading appointment: " + error.message);
-      return;
+    if (!error) {
+      setAppointment(data);
     }
 
-    setAppointment(data);
     setLoading(false);
   }
 
   async function saveChanges() {
     if (!newDate || !newTime) {
-      alert("Select date and time");
+      alert("Please select a new date and time");
       return;
     }
 
@@ -47,26 +47,29 @@ export default function ReschedulePage() {
       .update({
         date: newDate,
         time: formattedTime,
+        status: "confirmed", // KEEP confirmed so barber sees it
       })
-      .eq("id", id);
+      .eq("secret_link", secret);
 
     if (error) {
-      console.error("UPDATE ERROR:", error);
-      alert("Update failed: " + error.message);
+      alert("Error updating appointment");
     } else {
-      // Force dashboard to reload fresh (no cache)
-      window.location.href = `/barber/${barber}/dashboard?refresh=${Date.now()}`;
+      alert("Appointment rescheduled");
+      router.push(`/customer/${secret}`);
     }
   }
 
   if (loading) return <p className="p-6">Loading...</p>;
+  if (!appointment) return <p className="p-6">Appointment not found.</p>;
 
   return (
-    <div className="p-6 max-w-lg mx-auto">
+    <div className="max-w-xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-4">Reschedule Appointment</h1>
 
-      <p><strong>Current Date:</strong> {appointment.date}</p>
-      <p><strong>Current Time:</strong> {appointment.time}</p>
+      <div className="border p-4 rounded-xl bg-white shadow-sm">
+        <p><strong>Current Date:</strong> {appointment.date}</p>
+        <p><strong>Current Time:</strong> {appointment.time}</p>
+      </div>
 
       <div className="mt-4">
         <label className="block mb-1">New Date</label>
@@ -87,7 +90,7 @@ export default function ReschedulePage() {
       </div>
 
       <button
-        className="mt-6 w-full bg-green-600 text-white py-3 rounded-xl"
+        className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl"
         onClick={saveChanges}
       >
         Save Changes
@@ -95,7 +98,7 @@ export default function ReschedulePage() {
 
       <button
         className="mt-3 w-full bg-gray-300 py-3 rounded-xl"
-        onClick={() => window.history.back()}
+        onClick={() => router.push(`/customer/${secret}`)}
       >
         Back
       </button>

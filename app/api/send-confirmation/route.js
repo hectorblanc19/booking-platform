@@ -14,35 +14,74 @@ export async function POST(req) {
     business_name,
     date,
     time,
-    secret_link
+    secret_link,
+    lang = "en", // ⭐ language from booking page
   } = body;
 
   if (!customer_email) {
     return NextResponse.json({ error: "Missing email" });
   }
 
+  // ⭐ TRANSLATIONS
+  const tr = {
+    en: {
+      subject: "Your Appointment is Confirmed",
+      title: "🎉 Appointment Confirmed!",
+      thanks: "Thank you for booking with",
+      details: "Appointment Details",
+      service: "Service",
+      barber: "Barber",
+      business: "Business",
+      date: "Date",
+      time: "Time",
+      manage: "Manage Your Appointment",
+      button: "View Appointment",
+    },
+    es: {
+      subject: "Tu Cita ha sido Confirmada",
+      title: "🎉 ¡Cita Confirmada!",
+      thanks: "Gracias por reservar con",
+      details: "Detalles de la Cita",
+      service: "Servicio",
+      barber: "Barbero",
+      business: "Negocio",
+      date: "Fecha",
+      time: "Hora",
+      manage: "Gestiona tu Cita",
+      button: "Ver Cita",
+    },
+  }[lang];
+
   try {
     await resend.emails.send({
       from: "info@flowpaydr.com",
       to: customer_email,
-      subject: "Your Appointment is Confirmed",
+      subject: tr.subject,
       html: `
-        <h2>🎉 Appointment Confirmed!</h2>
-        <p>Thank you for booking with FlowPayDR.</p>
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
+        
+        <h2 style="text-align:center;">${tr.title}</h2>
+        <p style="text-align:center;">${tr.thanks} <strong>${business_name}</strong></p>
 
-        <h3>Appointment Details</h3>
-        <p><strong>Service:</strong> ${service}</p>
-        <p><strong>Barber:</strong> ${barber_name}</p>
-        <p><strong>Business:</strong> ${business_name}</p>
-        <p><strong>Date:</strong> ${date}</p>
-        <p><strong>Time:</strong> ${time}</p>
+        <h3>${tr.details}</h3>
+        <p><strong>${tr.service}:</strong> ${service}</p>
+        <p><strong>${tr.barber}:</strong> ${barber_name}</p>
+        <p><strong>${tr.business}:</strong> ${business_name}</p>
+        <p><strong>${tr.date}:</strong> ${date}</p>
+        <p><strong>${tr.time}:</strong> ${time}</p>
 
-        <h3>Manage Your Appointment</h3>
-        <p><a href="${secret_link}">${secret_link}</a></p>
+        <div style="text-align:center; margin-top: 25px;">
+          <a href="${secret_link}" 
+            style="background:#2563eb; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:16px;">
+            ${tr.button}
+          </a>
+        </div>
 
-        <hr>
-        <p><strong>FlowPayDR</strong><br>info@flowpaydr.com</p>
-      `
+        <p style="margin-top:30px; font-size:12px; text-align:center; color:#666;">
+          FlowPayDR • info@flowpaydr.com
+        </p>
+      </div>
+      `,
     });
 
     return NextResponse.json({ success: true });

@@ -48,7 +48,7 @@ export default function TimeSelector({ selectedDate, onSelect, barber, lang }) {
     const { data, error } = await supabase
       .from("appointments")
       .select("time")
-      .eq("barber", barber)
+      .eq("barber_id", barber)   // ⭐ FIXED HERE
       .eq("date", formattedDate);
 
     if (error) {

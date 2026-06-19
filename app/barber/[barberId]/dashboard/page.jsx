@@ -19,6 +19,7 @@ const t = {
   es: {
     title: "Panel del Barbero",
     barber: "Barbero",
+    uploadPhoto: "Subir Foto",
     today: "Hoy",
     tomorrow: "Mañana",
     week: "Próximos 7 Días",
@@ -41,6 +42,7 @@ const t = {
   en: {
     title: "Barber Dashboard",
     barber: "Barber",
+    uploadPhoto: "Upload Photo",
     today: "Today",
     tomorrow: "Tomorrow",
     week: "Next 7 Days",
@@ -86,6 +88,43 @@ export default function BarberDashboard() {
       .single();
 
     setBarberData(data);
+  }
+
+  // Upload photo handler
+  async function handlePhotoUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const fileName = `${barberId}-${Date.now()}.jpg`;
+
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from("barber-photos")
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      alert("Error uploading photo");
+      return;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("barber-photos")
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData.publicUrl;
+
+    // Save URL to database
+    await supabase
+      .from("barbers")
+      .update({ photo_url: publicUrl })
+      .eq("id", barberId);
+
+    // Refresh UI
+    loadBarber();
   }
 
   // Realtime updates
@@ -183,9 +222,28 @@ export default function BarberDashboard() {
         </div>
 
         <h1 className="text-3xl font-bold mb-2">{tr.title}</h1>
-        <h2 className="text-xl mb-6">
+        <h2 className="text-xl mb-4">
           {tr.barber}: {barberData?.name || "..."}
         </h2>
+
+        {/* ⭐ Barber Photo + Upload Button */}
+        <div className="flex flex-col items-center mb-6">
+          <img
+            src={barberData?.photo_url || "/default-barber.png"}
+            alt="Barber Photo"
+            className="w-28 h-28 rounded-full object-cover border shadow"
+          />
+
+          <label className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer">
+            {tr.uploadPhoto}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
+          </label>
+        </div>
 
         {/* FILTER BUTTONS */}
         <div className="flex gap-3 mb-6">
@@ -224,11 +282,9 @@ export default function BarberDashboard() {
         ) : (
           <div className="space-y-4">
 
-            {/* ⭐ UPDATED APPOINTMENT CARD BLOCK */}
             {appointments.map((appt) => (
               <div key={appt.id} className="p-4 border rounded-xl bg-white shadow-sm">
 
-                {/* DATE + TIME */}
                 <p className="text-gray-700 text-sm">
                   <strong>{tr.date}:</strong> {appt.date}
                 </p>
@@ -237,7 +293,6 @@ export default function BarberDashboard() {
                   <strong>{tr.time}:</strong> {appt.time}
                 </p>
 
-                {/* SMALL STATUS WITH ICON */}
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-green-600 text-lg">✔</span>
                   <span className="font-semibold text-green-700 text-sm">
@@ -245,7 +300,6 @@ export default function BarberDashboard() {
                   </span>
                 </div>
 
-                {/* SERVICE WITH TRANSLATION */}
                 <p className="mt-2 text-sm">
                   <strong>{tr.service}:</strong>{" "}
                   {serviceNames[appt.service]?.[lang] || appt.service}
@@ -253,13 +307,11 @@ export default function BarberDashboard() {
 
                 <hr className="my-3" />
 
-                {/* CUSTOMER INFO */}
                 <p className="text-sm"><strong>{tr.customer}:</strong> {appt.customer_name}</p>
                 <p className="text-sm"><strong>{tr.phone}:</strong> {appt.customer_phone}</p>
                 <p className="text-sm"><strong>{tr.email}:</strong> {appt.customer_email || "N/A"}</p>
                 <p className="text-sm"><strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}</p>
 
-                {/* BUTTONS */}
                 <div className="mt-4 flex gap-2">
 
                   <button

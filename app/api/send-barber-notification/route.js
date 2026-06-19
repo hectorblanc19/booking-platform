@@ -16,39 +16,86 @@ export async function POST(req) {
     date,
     time,
     notes,
-    dashboard_link
+    dashboard_link,
+    lang = "en", // ⭐ language from booking page
   } = body;
 
   if (!barber_email) {
     return NextResponse.json({ error: "Missing barber email" });
   }
 
+  // ⭐ TRANSLATIONS
+  const tr = {
+    en: {
+      subject: "New Appointment Booked",
+      title: "💈 New Appointment",
+      intro: "You have a new appointment.",
+      customerDetails: "Customer Details",
+      name: "Name",
+      phone: "Phone",
+      email: "Email",
+      apptDetails: "Appointment Details",
+      service: "Service",
+      date: "Date",
+      time: "Time",
+      notes: "Notes",
+      none: "None",
+      manage: "Manage Appointments",
+      button: "Open Dashboard",
+    },
+    es: {
+      subject: "Nueva Cita Reservada",
+      title: "💈 Nueva Cita",
+      intro: "Tienes una nueva cita.",
+      customerDetails: "Detalles del Cliente",
+      name: "Nombre",
+      phone: "Teléfono",
+      email: "Correo",
+      apptDetails: "Detalles de la Cita",
+      service: "Servicio",
+      date: "Fecha",
+      time: "Hora",
+      notes: "Notas",
+      none: "Ninguna",
+      manage: "Gestionar Citas",
+      button: "Abrir Panel",
+    },
+  }[lang];
+
   try {
     await resend.emails.send({
       from: "info@flowpaydr.com",
       to: barber_email,
-      subject: "New Appointment Booked",
+      subject: tr.subject,
       html: `
-        <h2>💈 New Appointment</h2>
-        <p>You have a new appointment booked.</p>
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
+        
+        <h2 style="text-align:center;">${tr.title}</h2>
+        <p style="text-align:center;">${tr.intro}</p>
 
-        <h3>Customer Details</h3>
-        <p><strong>Name:</strong> ${customer_name}</p>
-        <p><strong>Phone:</strong> ${customer_phone}</p>
-        <p><strong>Email:</strong> ${customer_email}</p>
+        <h3>${tr.customerDetails}</h3>
+        <p><strong>${tr.name}:</strong> ${customer_name}</p>
+        <p><strong>${tr.phone}:</strong> ${customer_phone}</p>
+        <p><strong>${tr.email}:</strong> ${customer_email}</p>
 
-        <h3>Appointment Details</h3>
-        <p><strong>Service:</strong> ${service}</p>
-        <p><strong>Date:</strong> ${date}</p>
-        <p><strong>Time:</strong> ${time}</p>
-        <p><strong>Notes:</strong> ${notes || "None"}</p>
+        <h3>${tr.apptDetails}</h3>
+        <p><strong>${tr.service}:</strong> ${service}</p>
+        <p><strong>${tr.date}:</strong> ${date}</p>
+        <p><strong>${tr.time}:</strong> ${time}</p>
+        <p><strong>${tr.notes}:</strong> ${notes || tr.none}</p>
 
-        <h3>Manage Appointments</h3>
-        <p><a href="${dashboard_link}">${dashboard_link}</a></p>
+        <div style="text-align:center; margin-top: 25px;">
+          <a href="${dashboard_link}" 
+            style="background:#2563eb; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:16px;">
+            ${tr.button}
+          </a>
+        </div>
 
-        <hr>
-        <p><strong>FlowPayDR</strong><br>info@flowpaydr.com</p>
-      `
+        <p style="margin-top:30px; font-size:12px; text-align:center; color:#666;">
+          FlowPayDR • info@flowpaydr.com
+        </p>
+      </div>
+      `,
     });
 
     return NextResponse.json({ success: true });

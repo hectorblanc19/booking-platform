@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+// Service translation dictionary
+const serviceNames = {
+  "Haircut": { es: "Corte", en: "Haircut" },
+  "Beard": { es: "Barba", en: "Beard" },
+  "Haircut + Beard": { es: "Corte + Barba", en: "Haircut + Beard" },
+  "Fade": { es: "Fade", en: "Fade" },
+  "Other": { es: "Otro", en: "Other" },
+};
+
 // Bilingual dictionary
 const t = {
   en: {
@@ -18,7 +27,7 @@ const t = {
     status: "Status",
     notes: "Notes",
     none: "None",
-    cancel: "Cancel Appointment",
+    cancel: "Cancel",
     reschedule: "Reschedule",
     lang: "Language",
   },
@@ -34,7 +43,7 @@ const t = {
     status: "Estado",
     notes: "Notas",
     none: "Ninguna",
-    cancel: "Cancelar Cita",
+    cancel: "Cancelar",
     reschedule: "Reprogramar",
     lang: "Idioma",
   },
@@ -44,7 +53,7 @@ export default function CustomerSecretPage() {
   const { secret } = useParams();
   const router = useRouter();
 
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState("es");
   const tr = t[lang];
 
   const [appointment, setAppointment] = useState(null);
@@ -56,13 +65,13 @@ export default function CustomerSecretPage() {
   }, []);
 
   async function loadAppointment() {
-    const { data: appt, error } = await supabase
+    const { data: appt } = await supabase
       .from("appointments")
       .select("*")
       .eq("secret_link", secret)
       .single();
 
-    if (error || !appt) return;
+    if (!appt) return;
 
     setAppointment(appt);
 
@@ -89,8 +98,24 @@ export default function CustomerSecretPage() {
       .update({ status: "cancelled" })
       .eq("id", appointment.id);
 
-    alert(lang === "en" ? "Appointment cancelled" : "Cita cancelada");
+    alert(lang === "es" ? "Cita cancelada" : "Appointment cancelled");
     loadAppointment();
+  }
+
+  // ⭐ WhatsApp Share Function
+  function shareWhatsApp() {
+    const message =
+      `${lang === "es" ? "¡Mi cita está confirmada!" : "My appointment is confirmed!"}\n\n` +
+      `${tr.service}: ${serviceNames[appointment.service]?.[lang] || appointment.service}\n` +
+      `${tr.barber}: ${barber?.name}\n` +
+      `${tr.business}: ${business?.name}\n` +
+      `${tr.date}: ${appointment.date}\n` +
+      `${tr.time}: ${appointment.time}\n\n` +
+      `${lang === "es" ? "Ver detalles:" : "View details:"} ` +
+      `${window.location.href}`;
+
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
   }
 
   if (!appointment) return <p className="p-6">Loading...</p>;
@@ -117,68 +142,101 @@ export default function CustomerSecretPage() {
 
       <h1 className="text-2xl font-bold mb-4">{tr.title}</h1>
 
-      <div className="border p-4 rounded-xl shadow-sm bg-white">
+      {/* ⭐ SUCCESS MESSAGE */}
+      <div className="text-center mb-6">
+        <div className="text-green-600 text-5xl mb-2">✔</div>
+
+        <h2 className="text-2xl font-bold">
+          {lang === "es" ? "¡Cita Confirmada!" : "Appointment Confirmed!"}
+        </h2>
+
+        <p className="text-gray-600 mt-1">
+          {lang === "es"
+            ? "Tu cita ha sido registrada exitosamente."
+            : "Your appointment has been successfully booked."}
+        </p>
+
+        <button
+          className="mt-4 bg-black text-white px-5 py-3 rounded-xl w-full"
+          onClick={() => (window.location.href = "/")}
+        >
+          {lang === "es" ? "Volver al Inicio" : "Back Home"}
+        </button>
+
+        <button
+          className="mt-3 bg-green-600 text-white px-5 py-3 rounded-xl w-full"
+          onClick={shareWhatsApp}
+        >
+          {lang === "es" ? "Compartir por WhatsApp" : "Share via WhatsApp"}
+        </button>
+      </div>
+
+      {/* CARD */}
+      <div className="p-5 border rounded-xl bg-white shadow-md">
+
+        {/* SERVICE */}
         <p className="text-lg font-semibold mb-2">
-          {serviceEmoji(appointment.service)} {appointment.service}
+          {serviceNames[appointment.service]?.[lang] || appointment.service}
         </p>
 
-        <p><strong>{tr.barber}:</strong> {barber?.name}</p>
-        <p><strong>{tr.business}:</strong> {business?.name}</p>
+        {/* BARBER + BUSINESS */}
+        <p className="text-sm"><strong>{tr.barber}:</strong> {barber?.name}</p>
+        <p className="text-sm"><strong>{tr.business}:</strong> {business?.name}</p>
 
-        <p><strong>{tr.date}:</strong> {appointment.date}</p>
-        <p><strong>{tr.time}:</strong> {appointment.time}</p>
+        {/* DATE + TIME */}
+        <p className="text-sm mt-2"><strong>{tr.date}:</strong> {appointment.date}</p>
+        <p className="text-sm"><strong>{tr.time}:</strong> {appointment.time}</p>
 
-        <p><strong>{tr.name}:</strong> {appointment.customer_name}</p>
-        <p><strong>{tr.phone}:</strong> {appointment.customer_phone}</p>
-        <p><strong>{tr.email}:</strong> {appointment.customer_email}</p>
+        {/* CUSTOMER INFO */}
+        <p className="text-sm mt-2"><strong>{tr.name}:</strong> {appointment.customer_name}</p>
+        <p className="text-sm"><strong>{tr.phone}:</strong> {appointment.customer_phone}</p>
+        <p className="text-sm"><strong>{tr.email}:</strong> {appointment.customer_email}</p>
 
-        <p className="mt-2">
-          <strong>{tr.status}:</strong>{" "}
-          <span className={`px-3 py-1 rounded-lg text-white ${statusColor(appointment.status)}`}>
-            {appointment.status}
-          </span>
-        </p>
+        {/* STATUS WITH ICON */}
+        <div className="flex items-center gap-2 mt-3">
+          {appointment.status === "confirmed" && (
+            <>
+              <span className="text-green-600 text-lg">✔</span>
+              <span className="font-semibold text-green-700 text-sm">
+                {lang === "es" ? "Confirmado" : "Confirmed"}
+              </span>
+            </>
+          )}
 
-        <p className="mt-2">
+          {appointment.status === "cancelled" && (
+            <>
+              <span className="text-red-600 text-lg">✖</span>
+              <span className="font-semibold text-red-700 text-sm">
+                {lang === "es" ? "Cancelado" : "Cancelled"}
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* NOTES */}
+        <p className="text-sm mt-3">
           <strong>{tr.notes}:</strong> {appointment.notes || tr.none}
         </p>
       </div>
 
-      <button
-        className="mt-4 w-full bg-red-600 text-white py-3 rounded-xl"
-        onClick={cancelAppointment}
-      >
-        {tr.cancel}
-      </button>
+      {/* BUTTONS */}
+      {appointment.status !== "cancelled" && (
+        <>
+          <button
+            className="mt-4 w-full bg-red-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+            onClick={cancelAppointment}
+          >
+            ❌ {tr.cancel}
+          </button>
 
-      <button
-        className="mt-3 w-full bg-blue-600 text-white py-3 rounded-xl"
-        onClick={() => router.push(`/customer/reschedule?secret=${secret}`)}
-      >
-        {tr.reschedule}
-      </button>
+          <button
+            className="mt-3 w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
+            onClick={() => router.push(`/customer/reschedule?secret=${secret}`)}
+          >
+            🔄 {tr.reschedule}
+          </button>
+        </>
+      )}
     </div>
   );
-}
-
-function statusColor(status) {
-  switch (status) {
-    case "confirmed":
-      return "bg-green-600";
-    case "cancelled":
-      return "bg-red-600";
-    default:
-      return "bg-gray-500";
-  }
-}
-
-function serviceEmoji(service) {
-  if (!service) return "💈";
-  service = service.toLowerCase();
-
-  if (service.includes("hair")) return "💇‍♂️";
-  if (service.includes("beard")) return "🧔";
-  if (service.includes("fade")) return "✂️";
-
-  return "💈";
 }

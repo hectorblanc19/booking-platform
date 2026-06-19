@@ -29,28 +29,33 @@ export async function POST(req) {
   } = body;
 
   const customer_id = generateCustomerId();
+  const secret_link = crypto.randomUUID();
+
   const dashboardLink = `https://booking-platform.vercel.app/customer/${customer_id}`;
 
+  // ⭐ FIXED: correct Supabase column names
   const { data, error } = await supabase
     .from("appointments")
     .insert({
-      business,
-      barber,
+      business_id: business,
+      barber_id: barber,
       service,
       date,
       time,
+      duration: 60,
       customer_name,
       customer_email,
       customer_phone,
       notes,
       customer_id,
-      status: "confirmed"   // ⭐ REQUIRED FOR BADGE
+      status: "confirmed",
+      secret_link
     })
     .select()
     .single();
 
   if (error) {
-    console.log(error);
+    console.log("Supabase error:", error);
     return NextResponse.json({ error: "Failed to create appointment" });
   }
 

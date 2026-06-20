@@ -35,7 +35,8 @@ export default function WelcomePage() {
     },
   };
 
-  const tr = t[lang];
+  // ✅ FIXED FOR JSX — NO TYPESCRIPT SYNTAX
+  const tr = t[lang] ?? t["es"];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -68,7 +69,7 @@ export default function WelcomePage() {
             </button>
           </Link>
 
-          <Link href="/admin">
+          <Link href="/barber/login">
             <button className="bg-gray-200 px-6 py-3 rounded-xl text-lg">
               {tr.login}
             </button>

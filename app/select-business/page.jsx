@@ -69,7 +69,8 @@ export default function WelcomePage() {
             </button>
           </Link>
 
-          <Link href="/admin">
+          {/* ⭐ FIXED: Now goes to /barber/login instead of /admin */}
+          <Link href="/barber/login">
             <button className="bg-gray-200 px-6 py-3 rounded-xl text-lg shadow">
               {tr.login}
             </button>

@@ -184,10 +184,10 @@ async function loadAvailableTimes(selectedDate) {
       }
     }
 
-    const secret = crypto.randomUUID();
-// ⭐ ADD LANG HERE
+  const secret = crypto.randomUUID();
+
 const { error } = await supabase.from("appointments").insert({
-  business_id: barber.business_id,   // ✅ CORRECT
+  business_id: barber.business_id,
   barber_id: barberId,
   service,
   date,
@@ -199,7 +199,7 @@ const { error } = await supabase.from("appointments").insert({
   notes,
   status: "confirmed",
   lang,
-  secret_link: secret,
+  secret_link: `https://flowpaydr.com/customer/${secret}`,  // ⭐ FIXED URL
 });
 
 if (error) {

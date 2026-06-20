@@ -65,32 +65,35 @@ export default function CustomerSecretPage() {
   }, []);
 
   async function loadAppointment() {
-    const { data: appt } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("secret_link", secret)
-      .single();
+  // Build the full URL that matches what is stored in Supabase
+  const fullLink = `https://flowpaydr.com/customer/${secret}`;
 
-    if (!appt) return;
+  const { data: appt } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("secret_link", fullLink)
+    .single();
 
-    setAppointment(appt);
+  if (!appt) return;
 
-    const { data: barberData } = await supabase
-      .from("barbers")
-      .select("*")
-      .eq("id", appt.barber_id)
-      .single();
+  setAppointment(appt);
 
-    setBarber(barberData);
+  const { data: barberData } = await supabase
+    .from("barbers")
+    .select("*")
+    .eq("id", appt.barber_id)
+    .single();
 
-    const { data: businessData } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("id", appt.business_id)
-      .single();
+  setBarber(barberData);
 
-    setBusiness(businessData);
-  }
+  const { data: businessData } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("id", appt.business_id)
+    .single();
+
+  setBusiness(businessData);
+}
 
   async function cancelAppointment() {
     await supabase

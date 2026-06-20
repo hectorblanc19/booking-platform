@@ -219,7 +219,7 @@ await fetch("/api/send-confirmation", {
     business_name: barber.businesses?.name,
     date,
     time: formattedTime,
-    secret_link: `https://booking-platform.vercel.app/customer/${secret}`,
+    secret_link: `https://flowpaydr.com/customer/${secret}`,   // ⭐ FIXED
     lang,
   }),
 });
@@ -238,7 +238,7 @@ await fetch("/api/send-barber-notification", {
     date,
     time: formattedTime,
     notes,
-    dashboard_link: `https://booking-platform.vercel.app/barber/${barberId}`,
+    dashboard_link: `https://flowpaydr.com/barber/${barberId}`,   // ⭐ FIXED
     lang,
   }),
 });

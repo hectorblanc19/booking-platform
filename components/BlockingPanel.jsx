@@ -53,16 +53,25 @@ export default function BlockingPanel({ barber, lang }) {
   const [multiDay, setMultiDay] = useState(false);
   const [endDate, setEndDate] = useState("");
 
-  // Load existing blocks
+  // Load existing blocks + realtime
   useEffect(() => {
     loadBlocks();
 
-    // Realtime updates
     const channel = supabase
       .channel("blocks")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "barber_blocks" },
+        { event: "INSERT", schema: "public", table: "barber_blocks" },
+        () => loadBlocks()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "barber_blocks" },
+        () => loadBlocks()
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "barber_blocks" },
         () => loadBlocks()
       )
       .subscribe();
@@ -101,11 +110,7 @@ export default function BlockingPanel({ barber, lang }) {
       const endDateObj = new Date(endDate);
 
       const days = [];
-      for (
-        let d = new Date(startDateObj);
-        d <= endDateObj;
-        d.setDate(d.getDate() + 1)
-      ) {
+      for (let d = new Date(startDateObj); d <= endDateObj; d.setDate(d.getDate() + 1)) {
         days.push(new Date(d));
       }
 
@@ -133,10 +138,22 @@ export default function BlockingPanel({ barber, lang }) {
     });
   }
 
+  // ⭐ UPDATED deleteBlock()
   async function deleteBlock(id) {
-    await supabase.from("barber_blocks").delete().eq("id", id);
+    const { error } = await supabase
+      .from("barber_blocks")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      alert("Error deleting block / Error eliminando el bloqueo");
+    } else {
+      alert("Block removed / Bloque eliminado");
+      loadBlocks(); // refresh instantly
+    }
   }
 
+  // ⭐ RETURN JSX
   return (
     <div className="mt-10 p-4 border rounded-lg bg-white shadow">
       <h2 className="text-xl font-bold mb-4">{tr.blockedTimes}</h2>
@@ -228,15 +245,14 @@ export default function BlockingPanel({ barber, lang }) {
           >
             <div>
               <p className="font-bold">{b.date}</p>
-              <p>
-                {b.start_time} → {b.end_time}
-              </p>
+              <p>{b.start_time} → {b.end_time}</p>
               {b.reason && <p className="text-sm text-gray-500">{b.reason}</p>}
             </div>
 
+            {/* ⭐ DELETE BUTTON — LANGUAGE SWITCHES AUTOMATICALLY */}
             <button
               onClick={() => deleteBlock(b.id)}
-              className="text-red-500 font-bold"
+              className="text-red-600 underline cursor-pointer font-semibold"
             >
               {tr.delete}
             </button>

@@ -25,6 +25,7 @@ const t = {
     error: "Error creating appointment",
     slotTaken: "This time is already booked. Please choose another time.",
     selectTime: "Select a time",
+    blockedDay: "The barber has blocked this day and is not available.",
   },
   es: {
     title: "Reservar con",
@@ -45,6 +46,7 @@ const t = {
     error: "Error creando la cita",
     slotTaken: "Esta hora ya está reservada. Por favor elija otra hora.",
     selectTime: "Seleccione una hora",
+    blockedDay: "El barbero ha bloqueado este día y no está disponible.",
   },
 };
 
@@ -319,6 +321,14 @@ return (
     }}
   />
 </div>
+
+{/* ⭐ BLOCKED DAY MESSAGE (LANG‑AWARE) */}
+{date && availableTimes.length === 0 && (
+  <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-xl text-red-700">
+    <p>{tr.blockedDay}</p>
+  </div>
+)}
+
 
     {/* TIME */}
     <div className="mt-4">

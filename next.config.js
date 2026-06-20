@@ -1,9 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  skipTrailingSlashRedirect: true,
   experimental: {
-    serverActions: true,
+    turbo: {
+      rules: {
+        "*.css": {
+          loaders: ["postcss-loader"],
+        },
+      },
+    },
   },
 };
 

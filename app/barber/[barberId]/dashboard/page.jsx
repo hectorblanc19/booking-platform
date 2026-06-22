@@ -97,7 +97,6 @@ export default function BarberDashboard() {
 
     const fileName = `${barberId}-${Date.now()}.jpg`;
 
-    // Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from("barber-photos")
       .upload(fileName, file, {
@@ -110,20 +109,17 @@ export default function BarberDashboard() {
       return;
     }
 
-    // Get public URL
     const { data: urlData } = supabase.storage
       .from("barber-photos")
       .getPublicUrl(fileName);
 
     const publicUrl = urlData.publicUrl;
 
-    // Save URL to database
     await supabase
       .from("barbers")
       .update({ photo_url: publicUrl })
       .eq("id", barberId);
 
-    // Refresh UI
     loadBarber();
   }
 
@@ -186,12 +182,12 @@ export default function BarberDashboard() {
   async function cancelAppointment(id) {
     if (!confirm(tr.cancel)) return;
 
-    const { error } = await supabase
+    await supabase
       .from("appointments")
-      .delete()
+      .update({ status: "cancelled" })
       .eq("id", id);
 
-    if (!error) loadAppointments();
+    loadAppointments();
   }
 
   return (
@@ -226,7 +222,7 @@ export default function BarberDashboard() {
           {tr.barber}: {barberData?.name || "..."}
         </h2>
 
-        {/* ⭐ Barber Photo + Upload Button */}
+        {/* Barber Photo */}
         <div className="flex flex-col items-center mb-6">
           <img
             src={barberData?.photo_url || "/default-barber.png"}
@@ -293,12 +289,22 @@ export default function BarberDashboard() {
                   <strong>{tr.time}:</strong> {appt.time}
                 </p>
 
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-green-600 text-lg">✔</span>
-                  <span className="font-semibold text-green-700 text-sm">
-                    {lang === "es" ? "Confirmado" : "Confirmed"}
-                  </span>
-                </div>
+                {/* STATUS BADGE */}
+                {appt.status === "confirmed" ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-green-600 text-lg">✔</span>
+                    <span className="font-semibold text-green-700 text-sm">
+                      {lang === "es" ? "Confirmado" : "Confirmed"}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-red-600 text-lg">✖</span>
+                    <span className="font-semibold text-red-700 text-sm">
+                      {lang === "es" ? "Cancelado" : "Cancelled"}
+                    </span>
+                  </div>
+                )}
 
                 <p className="mt-2 text-sm">
                   <strong>{tr.service}:</strong>{" "}
@@ -312,25 +318,28 @@ export default function BarberDashboard() {
                 <p className="text-sm"><strong>{tr.email}:</strong> {appt.customer_email || "N/A"}</p>
                 <p className="text-sm"><strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}</p>
 
-                <div className="mt-4 flex gap-2">
+                {/* ACTION BUTTONS */}
+                {appt.status === "confirmed" && (
+                  <div className="mt-4 flex gap-2">
 
-                  <button
-                    className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold"
-                    onClick={() => cancelAppointment(appt.id)}
-                  >
-                    ❌ {tr.cancel}
-                  </button>
+                    <button
+                      className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold"
+                      onClick={() => cancelAppointment(appt.id)}
+                    >
+                      ❌ {tr.cancel}
+                    </button>
 
-                  <button
-                    className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold"
-                    onClick={() =>
-                      (window.location.href = `/barber/${barberId}/reschedule/${appt.id}`)
-                    }
-                  >
-                    🔄 {tr.reschedule}
-                  </button>
+                    <button
+                      className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold"
+                      onClick={() =>
+                        (window.location.href = `/barber/${barberId}/reschedule/${appt.id}`)
+                      }
+                    >
+                      🔄 {tr.reschedule}
+                    </button>
 
-                </div>
+                  </div>
+                )}
 
               </div>
             ))}

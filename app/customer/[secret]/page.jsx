@@ -65,35 +65,37 @@ export default function CustomerSecretPage() {
   }, []);
 
   async function loadAppointment() {
-  // Build the full URL that matches what is stored in Supabase
-  const fullLink = `https://flowpaydr.com/customer/${secret}`;
+    // ✔ FIXED: Search by UUID only
+    const { data: appt } = await supabase
+      .from("appointments")
+      .select("*")
+      .eq("secret_link", secret)
+      .single();
 
-  const { data: appt } = await supabase
-    .from("appointments")
-    .select("*")
-    .eq("secret_link", fullLink)
-    .single();
+    // ❗ FIX: Handle not found
+    if (!appt) {
+      setAppointment("not-found");
+      return;
+    }
 
-  if (!appt) return;
+    setAppointment(appt);
 
-  setAppointment(appt);
+    const { data: barberData } = await supabase
+      .from("barbers")
+      .select("*")
+      .eq("id", appt.barber_id)
+      .single();
 
-  const { data: barberData } = await supabase
-    .from("barbers")
-    .select("*")
-    .eq("id", appt.barber_id)
-    .single();
+    setBarber(barberData);
 
-  setBarber(barberData);
+    const { data: businessData } = await supabase
+      .from("businesses")
+      .select("*")
+      .eq("id", appt.business_id)
+      .single();
 
-  const { data: businessData } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("id", appt.business_id)
-    .single();
-
-  setBusiness(businessData);
-}
+    setBusiness(businessData);
+  }
 
   async function cancelAppointment() {
     await supabase
@@ -105,7 +107,6 @@ export default function CustomerSecretPage() {
     loadAppointment();
   }
 
-  // ⭐ WhatsApp Share Function
   function shareWhatsApp() {
     const message =
       `${lang === "es" ? "¡Mi cita está confirmada!" : "My appointment is confirmed!"}\n\n` +
@@ -119,6 +120,15 @@ export default function CustomerSecretPage() {
 
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
+  }
+
+  // ⭐ FIX: Handle not found
+  if (appointment === "not-found") {
+    return (
+      <p className="p-6 text-red-600 text-center text-lg">
+        {lang === "es" ? "Cita no encontrada." : "Appointment not found."}
+      </p>
+    );
   }
 
   if (!appointment) return <p className="p-6">Loading...</p>;
@@ -145,19 +155,23 @@ export default function CustomerSecretPage() {
 
       <h1 className="text-2xl font-bold mb-4">{tr.title}</h1>
 
-      {/* ⭐ SUCCESS MESSAGE */}
+      {/* STATUS MESSAGE */}
       <div className="text-center mb-6">
-        <div className="text-green-600 text-5xl mb-2">✔</div>
-
-        <h2 className="text-2xl font-bold">
-          {lang === "es" ? "¡Cita Confirmada!" : "Appointment Confirmed!"}
-        </h2>
-
-        <p className="text-gray-600 mt-1">
-          {lang === "es"
-            ? "Tu cita ha sido registrada exitosamente."
-            : "Your appointment has been successfully booked."}
-        </p>
+        {appointment.status === "confirmed" ? (
+          <>
+            <div className="text-green-600 text-5xl mb-2">✔</div>
+            <h2 className="text-2xl font-bold">
+              {lang === "es" ? "¡Cita Confirmada!" : "Appointment Confirmed!"}
+            </h2>
+          </>
+        ) : (
+          <>
+            <div className="text-red-600 text-5xl mb-2">✖</div>
+            <h2 className="text-2xl font-bold">
+              {lang === "es" ? "Cita Cancelada" : "Appointment Cancelled"}
+            </h2>
+          </>
+        )}
 
         <button
           className="mt-4 bg-black text-white px-5 py-3 rounded-xl w-full"
@@ -166,47 +180,43 @@ export default function CustomerSecretPage() {
           {lang === "es" ? "Volver al Inicio" : "Back Home"}
         </button>
 
-        <button
-          className="mt-3 bg-green-600 text-white px-5 py-3 rounded-xl w-full"
-          onClick={shareWhatsApp}
-        >
-          {lang === "es" ? "Compartir por WhatsApp" : "Share via WhatsApp"}
-        </button>
+        {appointment.status === "confirmed" && (
+          <button
+            className="mt-3 bg-green-600 text-white px-5 py-3 rounded-xl w-full"
+            onClick={shareWhatsApp}
+          >
+            {lang === "es" ? "Compartir por WhatsApp" : "Share via WhatsApp"}
+          </button>
+        )}
       </div>
 
       {/* CARD */}
       <div className="p-5 border rounded-xl bg-white shadow-md">
 
-        {/* SERVICE */}
         <p className="text-lg font-semibold mb-2">
           {serviceNames[appointment.service]?.[lang] || appointment.service}
         </p>
 
-        {/* BARBER + BUSINESS */}
         <p className="text-sm"><strong>{tr.barber}:</strong> {barber?.name}</p>
         <p className="text-sm"><strong>{tr.business}:</strong> {business?.name}</p>
 
-        {/* DATE + TIME */}
         <p className="text-sm mt-2"><strong>{tr.date}:</strong> {appointment.date}</p>
         <p className="text-sm"><strong>{tr.time}:</strong> {appointment.time}</p>
 
-        {/* CUSTOMER INFO */}
         <p className="text-sm mt-2"><strong>{tr.name}:</strong> {appointment.customer_name}</p>
         <p className="text-sm"><strong>{tr.phone}:</strong> {appointment.customer_phone}</p>
         <p className="text-sm"><strong>{tr.email}:</strong> {appointment.customer_email}</p>
 
-        {/* STATUS WITH ICON */}
+        {/* STATUS */}
         <div className="flex items-center gap-2 mt-3">
-          {appointment.status === "confirmed" && (
+          {appointment.status === "confirmed" ? (
             <>
               <span className="text-green-600 text-lg">✔</span>
               <span className="font-semibold text-green-700 text-sm">
                 {lang === "es" ? "Confirmado" : "Confirmed"}
               </span>
             </>
-          )}
-
-          {appointment.status === "cancelled" && (
+          ) : (
             <>
               <span className="text-red-600 text-lg">✖</span>
               <span className="font-semibold text-red-700 text-sm">
@@ -216,14 +226,13 @@ export default function CustomerSecretPage() {
           )}
         </div>
 
-        {/* NOTES */}
         <p className="text-sm mt-3">
           <strong>{tr.notes}:</strong> {appointment.notes || tr.none}
         </p>
       </div>
 
       {/* BUTTONS */}
-      {appointment.status !== "cancelled" && (
+      {appointment.status === "confirmed" && (
         <>
           <button
             className="mt-4 w-full bg-red-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"

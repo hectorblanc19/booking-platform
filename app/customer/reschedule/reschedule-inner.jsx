@@ -4,11 +4,42 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+// Bilingual dictionary
+const t = {
+  en: {
+    title: "Reschedule Appointment",
+    currentDate: "Current Date",
+    currentTime: "Current Time",
+    newDate: "New Date",
+    newTime: "New Time",
+    save: "Save Changes",
+    back: "Back",
+    selectDateTime: "Please select a new date and time",
+    loading: "Loading...",
+    notFound: "Appointment not found.",
+  },
+  es: {
+    title: "Reprogramar Cita",
+    currentDate: "Fecha Actual",
+    currentTime: "Hora Actual",
+    newDate: "Nueva Fecha",
+    newTime: "Nueva Hora",
+    save: "Guardar Cambios",
+    back: "Atrás",
+    selectDateTime: "Seleccione una nueva fecha y hora",
+    loading: "Cargando...",
+    notFound: "Cita no encontrada.",
+  },
+};
+
 export default function RescheduleInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   const secret = searchParams.get("secret");
+
+  const [lang, setLang] = useState("es");
+  const tr = t[lang];
 
   const [appointment, setAppointment] = useState(null);
   const [newDate, setNewDate] = useState("");
@@ -20,28 +51,30 @@ export default function RescheduleInner() {
   }, []);
 
   async function loadAppointment() {
-    const { data, error } = await supabase
+    const { data: appt } = await supabase
       .from("appointments")
       .select("*")
       .eq("secret_link", secret)
       .single();
 
-    if (!error) {
-      setAppointment(data);
+    if (!appt) {
+      setAppointment("not-found");
+      return;
     }
 
+    setAppointment(appt);
     setLoading(false);
   }
 
   async function saveChanges() {
     if (!newDate || !newTime) {
-      alert("Please select a new date and time");
+      alert(tr.selectDateTime);
       return;
     }
 
     const formattedTime = newTime + ":00";
 
-    const { error } = await supabase
+    await supabase
       .from("appointments")
       .update({
         date: newDate,
@@ -50,28 +83,44 @@ export default function RescheduleInner() {
       })
       .eq("secret_link", secret);
 
-    if (error) {
-      alert("Error updating appointment");
-    } else {
-      alert("Appointment rescheduled");
-      router.push(`/customer/${secret}`);
-    }
+    router.push(`/customer/${secret}`);
   }
 
-  if (loading) return <p className="p-6">Loading...</p>;
-  if (!appointment) return <p className="p-6">Appointment not found.</p>;
+  if (appointment === "not-found") {
+    return <p className="p-6 text-red-600">{tr.notFound}</p>;
+  }
+
+  if (loading) return <p className="p-6">{tr.loading}</p>;
 
   return (
     <div className="max-w-xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Reschedule Appointment</h1>
+
+      {/* Language Toggle */}
+      <div className="flex justify-end gap-2 mb-4">
+        <span className="text-sm">Idioma:</span>
+        <button
+          className={`px-2 py-1 rounded ${lang === "es" ? "bg-black text-white" : "bg-gray-200"}`}
+          onClick={() => setLang("es")}
+        >
+          ES
+        </button>
+        <button
+          className={`px-2 py-1 rounded ${lang === "en" ? "bg-black text-white" : "bg-gray-200"}`}
+          onClick={() => setLang("en")}
+        >
+          EN
+        </button>
+      </div>
+
+      <h1 className="text-2xl font-bold mb-4">{tr.title}</h1>
 
       <div className="border p-4 rounded-xl bg-white shadow-sm">
-        <p><strong>Current Date:</strong> {appointment.date}</p>
-        <p><strong>Current Time:</strong> {appointment.time}</p>
+        <p><strong>{tr.currentDate}:</strong> {appointment.date}</p>
+        <p><strong>{tr.currentTime}:</strong> {appointment.time}</p>
       </div>
 
       <div className="mt-4">
-        <label className="block mb-1">New Date</label>
+        <label className="block mb-1">{tr.newDate}</label>
         <input
           type="date"
           className="w-full p-3 border rounded-xl"
@@ -80,7 +129,7 @@ export default function RescheduleInner() {
       </div>
 
       <div className="mt-4">
-        <label className="block mb-1">New Time</label>
+        <label className="block mb-1">{tr.newTime}</label>
         <input
           type="time"
           className="w-full p-3 border rounded-xl"
@@ -92,14 +141,14 @@ export default function RescheduleInner() {
         className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl"
         onClick={saveChanges}
       >
-        Save Changes
+        {tr.save}
       </button>
 
       <button
         className="mt-3 w-full bg-gray-300 py-3 rounded-xl"
         onClick={() => router.push(`/customer/${secret}`)}
       >
-        Back
+        {tr.back}
       </button>
     </div>
   );

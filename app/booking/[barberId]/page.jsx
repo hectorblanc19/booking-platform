@@ -151,13 +151,16 @@ export default function BookingPage() {
     const now = new Date();
     const selected = new Date(selectedDate);
 
-    if (selected.toDateString() === now.toDateString()) {
-      const currentHour = now.getHours();
-      slots = slots.filter(slot => {
-        const slotHour = parseInt(slot.split(":")[0]);
-        return slotHour > currentHour;
-      });
-    }
+   // Hide past times if booking for today
+const today = new Date().toISOString().split("T")[0];
+
+if (selectedDate === today) {
+  const now = new Date();
+  const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+  slots = slots.filter(slot => slot >= currentTime);
+}
+
+setAvailableTimes(slots);
 
     setAvailableTimes(slots);
   }

@@ -65,14 +65,12 @@ export default function CustomerSecretPage() {
   }, []);
 
   async function loadAppointment() {
-    // ✔ FIXED: Search by UUID only
     const { data: appt } = await supabase
       .from("appointments")
       .select("*")
       .eq("secret_link", secret)
       .single();
 
-    // ❗ FIX: Handle not found
     if (!appt) {
       setAppointment("not-found");
       return;
@@ -98,6 +96,19 @@ export default function CustomerSecretPage() {
   }
 
   async function cancelAppointment() {
+    // ⭐ BACKEND PROTECTION
+    const now = new Date();
+    const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+
+    if (apptDateTime < now) {
+      alert(
+        lang === "es"
+          ? "La cita ya pasó. No se puede cancelar."
+          : "This appointment has already passed. Cannot cancel."
+      );
+      return;
+    }
+
     await supabase
       .from("appointments")
       .update({ status: "cancelled" })
@@ -122,7 +133,6 @@ export default function CustomerSecretPage() {
     window.open(url, "_blank");
   }
 
-  // ⭐ FIX: Handle not found
   if (appointment === "not-found") {
     return (
       <p className="p-6 text-red-600 text-center text-lg">
@@ -132,6 +142,11 @@ export default function CustomerSecretPage() {
   }
 
   if (!appointment) return <p className="p-6">Loading...</p>;
+
+  // ⭐ DETECT IF APPOINTMENT IS IN THE PAST
+  const now = new Date();
+  const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+  const isPast = apptDateTime < now;
 
   return (
     <div className="max-w-xl mx-auto p-6">
@@ -232,7 +247,7 @@ export default function CustomerSecretPage() {
       </div>
 
       {/* BUTTONS */}
-      {appointment.status === "confirmed" && (
+      {appointment.status === "confirmed" && !isPast && (
         <>
           <button
             className="mt-4 w-full bg-red-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
@@ -248,6 +263,14 @@ export default function CustomerSecretPage() {
             🔄 {tr.reschedule}
           </button>
         </>
+      )}
+
+      {isPast && (
+        <p className="mt-4 text-center text-red-600 font-semibold">
+          {lang === "es"
+            ? "Esta cita ya pasó. No se puede cancelar ni reprogramar."
+            : "This appointment has already passed. You cannot cancel or reschedule."}
+        </p>
       )}
     </div>
   );

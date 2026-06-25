@@ -38,6 +38,9 @@ const t = {
     langLabel: "Idioma",
     es: "ES",
     en: "EN",
+    quickActions: "Acciones Rápidas",
+    blockTime: "Bloquear Horario",
+    editProfile: "Editar Perfil",
   },
   en: {
     title: "Barber Dashboard",
@@ -61,6 +64,9 @@ const t = {
     langLabel: "Language",
     es: "ES",
     en: "EN",
+    quickActions: "Quick Actions",
+    blockTime: "Block Time",
+    editProfile: "Edit Profile",
   },
 };
 
@@ -83,7 +89,7 @@ export default function BarberDashboard() {
   async function loadBarber() {
     const { data } = await supabase
       .from("barbers")
-      .select("*")
+      .select("*, businesses(*)")
       .eq("id", barberId)
       .single();
 
@@ -189,7 +195,6 @@ export default function BarberDashboard() {
 
     loadAppointments();
   }
-
   return (
     <div className="min-h-screen bg-gray-100 py-10">
       <div className="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-6">
@@ -217,20 +222,25 @@ export default function BarberDashboard() {
           </button>
         </div>
 
-        <h1 className="text-3xl font-bold mb-2">{tr.title}</h1>
-        <h2 className="text-xl mb-4">
-          {tr.barber}: {barberData?.name || "..."}
-        </h2>
-
-        {/* Barber Photo */}
-        <div className="flex flex-col items-center mb-6">
+        {/* ⭐ Barber Profile Header */}
+        <div className="flex items-center gap-4 mb-6">
           <img
             src={barberData?.photo_url || "/default-barber.png"}
             alt="Barber Photo"
-            className="w-28 h-28 rounded-full object-cover border shadow"
+            className="w-20 h-20 rounded-full object-cover border shadow"
           />
 
-          <label className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer">
+          <div>
+            <h1 className="text-2xl font-bold">{barberData?.name}</h1>
+            <p className="text-gray-500">
+              {barberData?.businesses?.name || ""}
+            </p>
+          </div>
+        </div>
+
+        {/* Upload Photo Button */}
+        <div className="flex justify-center mb-6">
+          <label className="bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer">
             {tr.uploadPhoto}
             <input
               type="file"
@@ -241,10 +251,32 @@ export default function BarberDashboard() {
           </label>
         </div>
 
+        {/* ⭐ Quick Actions */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-2">{tr.quickActions}</h3>
+
+          <div className="flex gap-3">
+            <button
+              className="flex-1 bg-black text-white py-2 rounded-lg"
+              onClick={() => document.getElementById("block-panel").scrollIntoView()}
+            >
+              {tr.blockTime}
+            </button>
+
+            <button
+              className="flex-1 bg-gray-300 text-black py-2 rounded-lg"
+              onClick={() => (window.location.href = `/barber/${barberId}/edit`)}
+
+            >
+              {tr.editProfile}
+            </button>
+          </div>
+        </div>
+
         {/* FILTER BUTTONS */}
         <div className="flex gap-3 mb-6">
           <button
-            className={`px-4 py-2 rounded ${
+            className={`px-4 py-2 rounded-lg ${
               view === "today" ? "bg-black text-white" : "bg-gray-200"
             }`}
             onClick={() => setView("today")}
@@ -253,7 +285,7 @@ export default function BarberDashboard() {
           </button>
 
           <button
-            className={`px-4 py-2 rounded ${
+            className={`px-4 py-2 rounded-lg ${
               view === "tomorrow" ? "bg-black text-white" : "bg-gray-200"
             }`}
             onClick={() => setView("tomorrow")}
@@ -262,7 +294,7 @@ export default function BarberDashboard() {
           </button>
 
           <button
-            className={`px-4 py-2 rounded ${
+            className={`px-4 py-2 rounded-lg ${
               view === "week" ? "bg-black text-white" : "bg-gray-200"
             }`}
             onClick={() => setView("week")}
@@ -271,6 +303,7 @@ export default function BarberDashboard() {
           </button>
         </div>
 
+        {/* ⭐ Appointment List */}
         {loading ? (
           <p>{tr.loading}</p>
         ) : appointments.length === 0 ? (
@@ -281,32 +314,25 @@ export default function BarberDashboard() {
             {appointments.map((appt) => (
               <div key={appt.id} className="p-4 border rounded-xl bg-white shadow-sm">
 
-                <p className="text-gray-700 text-sm">
+                <div className="flex justify-between items-center">
+                  <p className="text-lg font-semibold">{appt.time}</p>
+
+                  {appt.status === "confirmed" ? (
+                    <span className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                      {lang === "es" ? "Confirmado" : "Confirmed"}
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                      {lang === "es" ? "Cancelado" : "Cancelled"}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-gray-700 text-sm mt-1">
                   <strong>{tr.date}:</strong> {appt.date}
                 </p>
 
                 <p className="text-gray-700 text-sm">
-                  <strong>{tr.time}:</strong> {appt.time}
-                </p>
-
-                {/* STATUS BADGE */}
-                {appt.status === "confirmed" ? (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-green-600 text-lg">✔</span>
-                    <span className="font-semibold text-green-700 text-sm">
-                      {lang === "es" ? "Confirmado" : "Confirmed"}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-red-600 text-lg">✖</span>
-                    <span className="font-semibold text-red-700 text-sm">
-                      {lang === "es" ? "Cancelado" : "Cancelled"}
-                    </span>
-                  </div>
-                )}
-
-                <p className="mt-2 text-sm">
                   <strong>{tr.service}:</strong>{" "}
                   {serviceNames[appt.service]?.[lang] || appt.service}
                 </p>
@@ -346,7 +372,11 @@ export default function BarberDashboard() {
           </div>
         )}
 
-        <BlockingPanel barber={barberId} lang={lang} />
+        {/* ⭐ Blocking Panel */}
+        <div id="block-panel" className="mt-10">
+          <BlockingPanel barber={barberId} lang={lang} />
+        </div>
+
       </div>
     </div>
   );

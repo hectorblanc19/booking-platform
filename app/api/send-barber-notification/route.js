@@ -3,6 +3,15 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// ⭐ SERVICE TRANSLATIONS
+const SERVICE_TRANSLATIONS = {
+  "Haircut": { en: "Haircut", es: "Corte" },
+  "Beard": { en: "Beard", es: "Barba" },
+  "Haircut + Beard": { en: "Haircut + Beard", es: "Corte + Barba" },
+  "Fade": { en: "Fade", es: "Degradado" },
+  "Other": { en: "Other", es: "Otro" }
+};
+
 export async function POST(req) {
   const body = await req.json();
 
@@ -17,14 +26,21 @@ export async function POST(req) {
     time,
     notes,
     dashboard_link,
-    lang = "en", // ⭐ language from booking page
+    lang = "en",
   } = body;
 
   if (!barber_email) {
     return NextResponse.json({ error: "Missing barber email" });
   }
 
-  // ⭐ TRANSLATIONS
+  // ⭐ Determine language
+  const langCode = lang === "es" ? "es" : "en";
+
+  // ⭐ Translate service
+  const translatedService =
+    SERVICE_TRANSLATIONS[service]?.[langCode] || service;
+
+  // ⭐ TRANSLATIONS FOR THE REST OF THE EMAIL
   const tr = {
     en: {
       subject: "New Appointment Booked",
@@ -60,7 +76,7 @@ export async function POST(req) {
       manage: "Gestionar Citas",
       button: "Abrir Panel",
     },
-  }[lang];
+  }[langCode];
 
   try {
     await resend.emails.send({
@@ -79,7 +95,7 @@ export async function POST(req) {
         <p><strong>${tr.email}:</strong> ${customer_email}</p>
 
         <h3>${tr.apptDetails}</h3>
-        <p><strong>${tr.service}:</strong> ${service}</p>
+        <p><strong>${tr.service}:</strong> ${translatedService}</p>
         <p><strong>${tr.date}:</strong> ${date}</p>
         <p><strong>${tr.time}:</strong> ${time}</p>
         <p><strong>${tr.notes}:</strong> ${notes || tr.none}</p>

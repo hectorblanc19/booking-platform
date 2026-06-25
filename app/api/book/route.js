@@ -33,7 +33,21 @@ export async function POST(req) {
 
   const dashboardLink = `https://booking-platform.vercel.app/customer/${customer_id}`;
 
-  // ⭐ FIXED: correct Supabase column names
+  // ⭐ CHECK AVAILABILITY (ignore canceled)
+  const { data: existing } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("date", date)
+    .eq("time", time)
+    .eq("barber_id", barber)
+    .eq("status", "confirmed")   // ⭐ Only confirmed blocks the slot
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json({ error: "Time slot already taken" });
+  }
+
+  // ⭐ INSERT APPOINTMENT
   const { data, error } = await supabase
     .from("appointments")
     .insert({

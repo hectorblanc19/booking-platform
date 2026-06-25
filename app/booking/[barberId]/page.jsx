@@ -4,6 +4,20 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+// ⭐ Visual Time Slot Component
+function TimeSlot({ time, selected, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(time)}
+      className={`px-4 py-2 rounded-xl border text-center
+        ${selected === time ? "bg-black text-white" : "bg-white text-black"}
+      `}
+    >
+      {time}
+    </button>
+  );
+}
+
 // Bilingual dictionary
 const t = {
   en: {
@@ -148,22 +162,17 @@ export default function BookingPage() {
       });
     }
 
-    const now = new Date();
-    const selected = new Date(selectedDate);
+    const today = new Date().toISOString().split("T")[0];
 
-   // Hide past times if booking for today
-const today = new Date().toISOString().split("T")[0];
-
-if (selectedDate === today) {
-  const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
-  slots = slots.filter(slot => slot >= currentTime);
-}
-
-setAvailableTimes(slots);
+    if (selectedDate === today) {
+      const now = new Date();
+      const currentTime = now.toTimeString().slice(0, 5);
+      slots = slots.filter(slot => slot >= currentTime);
+    }
 
     setAvailableTimes(slots);
   }
+
   async function createAppointment() {
     if (!service || !date || !time || !customerName || !customerPhone || !customerEmail) {
       alert(tr.fillAll);
@@ -210,7 +219,7 @@ setAvailableTimes(slots);
       notes,
       status: "confirmed",
       lang,
-      secret_link: secret,   // ✔ FIXED
+      secret_link: secret,
     });
 
     if (error) {
@@ -218,7 +227,23 @@ setAvailableTimes(slots);
       return;
     }
 
-    // CUSTOMER EMAIL — send full URL
+    // ⭐ Save identity for push notifications (customer)
+    localStorage.setItem("flowpay_role", "customer");
+    localStorage.setItem("flowpay_user_id", secret);
+
+    // ⭐ Trigger push notification to the barber
+    await fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: barberId,
+        role: "barber",
+        title: "New Appointment",
+        message: `${customerName} booked a ${service} at ${formattedTime}`,
+      }),
+    });
+
+    // CUSTOMER EMAIL
     await fetch("/api/send-confirmation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -254,16 +279,15 @@ setAvailableTimes(slots);
       }),
     });
 
-    // Redirect customer
     window.location.href = `/customer/${secret}`;
   }
 
   if (loading) return <p className="p-6">Loading...</p>;
   if (!barber) return <p className="p-6">Barber not found.</p>;
-
   return (
     <div className="max-w-xl mx-auto p-6">
 
+      {/* ⭐ Language Switch */}
       <div className="flex justify-end gap-2 mb-4">
         <span className="text-sm">{tr.lang}:</span>
         <button
@@ -280,14 +304,26 @@ setAvailableTimes(slots);
         </button>
       </div>
 
-      <h1 className="text-3xl font-bold mb-4">
-        {tr.title} {barber.name}
-      </h1>
+      {/* ⭐ Barber Header with Photo */}
+      <div className="flex items-center gap-4 mb-6 mt-2">
+        <img
+          src={barber.photo_url || "/default-barber.png"}
+          alt={barber.name}
+          className="w-20 h-20 rounded-full object-cover border shadow"
+        />
 
-      <p className="mb-4 text-gray-600">
-        {tr.business}: {barber.businesses?.name || "Unknown"}
-      </p>
+        <div>
+          <h1 className="text-2xl font-bold">
+            {tr.title} {barber.name}
+          </h1>
 
+          <p className="text-gray-500">
+            {tr.business}: {barber.businesses?.name || "Unknown"}
+          </p>
+        </div>
+      </div>
+
+      {/* ⭐ Service */}
       <div className="mt-4">
         <label className="block mb-1">{tr.service}</label>
 
@@ -316,6 +352,7 @@ setAvailableTimes(slots);
         </div>
       )}
 
+      {/* ⭐ Date */}
       <div className="mt-4">
         <label className="block mb-1">{tr.date}</label>
         <input
@@ -335,21 +372,27 @@ setAvailableTimes(slots);
         </div>
       )}
 
+      {/* ⭐ Visual Time Slots */}
       <div className="mt-4">
         <label className="block mb-1">{tr.time}</label>
 
-        <select
-          className="w-full p-3 border rounded-xl"
-          onChange={(e) => setTime(e.target.value)}
-        >
-          <option value="">{tr.selectTime}</option>
-
-          {availableTimes.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+        {availableTimes.length > 0 ? (
+          <div className="grid grid-cols-3 gap-3 mt-2">
+            {availableTimes.map((t) => (
+              <TimeSlot
+                key={t}
+                time={t}
+                selected={time}
+                onSelect={setTime}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500">{tr.selectTime}</p>
+        )}
       </div>
 
+      {/* ⭐ Customer Info */}
       <div className="mt-4">
         <label className="block mb-1">{tr.name}</label>
         <input
@@ -387,6 +430,7 @@ setAvailableTimes(slots);
         </div>
       )}
 
+      {/* ⭐ Book Button */}
       <button
         className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl"
         onClick={createAppointment}

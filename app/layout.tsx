@@ -32,8 +32,37 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ("serviceWorker" in navigator) {
-                navigator.serviceWorker.register("/sw.js");
+              if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+                window.addEventListener("load", async () => {
+                  try {
+                    const registration = await navigator.serviceWorker.register("/sw.js");
+
+                    const permission = await Notification.requestPermission();
+                    if (permission !== "granted") return;
+
+                    const subscription = await registration.pushManager.subscribe({
+                      userVisibleOnly: true,
+                      applicationServerKey: "${process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY}"
+                    });
+
+                    const role = localStorage.getItem("flowpay_role");
+                    const userId = localStorage.getItem("flowpay_user_id");
+
+                    if (role && userId) {
+                      await fetch("/api/push/subscribe", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          userId,
+                          role,
+                          subscription
+                        })
+                      });
+                    }
+                  } catch (err) {
+                    console.error("SW registration failed:", err);
+                  }
+                });
               }
             `,
           }}

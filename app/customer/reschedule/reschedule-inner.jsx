@@ -17,6 +17,7 @@ const t = {
     selectDateTime: "Please select a new date and time",
     loading: "Loading...",
     notFound: "Appointment not found.",
+    past: "This appointment has already passed. You cannot reschedule.",
   },
   es: {
     title: "Reprogramar Cita",
@@ -29,6 +30,7 @@ const t = {
     selectDateTime: "Seleccione una nueva fecha y hora",
     loading: "Cargando...",
     notFound: "Cita no encontrada.",
+    past: "Esta cita ya pasó. No se puede reprogramar.",
   },
 };
 
@@ -72,6 +74,15 @@ export default function RescheduleInner() {
       return;
     }
 
+    // ⭐ BACKEND PROTECTION: Prevent rescheduling past appointments
+    const now = new Date();
+    const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+
+    if (apptDateTime < now) {
+      alert(tr.past);
+      return;
+    }
+
     const formattedTime = newTime + ":00";
 
     await supabase
@@ -91,6 +102,11 @@ export default function RescheduleInner() {
   }
 
   if (loading) return <p className="p-6">{tr.loading}</p>;
+
+  // ⭐ FRONTEND PROTECTION: Detect if appointment is in the past
+  const now = new Date();
+  const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+  const isPast = apptDateTime < now;
 
   return (
     <div className="max-w-xl mx-auto p-6">
@@ -119,30 +135,37 @@ export default function RescheduleInner() {
         <p><strong>{tr.currentTime}:</strong> {appointment.time}</p>
       </div>
 
-      <div className="mt-4">
-        <label className="block mb-1">{tr.newDate}</label>
-        <input
-          type="date"
-          className="w-full p-3 border rounded-xl"
-          onChange={(e) => setNewDate(e.target.value)}
-        />
-      </div>
+      {/* ⭐ If appointment is in the past, block rescheduling */}
+      {isPast ? (
+        <p className="mt-4 text-red-600 font-semibold text-center">{tr.past}</p>
+      ) : (
+        <>
+          <div className="mt-4">
+            <label className="block mb-1">{tr.newDate}</label>
+            <input
+              type="date"
+              className="w-full p-3 border rounded-xl"
+              onChange={(e) => setNewDate(e.target.value)}
+            />
+          </div>
 
-      <div className="mt-4">
-        <label className="block mb-1">{tr.newTime}</label>
-        <input
-          type="time"
-          className="w-full p-3 border rounded-xl"
-          onChange={(e) => setNewTime(e.target.value)}
-        />
-      </div>
+          <div className="mt-4">
+            <label className="block mb-1">{tr.newTime}</label>
+            <input
+              type="time"
+              className="w-full p-3 border rounded-xl"
+              onChange={(e) => setNewTime(e.target.value)}
+            />
+          </div>
 
-      <button
-        className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl"
-        onClick={saveChanges}
-      >
-        {tr.save}
-      </button>
+          <button
+            className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl"
+            onClick={saveChanges}
+          >
+            {tr.save}
+          </button>
+        </>
+      )}
 
       <button
         className="mt-3 w-full bg-gray-300 py-3 rounded-xl"

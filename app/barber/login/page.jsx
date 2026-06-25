@@ -1,3 +1,4 @@
+// force rebuild 8
 "use client";
 
 import { useState } from "react";
@@ -9,6 +10,28 @@ export default function BarberLoginPage() {
 
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
+
+  async function subscribeToPush(barberId) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      });
+
+      // Save subscription to Supabase
+      await supabase.from("push_tokens").upsert({
+        user_id: barberId,
+        role: "barber",
+        subscription: subscription.toJSON(),
+      });
+
+      console.log("Push subscription saved!");
+    } catch (err) {
+      console.error("Push subscription failed:", err);
+    }
+  }
 
   async function loginBarber() {
     if (!email || !pin) {
@@ -27,6 +50,13 @@ export default function BarberLoginPage() {
       alert("Invalid login");
       return;
     }
+
+    // ⭐ Save identity for push notifications
+    localStorage.setItem("flowpay_role", "barber");
+    localStorage.setItem("flowpay_user_id", barber.id);
+
+    // ⭐ Create push subscription BEFORE redirect
+    await subscribeToPush(barber.id);
 
     // ⭐ Redirect to the REAL dashboard
     router.push(`/barber/${barber.id}/dashboard`);

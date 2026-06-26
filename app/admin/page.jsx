@@ -158,8 +158,17 @@ export default function AdminPanel() {
           </p>
         </div>
       </header>
+<div className="mt-4">
+  <a
+    href="/admin/payments"
+    className="text-blue-600 underline font-semibold"
+  >
+    Go to Payment Dashboard
+  </a>
+</div>
 
-      {/* Notifications */}
+
+     {/* Notifications */}
       {message && (
         <div
           className={`p-3 rounded-lg text-sm ${

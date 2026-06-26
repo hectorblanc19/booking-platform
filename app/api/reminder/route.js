@@ -9,26 +9,28 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ⭐ Normalize time to HH:MM:SS
-function normalize(t) {
-  if (!t) return t;
-  return t.length === 5 ? t + ":00" : t; // "19:00" → "19:00:00"
+// Convert server time to Dominican Republic time
+function getDRTime() {
+  const now = new Date();
+  const drString = now.toLocaleString("en-US", { timeZone: "America/Santo_Domingo" });
+  return new Date(drString);
 }
 
 export async function GET() {
-  console.log("🚀 Email + Push Reminder job started");
+  console.log("🚀 Email + Push Reminder job started (DR Time)");
 
-  const now = new Date();
+  // Use Dominican Republic time
+  const now = getDRTime();
+
   const currentDate = now.toISOString().split("T")[0];
 
-  // Current time normalized
-  const currentTime = normalize(now.toTimeString().slice(0, 5));
+  // FIXED: Always use HH:MM:SS for PostgreSQL TIME type
+  const currentTime = now.toTimeString().slice(0, 8); // HH:MM:SS
 
-  // 2-hour window normalized
   const twoHours = new Date(now.getTime() + 120 * 60000);
-  const twoHoursTime = normalize(twoHours.toTimeString().slice(0, 5));
+  const twoHoursTime = twoHours.toTimeString().slice(0, 8); // HH:MM:SS
 
-  console.log("⏱ Window:", currentTime, "→", twoHoursTime);
+  console.log("⏱ DR Window:", currentTime, "→", twoHoursTime);
 
   const { data: appointments, error } = await supabase
     .from("appointments")
@@ -53,20 +55,42 @@ export async function GET() {
 
   for (const appt of appointments) {
     try {
-      const apptTime = normalize(appt.time);
+      const apptTime = appt.time; // Already HH:MM:SS from DB
 
-      // Bilingual message
-      const msgEN = `Reminder: You have an appointment today at ${apptTime}.`;
-      const msgES = `Recordatorio: Tienes una cita hoy a las ${apptTime}.`;
+      // Fetch barber name
+      const { data: barber } = await supabase
+        .from("barbers")
+        .select("name")
+        .eq("id", appt.barber_id)
+        .single();
 
-      const finalMessage = `${msgEN}\n\n${msgES}`;
+      const barberName = barber?.name || "your barber";
 
-      // UNIQUE SUBJECT (Outlook fix)
-      const subject = `Appointment Reminder (${apptTime}) / Recordatorio de Cita (${apptTime})`;
+      // Determine language
+      const isSpanish = appt.lang?.toUpperCase() === "ES";
 
-      // ⭐ EMAIL REMINDER
+      // Build bilingual message with icons
+      const msgEN = `
+🗓️ Appointment Reminder  
+You have an appointment today at ${apptTime} with barber ${barberName}.  
+💈 Please arrive 5 minutes early.
+`;
+
+      const msgES = `
+🗓️ Recordatorio de Cita  
+Tienes una cita hoy a las ${apptTime} con el barbero ${barberName}.  
+💈 Por favor llega 5 minutos antes.
+`;
+
+      const finalMessage = isSpanish ? msgES : msgEN;
+
+      const subject = isSpanish
+        ? `Recordatorio de Cita (${apptTime})`
+        : `Appointment Reminder (${apptTime})`;
+
+      // EMAIL REMINDER
       await resend.emails.send({
-        from: "FlowPayDR <reminders@flowpay.app>",
+        from: "FlowPayDR <info@flowpaydr.com>",
         to: appt.customer_email,
         subject,
         text: finalMessage,
@@ -74,25 +98,33 @@ export async function GET() {
 
       console.log("📧 Email reminder sent to:", appt.customer_email);
 
-      // ⭐ PUSH NOTIFICATION REMINDER
-      try {
-        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/push/send`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: appt.secret_link,   // customer identifier
-            role: "customer",
-            title: "Appointment Reminder",
-            message: `Your appointment is today at ${apptTime}.`,
-          }),
-        });
+      // PUSH NOTIFICATION REMINDER
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
-        console.log("📲 Push reminder sent to:", appt.customer_email);
-      } catch (pushErr) {
-        console.error("❌ Push Reminder Error:", pushErr);
+      if (!baseUrl) {
+        console.error("❌ Missing NEXT_PUBLIC_BASE_URL");
+      } else {
+        try {
+          await fetch(`${baseUrl}/api/push/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: appt.secret_link,
+              role: "customer",
+              title: isSpanish ? "Recordatorio de Cita" : "Appointment Reminder",
+              message: isSpanish
+                ? `Tienes una cita hoy a las ${apptTime} con el barbero ${barberName}.`
+                : `You have an appointment today at ${apptTime} with barber ${barberName}.`,
+            }),
+          });
+
+          console.log("📲 Push reminder sent to:", appt.customer_email);
+        } catch (pushErr) {
+          console.error("❌ Push Reminder Error:", pushErr);
+        }
       }
 
-      // ⭐ MARK REMINDER AS SENT
+      // MARK REMINDER AS SENT
       await supabase
         .from("appointments")
         .update({ reminder_sent: true })
@@ -108,4 +140,9 @@ export async function GET() {
     message: "Email + Push reminders processed",
     count: appointments.length,
   });
+}
+
+// ⭐ REQUIRED FOR CRON-JOB.ORG (POST SUPPORT)
+export async function POST(req) {
+  return GET();
 }

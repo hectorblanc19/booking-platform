@@ -15,9 +15,17 @@ export default function AdminPanel() {
   const [newBusinessPhone, setNewBusinessPhone] = useState("");
   const [newBusinessAddress, setNewBusinessAddress] = useState("");
 
+  // ⭐ NEW BUSINESS HOURS
+  const [newBusinessOpen, setNewBusinessOpen] = useState("");
+  const [newBusinessClose, setNewBusinessClose] = useState("");
+
   const [newBarberName, setNewBarberName] = useState("");
   const [newBarberEmail, setNewBarberEmail] = useState("");
   const [newBarberBusiness, setNewBarberBusiness] = useState("");
+
+  // ⭐ NEW STATES
+  const [newBarberPhone, setNewBarberPhone] = useState("");
+  const [newBarberWorkingDays, setNewBarberWorkingDays] = useState([]);
 
   // Search / filter
   const [businessSearch, setBusinessSearch] = useState("");
@@ -26,7 +34,7 @@ export default function AdminPanel() {
   const [appointmentBarberFilter, setAppointmentBarberFilter] = useState("");
 
   // Notifications
-  const [message, setMessage] = useState(null); // { type: "success" | "error", text: string }
+  const [message, setMessage] = useState(null);
 
   useEffect(() => {
     loadAll();
@@ -54,7 +62,7 @@ export default function AdminPanel() {
     setTimeout(() => setMessage(null), 3000);
   }
 
-  // ⭐ Add Business
+  // ⭐ Add Business (UPDATED WITH OPEN/CLOSE TIME)
   async function addBusiness() {
     if (!newBusiness) return alert("Enter business name");
 
@@ -63,6 +71,8 @@ export default function AdminPanel() {
       phone: newBusinessPhone,
       address: newBusinessAddress,
       owner_id: null,
+      open_time: newBusinessOpen,
+      close_time: newBusinessClose,
     });
 
     if (error) {
@@ -74,11 +84,14 @@ export default function AdminPanel() {
     setNewBusiness("");
     setNewBusinessPhone("");
     setNewBusinessAddress("");
+    setNewBusinessOpen("");
+    setNewBusinessClose("");
+
     showMessage("success", "Business added");
     loadAll();
   }
 
-  // ⭐ Add Barber
+  // ⭐ UPDATED Add Barber
   async function addBarber() {
     if (!newBarberName || !newBarberEmail || !newBarberBusiness)
       return alert("Fill all fields");
@@ -87,6 +100,8 @@ export default function AdminPanel() {
       name: newBarberName,
       email: newBarberEmail,
       business_id: newBarberBusiness,
+      phone: newBarberPhone,
+      working_days: newBarberWorkingDays,
     });
 
     if (error) {
@@ -98,6 +113,9 @@ export default function AdminPanel() {
     setNewBarberName("");
     setNewBarberEmail("");
     setNewBarberBusiness("");
+    setNewBarberPhone("");
+    setNewBarberWorkingDays([]);
+
     showMessage("success", "Barber added");
     loadAll();
   }
@@ -158,17 +176,17 @@ export default function AdminPanel() {
           </p>
         </div>
       </header>
-<div className="mt-4">
-  <a
-    href="/admin/payments"
-    className="text-blue-600 underline font-semibold"
-  >
-    Go to Payment Dashboard
-  </a>
-</div>
 
+      <div className="mt-4">
+        <a
+          href="/admin/payments"
+          className="text-blue-600 underline font-semibold"
+        >
+          Go to Payment Dashboard
+        </a>
+      </div>
 
-     {/* Notifications */}
+      {/* Notifications */}
       {message && (
         <div
           className={`p-3 rounded-lg text-sm ${
@@ -231,6 +249,26 @@ export default function AdminPanel() {
               onChange={(e) => setNewBusinessAddress(e.target.value)}
             />
           </div>
+
+          {/* ⭐ NEW BUSINESS HOURS INPUTS */}
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              className="border border-gray-300 p-2 rounded-lg text-sm"
+              type="time"
+              value={newBusinessOpen}
+              onChange={(e) => setNewBusinessOpen(e.target.value)}
+              placeholder="Opening Time"
+            />
+
+            <input
+              className="border border-gray-300 p-2 rounded-lg text-sm"
+              type="time"
+              value={newBusinessClose}
+              onChange={(e) => setNewBusinessClose(e.target.value)}
+              placeholder="Closing Time"
+            />
+          </div>
+
           <button
             className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm"
             onClick={addBusiness}
@@ -238,167 +276,231 @@ export default function AdminPanel() {
             Add Business
           </button>
         </div>
+{/* Business List */}
+<div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
+  {filteredBusinesses.map((b) => (
+    <div
+      key={b.id}
+      className="flex justify-between items-center border-b last:border-none py-2"
+    >
+      <div>
+        <p className="font-semibold text-sm">{b.name}</p>
 
-        {/* Business List */}
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
-          {filteredBusinesses.map((b) => (
-            <div
-              key={b.id}
-              className="flex justify-between items-center border-b last:border-none py-2"
-            >
-              <div>
-                <p className="font-semibold text-sm">{b.name}</p>
-                {b.phone && (
-                  <p className="text-xs text-gray-600">Phone: {b.phone}</p>
-                )}
-                {b.address && (
-                  <p className="text-xs text-gray-600">Address: {b.address}</p>
-                )}
-              </div>
-              <button
-                className="text-red-600 text-sm"
-                onClick={() => deleteBusiness(b.id)}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-          {filteredBusinesses.length === 0 && (
-            <p className="text-xs text-gray-500">No businesses found.</p>
-          )}
-        </div>
-      </section>
+        {b.phone && (
+          <p className="text-xs text-gray-600">Phone: {b.phone}</p>
+        )}
 
-      {/* Barbers */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Barbers</h2>
-          <input
-            className="border border-gray-300 rounded-lg px-3 py-1 text-sm bg-white"
-            placeholder="Search barbers..."
-            value={barberSearch}
-            onChange={(e) => setBarberSearch(e.target.value)}
-          />
-        </div>
+        {b.address && (
+          <p className="text-xs text-gray-600">Address: {b.address}</p>
+        )}
 
-        {/* Add Barber Form */}
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <input
-              className="border border-gray-300 p-2 rounded-lg text-sm"
-              placeholder="Barber name"
-              value={newBarberName}
-              onChange={(e) => setNewBarberName(e.target.value)}
-            />
-            <input
-              className="border border-gray-300 p-2 rounded-lg text-sm"
-              placeholder="Barber email"
-              value={newBarberEmail}
-              onChange={(e) => setNewBarberEmail(e.target.value)}
-            />
-            <select
-              className="border border-gray-300 p-2 rounded-lg text-sm bg-white"
-              value={newBarberBusiness}
-              onChange={(e) => setNewBarberBusiness(e.target.value)}
-            >
-              <option value="">Select business</option>
-              {businesses.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button
-            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm"
-            onClick={addBarber}
-          >
-            Add Barber
-          </button>
-        </div>
+        {/* ⭐ SHOW BUSINESS HOURS */}
+        {b.open_time && b.close_time && (
+          <p className="text-xs text-gray-600">
+            Hours: {b.open_time} - {b.close_time}
+          </p>
+        )}
+      </div>
 
-        {/* Barber List */}
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
-          {filteredBarbers.map((b) => (
-            <div
-              key={b.id}
-              className="flex justify-between items-center border-b last:border-none py-2"
-            >
-              <div>
-                <p className="font-semibold text-sm">{b.name}</p>
-                <p className="text-xs text-gray-600">{b.email}</p>
-                <p className="text-xs text-gray-600">
-                  Business: {b.businesses?.name || "—"}
-                </p>
-              </div>
-              <button
-                className="text-red-600 text-sm"
-                onClick={() => deleteBarber(b.id)}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-          {filteredBarbers.length === 0 && (
-            <p className="text-xs text-gray-500">No barbers found.</p>
-          )}
-        </div>
-      </section>
-
-      {/* Appointments */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Appointments</h2>
-          <div className="flex gap-2">
-            <select
-              className="border border-gray-300 rounded-lg px-3 py-1 text-sm bg-white"
-              value={appointmentBusinessFilter}
-              onChange={(e) => setAppointmentBusinessFilter(e.target.value)}
-            >
-              <option value="">All businesses</option>
-              {businesses.map((b) => (
-                <option key={b.id} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="border border-gray-300 rounded-lg px-3 py-1 text-sm bg-white"
-              value={appointmentBarberFilter}
-              onChange={(e) => setAppointmentBarberFilter(e.target.value)}
-            >
-              <option value="">All barbers</option>
-              {barbers.map((b) => (
-                <option key={b.id} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
-          {filteredAppointments.map((a) => (
-            <div
-              key={a.id}
-              className="border-b last:border-none py-3 text-sm"
-            >
-              <p className="font-semibold">
-                {a.date} at {a.time}
-              </p>
-              <p>
-                {a.customer_name} — {a.service}
-              </p>
-              <p className="text-xs text-gray-600">
-                Barber: {a.barbers?.name} | Business: {a.businesses?.name}
-              </p>
-            </div>
-          ))}
-          {filteredAppointments.length === 0 && (
-            <p className="text-xs text-gray-500">No appointments found.</p>
-          )}
-        </div>
-      </section>
+      <button
+        className="text-red-600 text-sm"
+        onClick={() => deleteBusiness(b.id)}
+      >
+        Delete
+      </button>
     </div>
-  );
+  ))}
+
+  {filteredBusinesses.length === 0 && (
+    <p className="text-xs text-gray-500">No businesses found.</p>
+  )}
+</div>
+</section>
+
+{/* ⭐ BARBERS SECTION ⭐ */}
+<section className="space-y-4">
+  <div className="flex items-center justify-between">
+    <h2 className="text-xl font-semibold">Barbers</h2>
+    <input
+      className="border border-gray-300 rounded-lg px-3 py-1 text-sm bg-white"
+      placeholder="Search barbers..."
+      value={barberSearch}
+      onChange={(e) => setBarberSearch(e.target.value)}
+    />
+  </div>
+
+  {/* Add Barber Form */}
+  <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3">
+
+    {/* 3-column row */}
+    <div className="grid grid-cols-3 gap-3">
+      <input
+        className="border border-gray-300 p-2 rounded-lg text-sm"
+        placeholder="Barber name"
+        value={newBarberName}
+        onChange={(e) => setNewBarberName(e.target.value)}
+      />
+
+      <input
+        className="border border-gray-300 p-2 rounded-lg text-sm"
+        placeholder="Barber email"
+        value={newBarberEmail}
+        onChange={(e) => setNewBarberEmail(e.target.value)}
+      />
+
+      <select
+        className="border border-gray-300 p-2 rounded-lg text-sm bg-white"
+        value={newBarberBusiness}
+        onChange={(e) => setNewBarberBusiness(e.target.value)}
+      >
+        <option value="">Select business</option>
+        {businesses.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Phone Number */}
+    <input
+      className="border border-gray-300 p-2 rounded-lg text-sm w-full"
+      placeholder="Phone number"
+      value={newBarberPhone}
+      onChange={(e) => setNewBarberPhone(e.target.value)}
+    />
+
+    {/* Working Days */}
+    <div>
+      <p className="text-sm font-semibold mb-1">Working Days</p>
+
+      <div className="grid grid-cols-4 gap-2 text-sm">
+        {["mon","tue","wed","thu","fri","sat","sun"].map((day) => (
+          <label key={day} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={newBarberWorkingDays.includes(day)}
+              onChange={() => {
+                if (newBarberWorkingDays.includes(day)) {
+                  setNewBarberWorkingDays(
+                    newBarberWorkingDays.filter((d) => d !== day)
+                  );
+                } else {
+                  setNewBarberWorkingDays([...newBarberWorkingDays, day]);
+                }
+              }}
+            />
+            {day.toUpperCase()}
+          </label>
+        ))}
+      </div>
+    </div>
+
+    <button
+      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm"
+      onClick={addBarber}
+    >
+      Add Barber
+    </button>
+  </div>
+
+  {/* Barber List */}
+  <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
+    {filteredBarbers.map((b) => (
+      <div
+        key={b.id}
+        className="flex justify-between items-center border-b last:border-none py-2"
+      >
+        <div>
+          <p className="font-semibold text-sm">{b.name}</p>
+          <p className="text-xs text-gray-600">{b.email}</p>
+
+          {b.phone && (
+            <p className="text-xs text-gray-600">Phone: {b.phone}</p>
+          )}
+
+          {b.working_days && (
+            <p className="text-xs text-gray-600">
+              Days: {b.working_days.join(", ").toUpperCase()}
+            </p>
+          )}
+
+          <p className="text-xs text-gray-600">
+            Business: {b.businesses?.name || "—"}
+          </p>
+        </div>
+
+        <button
+          className="text-red-600 text-sm"
+          onClick={() => deleteBarber(b.id)}
+        >
+          Delete
+        </button>
+      </div>
+    ))}
+
+    {filteredBarbers.length === 0 && (
+      <p className="text-xs text-gray-500">No barbers found.</p>
+    )}
+  </div>
+</section>
+
+{/* Appointments */}
+<section className="space-y-4">
+  <div className="flex items-center justify-between">
+    <h2 className="text-xl font-semibold">Appointments</h2>
+    <div className="flex gap-2">
+      <select
+        className="border border-gray-300 rounded-lg px-3 py-1 text-sm bg-white"
+        value={appointmentBusinessFilter}
+        onChange={(e) => setAppointmentBusinessFilter(e.target.value)}
+      >
+        <option value="">All businesses</option>
+        {businesses.map((b) => (
+          <option key={b.id} value={b.name}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+
+      <select
+        className="border border-gray-300 rounded-lg px-3 py-1 text-sm bg-white"
+        value={appointmentBarberFilter}
+        onChange={(e) => setAppointmentBarberFilter(e.target.value)}
+      >
+        <option value="">All barbers</option>
+        {barbers.map((b) => (
+          <option key={b.id} value={b.name}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  </div>
+
+  <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
+    {filteredAppointments.map((a) => (
+      <div
+        key={a.id}
+        className="border-b last:border-none py-3 text-sm"
+      >
+        <p className="font-semibold">
+          {a.date} at {a.time}
+        </p>
+        <p>
+          {a.customer_name} — {a.service}
+        </p>
+        <p className="text-xs text-gray-600">
+          Barber: {a.barbers?.name} | Business: {a.businesses?.name}
+        </p>
+      </div>
+    ))}
+
+    {filteredAppointments.length === 0 && (
+      <p className="text-xs text-gray-500">No appointments found.</p>
+    )}
+  </div>
+</section>
+</div>
+);
 }

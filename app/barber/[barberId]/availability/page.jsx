@@ -2,12 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { supabase } from "@/lib/supabaseClient";
 
 const DAYS = [
   "monday",
@@ -20,136 +15,134 @@ const DAYS = [
 ];
 
 export default function AvailabilityPage() {
-  const { barberId } = useParams(); // FIXED
-  const [availability, setAvailability] = useState([]);
+  const { barberId } = useParams();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadAvailability();
   }, []);
 
   async function loadAvailability() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("barber_availability")
       .select("*")
-      .eq("barber", barberId); // FIXED
+      .eq("barber_id", barberId);
+
+    // Build full week (ensure no missing days)
+    const fullWeek = DAYS.map((day) => {
+      const existing = data?.find((r) => r.day_of_week === day);
+      return (
+        existing || {
+          barber_id: barberId,
+          day_of_week: day,
+          start_time: "08:00:00",
+          end_time: "22:00:00",
+          is_closed: false,
+        }
+      );
+    });
+
+    setRows(fullWeek);
+    setLoading(false);
+  }
+
+  async function saveRow(row) {
+    setSaving(true);
+
+    const { error } = await supabase.from("barber_availability").upsert(
+      {
+        barber_id: barberId,
+        day_of_week: row.day_of_week,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        is_closed: row.is_closed,
+      },
+      { onConflict: "barber_id,day_of_week" }
+    );
 
     if (error) {
-      console.error("Load error:", error);
-      return;
+      alert("Error saving availability");
+      console.error(error);
     }
 
-    // If no rows exist, create default schedule
-    if (!data || data.length === 0) {
-      const defaultRows = DAYS.map((day) => ({
-        barber: barberId, // FIXED
-        day_of_week: day,
-        start_time: "09:00",
-        end_time: "17:00",
-        is_closed: false,
-      }));
-
-      const { data: inserted } = await supabase
-        .from("barber_availability")
-        .insert(defaultRows)
-        .select("*");
-
-      setAvailability(inserted);
-    } else {
-      setAvailability(data);
-    }
+    setSaving(false);
   }
 
   function updateField(day, field, value) {
-    setAvailability((prev) =>
-      prev.map((row) =>
-        row.day_of_week === day ? { ...row, [field]: value } : row
-      )
+    const updated = rows.map((r) =>
+      r.day_of_week === day ? { ...r, [field]: value } : r
     );
+    setRows(updated);
   }
 
-  async function saveAvailability() {
-    // Ensure barberId is included in every row
-    const rowsWithId = availability.map((row) => ({
-      ...row,
-      barber: barberId, // FIXED
-    }));
-
-    const { error } = await supabase
-      .from("barber_availability")
-      .upsert(rowsWithId);
-
-    if (error) {
-      console.error("Save error:", error);
-      alert("Error saving schedule");
-    } else {
-      alert("Schedule saved!");
-    }
-  }
+  if (loading) return <p className="p-6">Loading availability...</p>;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">
-        Availability for {barberId}
-      </h1>
+    <div className="max-w-xl mx-auto p-6 bg-white rounded-xl shadow">
+      <h1 className="text-2xl font-bold mb-4">Weekly Availability</h1>
 
-      <div className="space-y-4">
-        {availability.map((row) => (
-          <div
-            key={row.day_of_week}
-            className="border p-4 rounded-lg flex items-center justify-between"
-          >
-            <div className="font-semibold capitalize w-32">
-              {row.day_of_week}
-            </div>
+      {rows.map((row) => (
+        <div
+          key={row.day_of_week}
+          className="flex items-center justify-between border-b py-3"
+        >
+          <div className="w-24 capitalize font-semibold">{row.day_of_week}</div>
 
-            <div className="flex items-center gap-4">
-              <label className="flex flex-col text-sm">
-                Start
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={!row.is_closed}
+                onChange={(e) =>
+                  updateField(row.day_of_week, "is_closed", !e.target.checked)
+                }
+              />
+              Open
+            </label>
+
+            {!row.is_closed && (
+              <>
                 <input
                   type="time"
-                  value={row.start_time}
-                  disabled={row.is_closed}
+                  value={row.start_time.slice(0, 5)}
                   onChange={(e) =>
-                    updateField(row.day_of_week, "start_time", e.target.value)
+                    updateField(
+                      row.day_of_week,
+                      "start_time",
+                      e.target.value + ":00"
+                    )
                   }
-                  className="border p-1 rounded"
+                  className="border p-2 rounded"
                 />
-              </label>
 
-              <label className="flex flex-col text-sm">
-                End
                 <input
                   type="time"
-                  value={row.end_time}
-                  disabled={row.is_closed}
+                  value={row.end_time.slice(0, 5)}
                   onChange={(e) =>
-                    updateField(row.day_of_week, "end_time", e.target.value)
+                    updateField(
+                      row.day_of_week,
+                      "end_time",
+                      e.target.value + ":00"
+                    )
                   }
-                  className="border p-1 rounded"
+                  className="border p-2 rounded"
                 />
-              </label>
+              </>
+            )}
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={row.is_closed}
-                  onChange={(e) =>
-                    updateField(row.day_of_week, "is_closed", e.target.checked)
-                  }
-                />
-                Closed
-              </label>
-            </div>
+            <button
+              onClick={() => saveRow(row)}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg"
+            >
+              Save
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
 
-      <button
-        onClick={saveAvailability}
-        className="mt-6 bg-blue-600 text-white px-4 py-2 rounded"
-      >
-        Save Schedule
-      </button>
+      {saving && <p className="text-green-600 mt-3">Saving...</p>}
     </div>
   );
 }

@@ -106,7 +106,7 @@ export default function BookingPage() {
     setLoading(false);
   }
 
-  // Load available time slots
+  // ⭐ Load available time slots
   async function loadAvailableTimes(selectedDate) {
     if (!selectedDate) return;
 
@@ -114,10 +114,11 @@ export default function BookingPage() {
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
 
+    // ⭐ FIXED — correct column name
     const { data: availability } = await supabase
       .from("barber_availability")
       .select("*")
-      .eq("barber", barberId)
+      .eq("barber_id", barberId)
       .eq("day_of_week", dayOfWeek)
       .single();
 
@@ -144,10 +145,11 @@ export default function BookingPage() {
     const booked = appointments?.map(a => a.time.slice(0, 5)) || [];
     slots = slots.filter(t => !booked.includes(t));
 
+    // ⭐ FIXED — correct column name
     const { data: blocks } = await supabase
       .from("barber_blocks")
       .select("*")
-      .eq("barber", barberId)
+      .eq("barber_id", barberId)
       .eq("date", selectedDate);
 
     if (blocks && blocks.length > 0) {
@@ -172,8 +174,7 @@ export default function BookingPage() {
 
     setAvailableTimes(slots);
   }
-
-  async function createAppointment() {
+async function createAppointment() {
     if (!service || !date || !time || !customerName || !customerPhone || !customerEmail) {
       alert(tr.fillAll);
       return;

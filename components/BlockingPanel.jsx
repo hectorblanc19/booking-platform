@@ -61,17 +61,7 @@ export default function BlockingPanel({ barber, lang }) {
       .channel("blocks")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "barber_blocks" },
-        () => loadBlocks()
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "barber_blocks" },
-        () => loadBlocks()
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "barber_blocks" },
+        { event: "*", schema: "public", table: "barber_blocks" },
         () => loadBlocks()
       )
       .subscribe();
@@ -83,7 +73,7 @@ export default function BlockingPanel({ barber, lang }) {
     const { data } = await supabase
       .from("barber_blocks")
       .select("*")
-      .eq("barber", barber)
+      .eq("barber_id", barber)   // ⭐ FIXED
       .order("date", { ascending: true });
 
     setBlocks(data || []);
@@ -92,9 +82,10 @@ export default function BlockingPanel({ barber, lang }) {
   async function createBlock() {
     if (!date) return alert(tr.selectDate);
 
+    // ⭐ FULL DAY BLOCK
     if (fullDay) {
       await supabase.from("barber_blocks").insert({
-        barber,
+        barber_id: barber,       // ⭐ FIXED
         date,
         start_time: "00:00:00",
         end_time: "23:59:59",
@@ -103,6 +94,7 @@ export default function BlockingPanel({ barber, lang }) {
       return;
     }
 
+    // ⭐ MULTI-DAY BLOCK (VACATION)
     if (multiDay) {
       if (!endDate) return alert(tr.selectEndDate);
 
@@ -116,7 +108,7 @@ export default function BlockingPanel({ barber, lang }) {
 
       for (const d of days) {
         await supabase.from("barber_blocks").insert({
-          barber,
+          barber_id: barber,     // ⭐ FIXED
           date: d.toISOString().split("T")[0],
           start_time: "00:00:00",
           end_time: "23:59:59",
@@ -127,10 +119,11 @@ export default function BlockingPanel({ barber, lang }) {
       return;
     }
 
+    // ⭐ NORMAL BLOCK
     if (!start || !end) return alert(tr.selectStartEnd);
 
     await supabase.from("barber_blocks").insert({
-      barber,
+      barber_id: barber,         // ⭐ FIXED
       date,
       start_time: start + ":00",
       end_time: end + ":00",
@@ -138,7 +131,7 @@ export default function BlockingPanel({ barber, lang }) {
     });
   }
 
-  // ⭐ UPDATED deleteBlock()
+  // ⭐ DELETE BLOCK
   async function deleteBlock(id) {
     const { error } = await supabase
       .from("barber_blocks")
@@ -149,11 +142,10 @@ export default function BlockingPanel({ barber, lang }) {
       alert("Error deleting block / Error eliminando el bloqueo");
     } else {
       alert("Block removed / Bloque eliminado");
-      loadBlocks(); // refresh instantly
+      loadBlocks();
     }
   }
 
-  // ⭐ RETURN JSX
   return (
     <div className="mt-10 p-4 border rounded-lg bg-white shadow">
       <h2 className="text-xl font-bold mb-4">{tr.blockedTimes}</h2>
@@ -249,7 +241,6 @@ export default function BlockingPanel({ barber, lang }) {
               {b.reason && <p className="text-sm text-gray-500">{b.reason}</p>}
             </div>
 
-            {/* ⭐ DELETE BUTTON — LANGUAGE SWITCHES AUTOMATICALLY */}
             <button
               onClick={() => deleteBlock(b.id)}
               className="text-red-600 underline cursor-pointer font-semibold"

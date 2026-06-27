@@ -13,16 +13,48 @@ export default function AdminPayments() {
   const loadPayments = async () => {
     const { data: barberData } = await supabase
       .from("barbers")
-      .select("id, name, monthly_fee, last_payment_date, payment_status, business_id");
+      .select("id, name, monthly_fee, last_payment_date, payment_status");
 
     const { data: businessData } = await supabase
       .from("businesses")
       .select("id, name, monthly_fee, last_payment_date, payment_status");
 
-    setBarbers(barberData || []);
-    setBusinesses(businessData || []);
+    // Apply overdue detection
+    const updatedBarbers = applyOverdue(barberData || []);
+    const updatedBusinesses = applyOverdue(businessData || []);
+
+    // Sort unpaid first
+    setBarbers(sortByStatus(updatedBarbers));
+    setBusinesses(sortByStatus(updatedBusinesses));
   };
 
+  // ⭐ Auto-overdue detection
+  const applyOverdue = (items) => {
+    const today = new Date();
+
+    return items.map((item) => {
+      if (!item.last_payment_date) {
+        return { ...item, payment_status: "never" };
+      }
+
+      const last = new Date(item.last_payment_date);
+      const diffDays = Math.floor((today - last) / (1000 * 60 * 60 * 24));
+
+      if (diffDays > 30) {
+        return { ...item, payment_status: "overdue" };
+      }
+
+      return { ...item, payment_status: "paid" };
+    });
+  };
+
+  // ⭐ Sorting: unpaid first
+  const sortByStatus = (items) => {
+    const order = { overdue: 0, never: 1, paid: 2 };
+    return items.sort((a, b) => order[a.payment_status] - order[b.payment_status]);
+  };
+
+  // ⭐ Mark Paid
   const markPaid = async (table, id) => {
     await supabase
       .from(table)
@@ -33,6 +65,23 @@ export default function AdminPayments() {
       .eq("id", id);
 
     loadPayments();
+  };
+
+  // ⭐ Format date
+  const formatDate = (date) => {
+    if (!date) return "Never";
+    return new Date(date).toISOString().split("T")[0];
+  };
+
+  // ⭐ Badge component
+  const StatusBadge = ({ status }) => {
+    if (status === "paid")
+      return <span className="text-green-700 bg-green-100 px-2 py-1 rounded text-xs">PAID</span>;
+
+    if (status === "overdue")
+      return <span className="text-red-700 bg-red-100 px-2 py-1 rounded text-xs">OVERDUE</span>;
+
+    return <span className="text-yellow-700 bg-yellow-100 px-2 py-1 rounded text-xs">NEVER PAID</span>;
   };
 
   return (
@@ -56,13 +105,9 @@ export default function AdminPayments() {
             <tr key={b.id} className="border-t">
               <td className="p-2">{b.name}</td>
               <td className="p-2">${b.monthly_fee}</td>
-              <td className="p-2">{b.last_payment_date || "Never"}</td>
+              <td className="p-2">{formatDate(b.last_payment_date)}</td>
               <td className="p-2 font-bold">
-                {b.payment_status === "paid" ? (
-                  <span className="text-green-600">Paid</span>
-                ) : (
-                  <span className="text-red-600">Overdue</span>
-                )}
+                <StatusBadge status={b.payment_status} />
               </td>
               <td className="p-2">
                 <button
@@ -94,13 +139,9 @@ export default function AdminPayments() {
             <tr key={b.id} className="border-t">
               <td className="p-2">{b.name}</td>
               <td className="p-2">${b.monthly_fee}</td>
-              <td className="p-2">{b.last_payment_date || "Never"}</td>
+              <td className="p-2">{formatDate(b.last_payment_date)}</td>
               <td className="p-2 font-bold">
-                {b.payment_status === "paid" ? (
-                  <span className="text-green-600">Paid</span>
-                ) : (
-                  <span className="text-red-600">Overdue</span>
-                )}
+                <StatusBadge status={b.payment_status} />
               </td>
               <td className="p-2">
                 <button

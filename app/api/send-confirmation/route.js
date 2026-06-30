@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { createClient } from "@supabase/supabase-js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 // ⭐ SERVICE TRANSLATIONS
 const SERVICE_TRANSLATIONS = {
@@ -19,8 +24,8 @@ export async function POST(req) {
     customer_email,
     customer_name,
     service,
-    barber_name,
-    business_name,
+    barber_id,
+    business_id,
     date,
     time,
     secret_link,
@@ -48,10 +53,13 @@ export async function POST(req) {
       service: "Service",
       barber: "Barber",
       business: "Business",
+      address: "Address",
+      phone: "Phone",
       date: "Date",
       time: "Time",
       manage: "Manage Your Appointment",
       button: "View Appointment",
+      maps: "Open in Google Maps",
     },
     es: {
       subject: "Tu Cita ha sido Confirmada",
@@ -61,12 +69,34 @@ export async function POST(req) {
       service: "Servicio",
       barber: "Barbero",
       business: "Negocio",
+      address: "Dirección",
+      phone: "Teléfono",
       date: "Fecha",
       time: "Hora",
       manage: "Gestiona tu Cita",
       button: "Ver Cita",
+      maps: "Abrir en Google Maps",
     },
   }[langCode];
+
+  // ⭐ FETCH BUSINESS INFO
+  const { data: businessInfo } = await supabase
+    .from("businesses")
+    .select("name, address, phone")
+    .eq("id", business_id)
+    .single();
+
+  // ⭐ FETCH BARBER INFO
+  const { data: barberInfo } = await supabase
+    .from("barbers")
+    .select("name")
+    .eq("id", barber_id)
+    .single();
+
+  // ⭐ Auto-generate Google Maps link
+  const mapsLink = businessInfo?.address
+    ? `https://maps.google.com/?q=${encodeURIComponent(businessInfo.address)}`
+    : null;
 
   try {
     await resend.emails.send({
@@ -74,17 +104,30 @@ export async function POST(req) {
       to: customer_email,
       subject: tr.subject,
       html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 550px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
         
         <h2 style="text-align:center;">${tr.title}</h2>
-        <p style="text-align:center;">${tr.thanks} <strong>${business_name}</strong></p>
+        <p style="text-align:center;">${tr.thanks} <strong>${businessInfo?.name}</strong></p>
 
         <h3>${tr.details}</h3>
         <p><strong>${tr.service}:</strong> ${translatedService}</p>
-        <p><strong>${tr.barber}:</strong> ${barber_name}</p>
-        <p><strong>${tr.business}:</strong> ${business_name}</p>
+        <p><strong>${tr.barber}:</strong> ${barberInfo?.name}</p>
+        <p><strong>${tr.business}:</strong> ${businessInfo?.name}</p>
+        <p><strong>${tr.address}:</strong> ${businessInfo?.address || "N/A"}</p>
+        <p><strong>${tr.phone}:</strong> ${businessInfo?.phone || "N/A"}</p>
         <p><strong>${tr.date}:</strong> ${date}</p>
         <p><strong>${tr.time}:</strong> ${time}</p>
+
+        ${
+          mapsLink
+            ? `<div style="text-align:center; margin-top: 15px;">
+                <a href="${mapsLink}" 
+                  style="background:#10b981; color:white; padding:10px 18px; border-radius:8px; text-decoration:none; font-size:15px;">
+                  ${tr.maps}
+                </a>
+              </div>`
+            : ""
+        }
 
         <div style="text-align:center; margin-top: 25px;">
           <a href="${secret_link}" 

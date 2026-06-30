@@ -25,7 +25,8 @@ export async function POST(req) {
     customer_name,
     customer_email,
     customer_phone,
-    notes
+    notes,
+    lang // ⭐ IMPORTANT: language from booking page
   } = body;
 
   const customer_id = generateCustomerId();
@@ -33,19 +34,35 @@ export async function POST(req) {
 
   const dashboardLink = `https://booking-platform.vercel.app/customer/${customer_id}`;
 
-  // ⭐ CHECK AVAILABILITY (ignore canceled)
+  // ⭐ CHECK AVAILABILITY
   const { data: existing } = await supabase
     .from("appointments")
     .select("*")
     .eq("date", date)
     .eq("time", time)
     .eq("barber_id", barber)
-    .eq("status", "confirmed")   // ⭐ Only confirmed blocks the slot
+    .eq("status", "confirmed")
     .maybeSingle();
 
   if (existing) {
     return NextResponse.json({ error: "Time slot already taken" });
   }
+
+  // ⭐ LOOKUP BUSINESS INFO
+  const { data: businessInfo } = await supabase
+    .from("businesses")
+    .select("name, address, phone")
+    .eq("id", business)
+    .single();
+
+  // ⭐ LOOKUP BARBER NAME
+  const { data: barberInfo } = await supabase
+    .from("barbers")
+    .select("name")
+    .eq("id", barber)
+    .single();
+
+  const barberName = barberInfo?.name || "Your Barber";
 
   // ⭐ INSERT APPOINTMENT
   const { data, error } = await supabase
@@ -73,27 +90,57 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to create appointment" });
   }
 
+  // ⭐ SEND EMAIL (BILINGUAL)
   if (customer_email) {
+    const mapsLink = `https://maps.google.com/?q=${encodeURIComponent(
+      businessInfo.address
+    )}`;
+
+    const emailEN = `
+Your appointment is confirmed!
+
+Barber: ${barberName}
+Business: ${businessInfo.name}
+Address: ${businessInfo.address}
+Google Maps: ${mapsLink}
+Phone: ${businessInfo.phone}
+
+Service: ${service}
+Date: ${date}
+Time: ${time}
+
+Please arrive 5–10 minutes early.
+
+Manage your appointment:
+${dashboardLink}
+`;
+
+    const emailES = `
+¡Tu cita está confirmada!
+
+Barbero: ${barberName}
+Negocio: ${businessInfo.name}
+Dirección: ${businessInfo.address}
+Google Maps: ${mapsLink}
+Teléfono: ${businessInfo.phone}
+
+Servicio: ${service}
+Fecha: ${date}
+Hora: ${time}
+
+Por favor llega 5–10 minutos antes.
+
+Gestiona tu cita:
+${dashboardLink}
+`;
+
+    const emailToSend = lang === "es" ? emailES : emailEN;
+
     await resend.emails.send({
       from: "info@flowpaydr.com",
       to: customer_email,
-      subject: "Your Appointment is Confirmed",
-      html: `
-        <h2>🎉 Appointment Confirmed!</h2>
-        <p>Thank you for booking with FlowPayDR.</p>
-
-        <h3>Appointment Details</h3>
-        <p><strong>Service:</strong> ${service}</p>
-        <p><strong>Barber:</strong> ${barber}</p>
-        <p><strong>Date:</strong> ${date}</p>
-        <p><strong>Time:</strong> ${time}</p>
-
-        <h3>Manage Your Appointment</h3>
-        <p><a href="${dashboardLink}">${dashboardLink}</a></p>
-
-        <hr>
-        <p><strong>FlowPayDR</strong><br>info@flowpaydr.com</p>
-      `
+      subject: lang === "es" ? "Tu cita está confirmada" : "Your Appointment is Confirmed",
+      html: emailToSend.replace(/\n/g, "<br>")
     });
   }
 

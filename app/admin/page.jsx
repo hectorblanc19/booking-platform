@@ -146,6 +146,41 @@ export default function AdminPanel() {
     loadAll();
   }
 
+// ⭐ Block Barber
+async function blockBarber(id) {
+  const { error } = await supabase
+    .from("barbers")
+    .update({ payment_status: "unpaid" })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error blocking barber:", error);
+    showMessage("error", "Error blocking barber: " + error.message);
+    return;
+  }
+
+  showMessage("success", "Barber blocked");
+  loadAll();
+}
+
+// ⭐ Unblock Barber
+async function unblockBarber(id) {
+  const { error } = await supabase
+    .from("barbers")
+    .update({ payment_status: "paid" })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error unblocking barber:", error);
+    showMessage("error", "Error unblocking barber: " + error.message);
+    return;
+  }
+
+  showMessage("success", "Barber unblocked");
+  loadAll();
+}
+
+
   if (loading) return <p className="p-6">Loading admin panel...</p>;
 
   // Filtered lists
@@ -405,44 +440,81 @@ export default function AdminPanel() {
   </div>
 
   {/* Barber List */}
-  <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
-    {filteredBarbers.map((b) => (
-      <div
-        key={b.id}
-        className="flex justify-between items-center border-b last:border-none py-2"
-      >
-        <div>
-          <p className="font-semibold text-sm">{b.name}</p>
-          <p className="text-xs text-gray-600">{b.email}</p>
+<div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
+  {filteredBarbers.map((b) => (
+    <div
+      key={b.id}
+      className="flex justify-between items-center border-b last:border-none py-2"
+    >
+      <div>
+        <p className="font-semibold text-sm">{b.name}</p>
+        <p className="text-xs text-gray-600">{b.email}</p>
 
-          {b.phone && (
-            <p className="text-xs text-gray-600">Phone: {b.phone}</p>
-          )}
+        {b.phone && (
+          <p className="text-xs text-gray-600">Phone: {b.phone}</p>
+        )}
 
-          {b.working_days && (
-            <p className="text-xs text-gray-600">
-              Days: {b.working_days.join(", ").toUpperCase()}
-            </p>
-          )}
-
+        {b.working_days && (
           <p className="text-xs text-gray-600">
-            Business: {b.businesses?.name || "—"}
+            Days: {b.working_days.join(", ").toUpperCase()}
           </p>
-        </div>
+        )}
 
+        <p className="text-xs text-gray-600">
+          Business: {b.businesses?.name || "—"}
+        </p>
+
+        {/* STATUS BADGE */}
+        {b.payment_status === "unpaid" ? (
+          <span className="inline-block mt-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
+            BLOCKED
+          </span>
+        ) : (
+          <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+            ACTIVE
+          </span>
+        )}
+      </div>
+
+      {/* BUTTONS */}
+      <div className="flex gap-3">
+
+        {/* BLOCK BARBER */}
+        {b.payment_status !== "unpaid" && (
+          <button
+            className="bg-red-600 text-white px-3 py-1 rounded text-xs"
+            onClick={() => blockBarber(b.id)}
+          >
+            Block
+          </button>
+        )}
+
+        {/* UNBLOCK BARBER */}
+        {b.payment_status === "unpaid" && (
+          <button
+            className="bg-green-600 text-white px-3 py-1 rounded text-xs"
+            onClick={() => unblockBarber(b.id)}
+          >
+            Unblock
+          </button>
+        )}
+
+        {/* DELETE */}
         <button
           className="text-red-600 text-sm"
           onClick={() => deleteBarber(b.id)}
         >
           Delete
         </button>
-      </div>
-    ))}
 
-    {filteredBarbers.length === 0 && (
-      <p className="text-xs text-gray-500">No barbers found.</p>
-    )}
-  </div>
+      </div>
+    </div>
+  ))}
+
+  {filteredBarbers.length === 0 && (
+    <p className="text-xs text-gray-500">No barbers found.</p>
+  )}
+</div>
 </section>
 
 {/* Appointments */}

@@ -96,15 +96,24 @@ export default function BookingPage() {
   }, []);
 
   async function loadBarber() {
-    const { data, error } = await supabase
-      .from("barbers")
-      .select("*, businesses(*)")
-      .eq("id", barberId)
-      .single();
+  const { data, error } = await supabase
+    .from("barbers")
+    .select("*, businesses(*)")
+    .eq("id", barberId)
+    .single();
 
-    if (!error) setBarber(data);
-    setLoading(false);
+  if (!error) setBarber(data);
+  setLoading(false);
+
+  // ⭐ BLOCKED BARBER PROTECTION
+  if (data?.payment_status === "unpaid") {
+    // Stop the booking page from loading
+    setBarber({
+      ...data,
+      blocked: true,
+    });
   }
+}
 
   // ⭐ Load available time slots
   async function loadAvailableTimes(selectedDate) {
@@ -245,21 +254,21 @@ async function createAppointment() {
     });
 
     // CUSTOMER EMAIL
-    await fetch("/api/send-confirmation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customer_email: customerEmail,
-        customer_name: customerName,
-        service,
-        barber_name: barber.name,
-        business_name: barber.businesses?.name,
-        date,
-        time: formattedTime,
-        secret_link: `https://flowpaydr.com/customer/${secret}`,
-        lang,
-      }),
-    });
+await fetch("/api/send-confirmation", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    customer_email: customerEmail,
+    customer_name: customerName,
+    service,
+    barber_id: barberId,
+    business_id: barber.business_id,
+    date,
+    time: formattedTime,
+    secret_link: `https://flowpaydr.com/customer/${secret}`,
+    lang,
+  }),
+});
 
     // BARBER EMAIL
     await fetch("/api/send-barber-notification", {
@@ -280,14 +289,24 @@ async function createAppointment() {
       }),
     });
 
-    window.location.href = `/customer/${secret}`;
-  }
+   window.location.href = `/customer/${secret}`;
+}
 
-  if (loading) return <p className="p-6">Loading...</p>;
-  if (!barber) return <p className="p-6">Barber not found.</p>;
+if (loading) return <p className="p-6">Loading...</p>;
+if (!barber) return <p className="p-6">Barber not found.</p>;
+
+// ⭐ BLOCKED BARBER PROTECTION
+if (barber?.payment_status === "unpaid" || barber?.blocked) {
   return (
-    <div className="max-w-xl mx-auto p-6">
+    <div className="p-6 text-center">
+      <h1 className="text-2xl font-bold text-red-600">Barber Unavailable</h1>
+      <p>This barber is currently blocked by the administrator.</p>
+    </div>
+  );
+}
 
+return (
+  <div className="max-w-xl mx-auto p-6">
       {/* ⭐ Language Switch */}
       <div className="flex justify-end gap-2 mb-4">
         <span className="text-sm">{tr.lang}:</span>

@@ -10,7 +10,7 @@ const supabase = createClient(
 );
 
 export async function POST(req) {
-  // ⭐ Move VAPID config INSIDE the handler
+  // Configure VAPID keys
   webpush.setVapidDetails(
     "mailto:admin@flowpaydr.com",
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
@@ -24,7 +24,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  // Get push token for this user
+  // Fetch push token for this user
   const { data, error } = await supabase
     .from("push_tokens")
     .select("subscription")

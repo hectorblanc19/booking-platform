@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import ServiceWorkerClient from "@/app/ServiceWorkerClient";   // ⭐ FIXED
 
 // Service translation dictionary
 const serviceNames = {
@@ -96,7 +97,6 @@ export default function CustomerSecretPage() {
   }
 
   async function cancelAppointment() {
-    // ⭐ BACKEND PROTECTION
     const now = new Date();
     const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
 
@@ -143,13 +143,15 @@ export default function CustomerSecretPage() {
 
   if (!appointment) return <p className="p-6">Loading...</p>;
 
-  // ⭐ DETECT IF APPOINTMENT IS IN THE PAST
   const now = new Date();
   const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
   const isPast = apptDateTime < now;
 
   return (
     <div className="max-w-xl mx-auto p-6">
+
+      {/* ⭐ FIXED: Correct push subscription */}
+      <ServiceWorkerClient role="customer" secret_link={secret} />
 
       {/* Language Toggle */}
       <div className="flex justify-end gap-2 mb-4">

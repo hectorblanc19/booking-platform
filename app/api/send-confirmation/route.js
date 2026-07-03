@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import { sendPushToSubscription } from "@/lib/push";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const supabase = createClient(
@@ -30,6 +31,7 @@ export async function POST(req) {
     time,
     secret_link,
     lang = "en",
+    customer_id,
   } = body;
 
   if (!customer_email) {
@@ -98,54 +100,75 @@ export async function POST(req) {
     ? `https://maps.google.com/?q=${encodeURIComponent(businessInfo.address)}`
     : null;
 
+  // ⭐ SEND EMAIL
   try {
     await resend.emails.send({
       from: "info@flowpaydr.com",
       to: customer_email,
       subject: tr.subject,
       html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 550px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
-        
-        <h2 style="text-align:center;">${tr.title}</h2>
-        <p style="text-align:center;">${tr.thanks} <strong>${businessInfo?.name}</strong></p>
+        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 550px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
+          
+          <h2 style="text-align:center;">${tr.title}</h2>
+          <p style="text-align:center;">${tr.thanks} <strong>${businessInfo?.name}</strong></p>
 
-        <h3>${tr.details}</h3>
-        <p><strong>${tr.service}:</strong> ${translatedService}</p>
-        <p><strong>${tr.barber}:</strong> ${barberInfo?.name}</p>
-        <p><strong>${tr.business}:</strong> ${businessInfo?.name}</p>
-        <p><strong>${tr.address}:</strong> ${businessInfo?.address || "N/A"}</p>
-        <p><strong>${tr.phone}:</strong> ${businessInfo?.phone || "N/A"}</p>
-        <p><strong>${tr.date}:</strong> ${date}</p>
-        <p><strong>${tr.time}:</strong> ${time}</p>
+          <h3>${tr.details}</h3>
+          <p><strong>${tr.service}:</strong> ${translatedService}</p>
+          <p><strong>${tr.barber}:</strong> ${barberInfo?.name}</p>
+          <p><strong>${tr.business}:</strong> ${businessInfo?.name}</p>
+          <p><strong>${tr.address}:</strong> ${businessInfo?.address || "N/A"}</p>
+          <p><strong>${tr.phone}:</strong> ${businessInfo?.phone || "N/A"}</p>
+          <p><strong>${tr.date}:</strong> ${date}</p>
+          <p><strong>${tr.time}:</strong> ${time}</p>
 
-        ${
-          mapsLink
-            ? `<div style="text-align:center; margin-top: 15px;">
-                <a href="${mapsLink}" 
-                  style="background:#10b981; color:white; padding:10px 18px; border-radius:8px; text-decoration:none; font-size:15px;">
-                  ${tr.maps}
-                </a>
-              </div>`
-            : ""
-        }
+          ${
+            mapsLink
+              ? `<div style="text-align:center; margin-top: 15px;">
+                  <a href="${mapsLink}" 
+                    style="background:#10b981; color:white; padding:10px 18px; border-radius:8px; text-decoration:none; font-size:15px;">
+                    ${tr.maps}
+                  </a>
+                </div>`
+              : ""
+          }
 
-        <div style="text-align:center; margin-top: 25px;">
-          <a href="${secret_link}" 
-            style="background:#2563eb; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:16px;">
-            ${tr.button}
-          </a>
+          <div style="text-align:center; margin-top: 25px;">
+            <a href="${secret_link}" 
+              style="background:#2563eb; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:16px;">
+              ${tr.button}
+            </a>
+          </div>
+
+          <p style="margin-top:30px; font-size:12px; text-align:center; color:#666;">
+            FlowPayDR • info@flowpaydr.com
+          </p>
         </div>
-
-        <p style="margin-top:30px; font-size:12px; text-align:center; color:#666;">
-          FlowPayDR • info@flowpaydr.com
-        </p>
-      </div>
       `,
     });
-
-    return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Email error:", err);
     return NextResponse.json({ error: "Failed to send email" });
   }
+
+  // ⭐ SEND PUSH NOTIFICATION TO CUSTOMER
+  try {
+    const { data: tokens } = await supabase
+      .from("push_tokens")
+      .select("subscription")
+      .eq("user_id", customer_id)
+      .eq("role", "customer");
+
+    if (tokens && tokens.length > 0) {
+      for (const t of tokens) {
+        await sendPushToSubscription(t.subscription, {
+          title: "FlowPayDR",
+          message: `Your appointment is confirmed for ${date} at ${time}.`,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Push error:", err);
+  }
+
+  return NextResponse.json({ success: true });
 }

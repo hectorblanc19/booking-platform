@@ -1,19 +1,48 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 export async function POST(req) {
-  const body = await req.json();
-  const { userId, role, subscription } = body;
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
 
-  if (!subscription || !userId || !role) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  const body = await req.json();
+  const { subscription, role, secret_link, barber_id } = body;
+
+  // ⭐ Validate required fields
+  if (!subscription || !role) {
+    return NextResponse.json(
+      { error: "Missing fields: subscription and role are required" },
+      { status: 400 }
+    );
   }
 
+  let userId;
+
+  // ⭐ CUSTOMER (anonymous booking)
+  if (role === "customer") {
+    if (!secret_link) {
+      return NextResponse.json(
+        { error: "Missing secret_link for customer push subscription" },
+        { status: 400 }
+      );
+    }
+    userId = secret_link; // ⭐ MUST MATCH appointments.customer_id
+  }
+
+  // ⭐ BARBER (logged-in business user)
+  if (role === "business") {
+    if (!barber_id) {
+      return NextResponse.json(
+        { error: "Missing barber_id for business push subscription" },
+        { status: 400 }
+      );
+    }
+    userId = barber_id; // ⭐ MUST MATCH barbers.id
+  }
+
+  // ⭐ Save or update the push token
   const { error } = await supabase
     .from("push_tokens")
     .upsert({

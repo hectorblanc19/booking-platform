@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { Resend } from "resend";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-function generateCustomerId() {
-  return Math.random().toString(36).substring(2, 10);
-}
 
 export async function POST(req) {
   const body = await req.json();
@@ -26,11 +19,12 @@ export async function POST(req) {
     customer_email,
     customer_phone,
     notes,
-    lang // ⭐ IMPORTANT: language from booking page
+    lang
   } = body;
 
-  const customer_id = generateCustomerId();
+  // ⭐ FIX: Anonymous customers → use secret_link as customer_id
   const secret_link = crypto.randomUUID();
+  const customer_id = secret_link;
 
   const dashboardLink = `https://booking-platform.vercel.app/customer/${customer_id}`;
 
@@ -55,10 +49,10 @@ export async function POST(req) {
     .eq("id", business)
     .single();
 
-  // ⭐ LOOKUP BARBER NAME
+  // ⭐ LOOKUP BARBER INFO
   const { data: barberInfo } = await supabase
     .from("barbers")
-    .select("name")
+    .select("name, email")
     .eq("id", barber)
     .single();
 
@@ -78,9 +72,10 @@ export async function POST(req) {
       customer_email,
       customer_phone,
       notes,
-      customer_id,
+      customer_id,   // ⭐ NOW MATCHES push_tokens.user_id
       status: "confirmed",
-      secret_link
+      secret_link,
+      lang
     })
     .select()
     .single();
@@ -90,59 +85,43 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to create appointment" });
   }
 
-  // ⭐ SEND EMAIL (BILINGUAL)
-  if (customer_email) {
-    const mapsLink = `https://maps.google.com/?q=${encodeURIComponent(
-      businessInfo.address
-    )}`;
+  // ⭐ SEND CUSTOMER CONFIRMATION EMAIL + PUSH
+  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-confirmation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      customer_email,
+      customer_name,
+      service,
+      barber_id: barber,
+      business_id: business,
+      date,
+      time,
+      secret_link,
+      lang,
+      customer_id   // ⭐ secret_link
+    })
+  });
 
-    const emailEN = `
-Your appointment is confirmed!
-
-Barber: ${barberName}
-Business: ${businessInfo.name}
-Address: ${businessInfo.address}
-Google Maps: ${mapsLink}
-Phone: ${businessInfo.phone}
-
-Service: ${service}
-Date: ${date}
-Time: ${time}
-
-Please arrive 5–10 minutes early.
-
-Manage your appointment:
-${dashboardLink}
-`;
-
-    const emailES = `
-¡Tu cita está confirmada!
-
-Barbero: ${barberName}
-Negocio: ${businessInfo.name}
-Dirección: ${businessInfo.address}
-Google Maps: ${mapsLink}
-Teléfono: ${businessInfo.phone}
-
-Servicio: ${service}
-Fecha: ${date}
-Hora: ${time}
-
-Por favor llega 5–10 minutos antes.
-
-Gestiona tu cita:
-${dashboardLink}
-`;
-
-    const emailToSend = lang === "es" ? emailES : emailEN;
-
-    await resend.emails.send({
-      from: "info@flowpaydr.com",
-      to: customer_email,
-      subject: lang === "es" ? "Tu cita está confirmada" : "Your Appointment is Confirmed",
-      html: emailToSend.replace(/\n/g, "<br>")
-    });
-  }
+  // ⭐ SEND BARBER EMAIL + PUSH
+  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-barber-notification`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      barber_email: barberInfo.email,
+      barber_name: barberInfo.name,
+      barber_id: barber,
+      customer_name,
+      customer_phone,
+      customer_email,
+      service,
+      date,
+      time,
+      notes,
+      dashboard_link: `https://booking-platform.vercel.app/barber/${barber}/dashboard`,
+      lang
+    })
+  });
 
   return NextResponse.json({
     success: true,

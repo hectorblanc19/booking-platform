@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import { sendPushToSubscription } from "@/lib/push";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -17,18 +18,14 @@ function getDRTime() {
 }
 
 export async function GET() {
-  console.log("🚀 Email + Push Reminder job started (DR Time)");
+  console.log("🚀 Reminder job started (DR Time)");
 
-  // Use Dominican Republic time
   const now = getDRTime();
-
   const currentDate = now.toISOString().split("T")[0];
-
-  // FIXED: Always use HH:MM:SS for PostgreSQL TIME type
-  const currentTime = now.toTimeString().slice(0, 8); // HH:MM:SS
+  const currentTime = now.toTimeString().slice(0, 8);
 
   const twoHours = new Date(now.getTime() + 120 * 60000);
-  const twoHoursTime = twoHours.toTimeString().slice(0, 8); // HH:MM:SS
+  const twoHoursTime = twoHours.toTimeString().slice(0, 8);
 
   console.log("⏱ DR Window:", currentTime, "→", twoHoursTime);
 
@@ -55,7 +52,7 @@ export async function GET() {
 
   for (const appt of appointments) {
     try {
-      const apptTime = appt.time; // Already HH:MM:SS from DB
+      const apptTime = appt.time;
 
       // Fetch barber name
       const { data: barber } = await supabase
@@ -66,24 +63,12 @@ export async function GET() {
 
       const barberName = barber?.name || "your barber";
 
-      // Determine language
       const isSpanish = appt.lang?.toUpperCase() === "ES";
 
-      // Build bilingual message with icons
-      const msgEN = `
-🗓️ Appointment Reminder  
-You have an appointment today at ${apptTime} with barber ${barberName}.  
-💈 Please arrive 5 minutes early.
-`;
-
-      const msgES = `
-🗓️ Recordatorio de Cita  
-Tienes una cita hoy a las ${apptTime} con el barbero ${barberName}.  
-💈 Por favor llega 5 minutos antes.
-`;
+      const msgEN = `You have an appointment today at ${apptTime} with barber ${barberName}.`;
+      const msgES = `Tienes una cita hoy a las ${apptTime} con el barbero ${barberName}.`;
 
       const finalMessage = isSpanish ? msgES : msgEN;
-
       const subject = isSpanish
         ? `Recordatorio de Cita (${apptTime})`
         : `Appointment Reminder (${apptTime})`;
@@ -98,31 +83,23 @@ Tienes una cita hoy a las ${apptTime} con el barbero ${barberName}.
 
       console.log("📧 Email reminder sent to:", appt.customer_email);
 
-      // PUSH NOTIFICATION REMINDER
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      // ⭐ PUSH REMINDER (CORRECTED)
+      const { data: tokens } = await supabase
+        .from("push_tokens")
+        .select("subscription")
+        .eq("user_id", appt.customer_id)   // ⭐ FIXED: use customer_id
+        .eq("role", "customer");
 
-      if (!baseUrl) {
-        console.error("❌ Missing NEXT_PUBLIC_BASE_URL");
-      } else {
-        try {
-          await fetch(`${baseUrl}/api/push/send`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: appt.secret_link,
-              role: "customer",
-              title: isSpanish ? "Recordatorio de Cita" : "Appointment Reminder",
-              message: isSpanish
-                ? `Tienes una cita hoy a las ${apptTime} con el barbero ${barberName}.`
-                : `You have an appointment today at ${apptTime} with barber ${barberName}.`,
-            }),
+      if (tokens && tokens.length > 0) {
+        for (const t of tokens) {
+          await sendPushToSubscription(t.subscription, {
+            title: isSpanish ? "Recordatorio de Cita" : "Appointment Reminder",
+            message: finalMessage,
           });
-
-          console.log("📲 Push reminder sent to:", appt.customer_email);
-        } catch (pushErr) {
-          console.error("❌ Push Reminder Error:", pushErr);
         }
       }
+
+      console.log("📲 Push reminder sent to:", appt.customer_email);
 
       // MARK REMINDER AS SENT
       await supabase
@@ -131,7 +108,7 @@ Tienes una cita hoy a las ${apptTime} con el barbero ${barberName}.
         .eq("id", appt.id);
 
     } catch (err) {
-      console.error("❌ Email Reminder Error:", err);
+      console.error("❌ Reminder Error:", err);
     }
   }
 

@@ -31,7 +31,7 @@ export async function POST(req) {
     time,
     secret_link,
     lang = "en",
-    customer_id,
+    customer_id, // still received but NOT used for push
   } = body;
 
   if (!customer_email) {
@@ -150,12 +150,12 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to send email" });
   }
 
-  // ⭐ SEND PUSH NOTIFICATION TO CUSTOMER
+  // ⭐ SEND PUSH NOTIFICATION TO CUSTOMER (FIXED)
   try {
     const { data: tokens } = await supabase
       .from("push_tokens")
       .select("subscription")
-      .eq("user_id", customer_id)
+      .eq("user_id", secret_link)   // ⭐ FIXED — use secret_link
       .eq("role", "customer");
 
     if (tokens && tokens.length > 0) {

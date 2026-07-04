@@ -22,11 +22,12 @@ export async function POST(req) {
     lang
   } = body;
 
-  // ⭐ FIX: Anonymous customers → use secret_link as customer_id
+  // ⭐ Anonymous customers → use secret_link as customer_id
   const secret_link = crypto.randomUUID();
   const customer_id = secret_link;
 
-  const dashboardLink = `https://booking-platform.vercel.app/customer/${customer_id}`;
+  // ⭐ FIX: Use correct production domain
+  const dashboardLink = `${process.env.NEXT_PUBLIC_BASE_URL}/customer/${customer_id}`;
 
   // ⭐ CHECK AVAILABILITY
   const { data: existing } = await supabase
@@ -72,7 +73,7 @@ export async function POST(req) {
       customer_email,
       customer_phone,
       notes,
-      customer_id,   // ⭐ NOW MATCHES push_tokens.user_id
+      customer_id,   // secret_link
       status: "confirmed",
       secret_link,
       lang
@@ -99,7 +100,7 @@ export async function POST(req) {
       time,
       secret_link,
       lang,
-      customer_id   // ⭐ secret_link
+      customer_id   // secret_link
     })
   });
 
@@ -118,7 +119,7 @@ export async function POST(req) {
       date,
       time,
       notes,
-      dashboard_link: `https://booking-platform.vercel.app/barber/${barber}/dashboard`,
+      dashboard_link: `${process.env.NEXT_PUBLIC_BASE_URL}/barber/${barber}/dashboard`,
       lang
     })
   });

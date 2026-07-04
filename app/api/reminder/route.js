@@ -83,11 +83,11 @@ export async function GET() {
 
       console.log("📧 Email reminder sent to:", appt.customer_email);
 
-      // ⭐ PUSH REMINDER (CORRECTED)
+      // ⭐ PUSH REMINDER (FIXED)
       const { data: tokens } = await supabase
         .from("push_tokens")
         .select("subscription")
-        .eq("user_id", appt.customer_id)   // ⭐ FIXED: use customer_id
+        .eq("user_id", appt.secret_link)   // ⭐ FIXED: use secret_link
         .eq("role", "customer");
 
       if (tokens && tokens.length > 0) {

@@ -126,13 +126,13 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to send barber email" });
   }
 
-  // ⭐ SEND PUSH NOTIFICATION TO BARBER
+  // ⭐ SEND PUSH NOTIFICATION TO BARBER (FIXED)
   try {
     const { data: tokens } = await supabase
       .from("push_tokens")
       .select("subscription")
-      .eq("user_id", barber_id)
-      .eq("role", "business");
+      .eq("user_id", barber_id)     // ✔ correct
+      .eq("role", "barber");        // ⭐ FIXED (was "business")
 
     if (tokens && tokens.length > 0) {
       for (const t of tokens) {

@@ -18,6 +18,8 @@ const t = {
     loading: "Loading...",
     notFound: "Appointment not found.",
     past: "This appointment has already passed. You cannot reschedule.",
+    blockedDay: "The barber is not available on this day.",
+    selectTime: "Select a time",
   },
   es: {
     title: "Reprogramar Cita",
@@ -31,8 +33,24 @@ const t = {
     loading: "Cargando...",
     notFound: "Cita no encontrada.",
     past: "Esta cita ya pasó. No se puede reprogramar.",
+    blockedDay: "El barbero no está disponible este día.",
+    selectTime: "Seleccione una hora",
   },
 };
+
+// Simple visual time slot button
+function TimeSlot({ time, selected, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(time)}
+      className={`px-4 py-2 rounded-xl border text-center
+        ${selected === time ? "bg-black text-white" : "bg-white text-black"}
+      `}
+    >
+      {time}
+    </button>
+  );
+}
 
 export default function RescheduleInner() {
   const searchParams = useSearchParams();
@@ -46,6 +64,8 @@ export default function RescheduleInner() {
   const [appointment, setAppointment] = useState(null);
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
+  const [availableTimes, setAvailableTimes] = useState([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -68,6 +88,78 @@ export default function RescheduleInner() {
     setLoading(false);
   }
 
+  async function loadAvailableTimes(selectedDate) {
+    if (!selectedDate || !appointment) return;
+
+    setLoadingTimes(true);
+
+    const dayOfWeek = new Date(selectedDate)
+      .toLocaleDateString("en-US", { weekday: "long" })
+      .toLowerCase();
+
+    const { data: availability } = await supabase
+      .from("barber_availability")
+      .select("*")
+      .eq("barber_id", appointment.barber_id)
+      .eq("day_of_week", dayOfWeek)
+      .single();
+
+    if (!availability || availability.is_closed) {
+      setAvailableTimes([]);
+      setLoadingTimes(false);
+      return;
+    }
+
+    const startHour = parseInt(availability.start_time.split(":")[0]);
+    const endHour = parseInt(availability.end_time.split(":")[0]);
+
+    let slots = [];
+    for (let hour = startHour; hour < endHour; hour++) {
+      slots.push(`${hour.toString().padStart(2, "0")}:00`);
+    }
+
+    // Existing confirmed appointments
+    const { data: appointments } = await supabase
+      .from("appointments")
+      .select("*")
+      .eq("barber_id", appointment.barber_id)
+      .eq("date", selectedDate)
+      .eq("status", "confirmed");
+
+    const booked = appointments?.map((a) => a.time.slice(0, 5)) || [];
+    slots = slots.filter((t) => !booked.includes(t));
+
+    // Barber blocks
+    const { data: blocks } = await supabase
+      .from("barber_blocks")
+      .select("*")
+      .eq("barber_id", appointment.barber_id)
+      .eq("date", selectedDate);
+
+    if (blocks && blocks.length > 0) {
+      blocks.forEach((block) => {
+        const blockStartHour = parseInt(block.start_time.split(":")[0]);
+        const blockEndHour = parseInt(block.end_time.split(":")[0]);
+
+        for (let h = blockStartHour; h < blockEndHour; h++) {
+          const blockedHour = `${h.toString().padStart(2, "0")}:00`;
+          slots = slots.filter((t) => t !== blockedHour);
+        }
+      });
+    }
+
+    // Same-day: remove past times
+    const today = new Date().toISOString().split("T")[0];
+    if (selectedDate === today) {
+      const now = new Date();
+      const currentTime = now.toTimeString().slice(0, 5);
+      slots = slots.filter((slot) => slot >= currentTime);
+    }
+
+    setAvailableTimes(slots);
+    setLoadingTimes(false);
+  }
+
   async function saveChanges() {
     if (!newDate || !newTime) {
       alert(tr.selectDateTime);
@@ -85,7 +177,7 @@ export default function RescheduleInner() {
 
     const formattedTime = newTime + ":00";
 
-    // ⭐ Load barber availability
+    // Load availability again for safety
     const dayOfWeek = new Date(newDate)
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
@@ -106,7 +198,6 @@ export default function RescheduleInner() {
       return;
     }
 
-    // ⭐ FULL TIME VALIDATION (hour + minutes)
     const selectedTime = newTime + ":00";
 
     if (
@@ -121,7 +212,7 @@ export default function RescheduleInner() {
       return;
     }
 
-    // ⭐ Check blocked hours
+    // Blocks
     const { data: blocks } = await supabase
       .from("barber_blocks")
       .select("*")
@@ -144,7 +235,7 @@ export default function RescheduleInner() {
       }
     }
 
-    // ⭐ Check if time is already booked
+    // Already booked
     const { data: existing } = await supabase
       .from("appointments")
       .select("*")
@@ -153,7 +244,6 @@ export default function RescheduleInner() {
       .eq("status", "confirmed");
 
     const booked = existing.map((a) => a.time.slice(0, 5));
-
     if (booked.includes(newTime)) {
       alert(
         lang === "es"
@@ -163,7 +253,7 @@ export default function RescheduleInner() {
       return;
     }
 
-    // ⭐ SAME-DAY cutoff: cannot pick past times today
+    // Same-day past time
     const today = new Date().toISOString().split("T")[0];
     if (newDate === today) {
       const currentTime = new Date().toTimeString().slice(0, 5);
@@ -177,7 +267,6 @@ export default function RescheduleInner() {
       }
     }
 
-    // ⭐ If all checks pass → update appointment
     await supabase
       .from("appointments")
       .update({
@@ -241,23 +330,47 @@ export default function RescheduleInner() {
         </p>
       ) : (
         <>
+          {/* New Date */}
           <div className="mt-4">
             <label className="block mb-1">{tr.newDate}</label>
             <input
               type="date"
               className="w-full p-3 border rounded-xl"
-              onChange={(e) => setNewDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => {
+                setNewDate(e.target.value);
+                setNewTime("");
+                loadAvailableTimes(e.target.value);
+              }}
             />
           </div>
 
-          <div className="mt-4">
-            <label className="block mb-1">{tr.newTime}</label>
-            <input
-              type="time"
-              className="w-full p-3 border rounded-xl"
-              onChange={(e) => setNewTime(e.target.value)}
-            />
-          </div>
+          {/* Time slots */}
+          {newDate && !loadingTimes && availableTimes.length === 0 && (
+            <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-xl text-red-700">
+              <p>{tr.blockedDay}</p>
+            </div>
+          )}
+
+          {newDate && loadingTimes && (
+            <p className="mt-4 text-sm text-gray-500">{tr.loading}</p>
+          )}
+
+          {newDate && !loadingTimes && availableTimes.length > 0 && (
+            <>
+              <p className="mt-4 text-sm text-gray-700">{tr.selectTime}</p>
+              <div className="grid grid-cols-3 gap-3 mt-2">
+                {availableTimes.map((t) => (
+                  <TimeSlot
+                    key={t}
+                    time={t}
+                    selected={newTime}
+                    onSelect={setNewTime}
+                  />
+                ))}
+              </div>
+            </>
+          )}
 
           <button
             className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl"

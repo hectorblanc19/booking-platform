@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BlockingPanel from "@/components/BlockingPanel";
+import ServiceWorkerClient from "@/app/ServiceWorkerClient"; // ⭐ REQUIRED
 
 // Service translation dictionary
 const serviceNames = {
@@ -81,7 +82,6 @@ export default function BarberDashboard() {
 
   const tr = t[lang];
 
-  // Load barber info
   useEffect(() => {
     loadBarber();
   }, []);
@@ -96,7 +96,6 @@ export default function BarberDashboard() {
     setBarberData(data);
   }
 
-  // Upload photo handler
   async function handlePhotoUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -105,10 +104,7 @@ export default function BarberDashboard() {
 
     const { error: uploadError } = await supabase.storage
       .from("barber-photos")
-      .upload(fileName, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
+      .upload(fileName, file);
 
     if (uploadError) {
       alert("Error uploading photo");
@@ -119,17 +115,14 @@ export default function BarberDashboard() {
       .from("barber-photos")
       .getPublicUrl(fileName);
 
-    const publicUrl = urlData.publicUrl;
-
     await supabase
       .from("barbers")
-      .update({ photo_url: publicUrl })
+      .update({ photo_url: urlData.publicUrl })
       .eq("id", barberId);
 
     loadBarber();
   }
 
-  // Realtime updates
   useEffect(() => {
     const channel = supabase
       .channel("appointments-realtime")
@@ -171,7 +164,7 @@ export default function BarberDashboard() {
       toDate = nextWeek.toISOString().split("T")[0];
     }
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("appointments")
       .select("*")
       .eq("barber_id", barberId)
@@ -180,8 +173,7 @@ export default function BarberDashboard() {
       .order("date", { ascending: true })
       .order("time", { ascending: true });
 
-    if (!error) setAppointments(data);
-
+    setAppointments(data || []);
     setLoading(false);
   }
 
@@ -195,9 +187,13 @@ export default function BarberDashboard() {
 
     loadAppointments();
   }
+
   return (
     <div className="min-h-screen bg-gray-100 py-10">
       <div className="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-6">
+
+        {/* ⭐ Push Subscription for Barber */}
+        <ServiceWorkerClient role="business" barber_id={barberId} />
 
         {/* Language Toggle */}
         <div className="flex justify-end mb-4 gap-2 items-center">
@@ -266,7 +262,6 @@ export default function BarberDashboard() {
             <button
               className="flex-1 bg-gray-300 text-black py-2 rounded-lg"
               onClick={() => (window.location.href = `/barber/${barberId}/edit`)}
-
             >
               {tr.editProfile}
             </button>
@@ -310,7 +305,6 @@ export default function BarberDashboard() {
           <p>{tr.none}</p>
         ) : (
           <div className="space-y-4">
-
             {appointments.map((appt) => (
               <div key={appt.id} className="p-4 border rounded-xl bg-white shadow-sm">
 
@@ -344,19 +338,18 @@ export default function BarberDashboard() {
                 <p className="text-sm"><strong>{tr.email}:</strong> {appt.customer_email || "N/A"}</p>
                 <p className="text-sm"><strong>{tr.notes}:</strong> {appt.notes || tr.noNotes}</p>
 
-                {/* ACTION BUTTONS */}
                 {appt.status === "confirmed" && (
                   <div className="mt-4 flex gap-2">
 
                     <button
-                      className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold"
+                      className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold"
                       onClick={() => cancelAppointment(appt.id)}
                     >
                       ❌ {tr.cancel}
                     </button>
 
                     <button
-                      className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold"
+                      className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold"
                       onClick={() =>
                         (window.location.href = `/barber/${barberId}/reschedule/${appt.id}`)
                       }

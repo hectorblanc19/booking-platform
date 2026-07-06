@@ -109,10 +109,23 @@ export default function CustomerSecretPage() {
       return;
     }
 
+    // Update appointment status
     await supabase
       .from("appointments")
       .update({ status: "cancelled" })
       .eq("id", appointment.id);
+
+    // ⭐ SEND PUSH NOTIFICATION TO BARBER
+    await fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: "business",
+        barber_id: appointment.barber_id,
+        title: "Appointment Cancelled",
+        message: `Client cancelled their appointment for ${appointment.date} at ${appointment.time}.`,
+      }),
+    });
 
     alert(lang === "es" ? "Cita cancelada" : "Appointment cancelled");
     loadAppointment();

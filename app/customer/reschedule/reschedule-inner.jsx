@@ -159,7 +159,6 @@ export default function RescheduleInner() {
     setAvailableTimes(slots);
     setLoadingTimes(false);
   }
-
   async function saveChanges() {
     if (!newDate || !newTime) {
       alert(tr.selectDateTime);
@@ -267,6 +266,7 @@ export default function RescheduleInner() {
       }
     }
 
+    // ⭐ UPDATE APPOINTMENT
     await supabase
       .from("appointments")
       .update({
@@ -275,6 +275,18 @@ export default function RescheduleInner() {
         status: "confirmed",
       })
       .eq("secret_link", secret);
+
+    // ⭐ SEND PUSH NOTIFICATION TO BARBER
+    await fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: "business",
+        barber_id: appointment.barber_id,
+        title: "Appointment Rescheduled",
+        message: `Client moved appointment to ${newDate} at ${newTime}.`,
+      }),
+    });
 
     router.push(`/customer/${secret}`);
   }

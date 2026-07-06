@@ -17,6 +17,8 @@ const t = {
     selectDateTime: "Select date and time",
     loading: "Loading...",
     past: "This appointment has already passed. You cannot reschedule.",
+    selectTime: "Select a time",
+    blockedDay: "Barber is not available this day.",
   },
   es: {
     title: "Reprogramar Cita",
@@ -29,8 +31,24 @@ const t = {
     selectDateTime: "Seleccione fecha y hora",
     loading: "Cargando...",
     past: "Esta cita ya pasó. No se puede reprogramar.",
+    selectTime: "Seleccione una hora",
+    blockedDay: "El barbero no está disponible este día.",
   },
 };
+
+// Simple time slot button
+function TimeSlot({ time, selected, onSelect }) {
+  return (
+    <button
+      onClick={() => onSelect(time)}
+      className={`px-4 py-2 rounded-xl border text-center ${
+        selected === time ? "bg-black text-white" : "bg-white text-black"
+      }`}
+    >
+      {time}
+    </button>
+  );
+}
 
 export default function ReschedulePage() {
   const { barberId, id } = useParams();
@@ -41,6 +59,8 @@ export default function ReschedulePage() {
   const [appointment, setAppointment] = useState(null);
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
+  const [availableTimes, setAvailableTimes] = useState([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,20 +68,87 @@ export default function ReschedulePage() {
   }, []);
 
   async function loadAppointment() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("appointments")
       .select("*")
       .eq("id", id)
       .single();
 
-    if (error) {
-      console.error("Error loading appointment:", error);
-      alert("Error loading appointment: " + error.message);
+    setAppointment(data);
+    setLoading(false);
+  }
+
+  async function loadAvailableTimes(selectedDate) {
+    if (!selectedDate || !appointment) return;
+
+    setLoadingTimes(true);
+
+    const dayOfWeek = new Date(selectedDate)
+      .toLocaleDateString("en-US", { weekday: "long" })
+      .toLowerCase();
+
+    // Barber availability
+    const { data: availability } = await supabase
+      .from("barber_availability")
+      .select("*")
+      .eq("barber_id", barberId)
+      .eq("day_of_week", dayOfWeek)
+      .single();
+
+    if (!availability || availability.is_closed) {
+      setAvailableTimes([]);
+      setLoadingTimes(false);
       return;
     }
 
-    setAppointment(data);
-    setLoading(false);
+    const startHour = parseInt(availability.start_time.split(":")[0]);
+    const endHour = parseInt(availability.end_time.split(":")[0]);
+
+    let slots = [];
+    for (let hour = startHour; hour < endHour; hour++) {
+      slots.push(`${hour.toString().padStart(2, "0")}:00`);
+    }
+
+    // Booked appointments
+    const { data: bookedAppts } = await supabase
+      .from("appointments")
+      .select("*")
+      .eq("barber_id", barberId)
+      .eq("date", selectedDate)
+      .eq("status", "confirmed");
+
+    const booked = bookedAppts?.map((a) => a.time.slice(0, 5)) || [];
+    slots = slots.filter((t) => !booked.includes(t));
+
+    // Barber blocks
+    const { data: blocks } = await supabase
+      .from("barber_blocks")
+      .select("*")
+      .eq("barber_id", barberId)
+      .eq("date", selectedDate);
+
+    if (blocks && blocks.length > 0) {
+      blocks.forEach((block) => {
+        const blockStartHour = parseInt(block.start_time.split(":")[0]);
+        const blockEndHour = parseInt(block.end_time.split(":")[0]);
+
+        for (let h = blockStartHour; h < blockEndHour; h++) {
+          const blockedHour = `${h.toString().padStart(2, "0")}:00`;
+          slots = slots.filter((t) => t !== blockedHour);
+        }
+      });
+    }
+
+    // Same-day: remove past times
+    const today = new Date().toISOString().split("T")[0];
+    if (selectedDate === today) {
+      const now = new Date();
+      const currentTime = now.toTimeString().slice(0, 5);
+      slots = slots.filter((slot) => slot >= currentTime);
+    }
+
+    setAvailableTimes(slots);
+    setLoadingTimes(false);
   }
 
   async function saveChanges() {
@@ -70,18 +157,9 @@ export default function ReschedulePage() {
       return;
     }
 
-    // ⭐ BACKEND PROTECTION: Prevent rescheduling past appointments
-    const now = new Date();
-    const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
-
-    if (apptDateTime < now) {
-      alert(tr.past);
-      return;
-    }
-
     const formattedTime = newTime + ":00";
 
-    const { error } = await supabase
+    await supabase
       .from("appointments")
       .update({
         date: newDate,
@@ -89,17 +167,23 @@ export default function ReschedulePage() {
       })
       .eq("id", id);
 
-    if (error) {
-      console.error("UPDATE ERROR:", error);
-      alert("Update failed: " + error.message);
-    } else {
-      window.location.href = `/barber/${barberId}/dashboard?refresh=${Date.now()}`;
-    }
+    // Push notification to customer
+    await fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role: "customer",
+        secret_link: appointment.secret_link,
+        title: "Appointment Updated",
+        message: `Your barber changed your appointment to ${newDate} at ${newTime}.`,
+      }),
+    });
+
+    window.location.href = `/barber/${barberId}/dashboard?refresh=${Date.now()}`;
   }
 
   if (loading) return <p className="p-6">{tr.loading}</p>;
 
-  // ⭐ FRONTEND PROTECTION: Detect if appointment is in the past
   const now = new Date();
   const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
   const isPast = apptDateTime < now;
@@ -129,28 +213,51 @@ export default function ReschedulePage() {
       <p><strong>{tr.currentDate}:</strong> {appointment.date}</p>
       <p><strong>{tr.currentTime}:</strong> {appointment.time}</p>
 
-      {/* ⭐ If appointment is in the past, block rescheduling */}
       {isPast ? (
         <p className="mt-4 text-red-600 font-semibold text-center">{tr.past}</p>
       ) : (
         <>
+          {/* New Date */}
           <div className="mt-4">
             <label className="block mb-1">{tr.newDate}</label>
             <input
               type="date"
               className="w-full p-3 border rounded-xl"
-              onChange={(e) => setNewDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => {
+                setNewDate(e.target.value);
+                setNewTime("");
+                loadAvailableTimes(e.target.value);
+              }}
             />
           </div>
 
-          <div className="mt-4">
-            <label className="block mb-1">{tr.newTime}</label>
-            <input
-              type="time"
-              className="w-full p-3 border rounded-xl"
-              onChange={(e) => setNewTime(e.target.value)}
-            />
-          </div>
+          {/* Time slots */}
+          {newDate && !loadingTimes && availableTimes.length === 0 && (
+            <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-xl text-red-700">
+              <p>{tr.blockedDay}</p>
+            </div>
+          )}
+
+          {newDate && loadingTimes && (
+            <p className="mt-4 text-sm text-gray-500">{tr.loading}</p>
+          )}
+
+          {newDate && !loadingTimes && availableTimes.length > 0 && (
+            <>
+              <p className="mt-4 text-sm text-gray-700">{tr.selectTime}</p>
+              <div className="grid grid-cols-3 gap-3 mt-2">
+                {availableTimes.map((t) => (
+                  <TimeSlot
+                    key={t}
+                    time={t}
+                    selected={newTime}
+                    onSelect={setNewTime}
+                  />
+                ))}
+              </div>
+            </>
+          )}
 
           <button
             className="mt-6 w-full bg-green-600 text-white py-3 rounded-xl"

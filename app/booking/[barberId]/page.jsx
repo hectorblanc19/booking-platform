@@ -91,39 +91,41 @@ export default function BookingPage() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // ⭐ NEW — prevents UI flash
+  const [loadingTimes, setLoadingTimes] = useState(false);
+
   useEffect(() => {
     loadBarber();
   }, []);
 
   async function loadBarber() {
-  const { data, error } = await supabase
-    .from("barbers")
-    .select("*, businesses(*)")
-    .eq("id", barberId)
-    .single();
+    const { data, error } = await supabase
+      .from("barbers")
+      .select("*, businesses(*)")
+      .eq("id", barberId)
+      .single();
 
-  if (!error) setBarber(data);
-  setLoading(false);
+    if (!error) setBarber(data);
+    setLoading(false);
 
-  // ⭐ BLOCKED BARBER PROTECTION
-  if (data?.payment_status === "unpaid") {
-    // Stop the booking page from loading
-    setBarber({
-      ...data,
-      blocked: true,
-    });
+    if (data?.payment_status === "unpaid") {
+      setBarber({
+        ...data,
+        blocked: true,
+      });
+    }
   }
-}
 
   // ⭐ Load available time slots
   async function loadAvailableTimes(selectedDate) {
     if (!selectedDate) return;
 
+    setLoadingTimes(true); // ⭐ Prevent flash
+
     const dayOfWeek = new Date(selectedDate)
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
 
-    // ⭐ FIXED — correct column name
     const { data: availability } = await supabase
       .from("barber_availability")
       .select("*")
@@ -133,6 +135,7 @@ export default function BookingPage() {
 
     if (!availability || availability.is_closed) {
       setAvailableTimes([]);
+      setLoadingTimes(false);
       return;
     }
 
@@ -154,7 +157,6 @@ export default function BookingPage() {
     const booked = appointments?.map(a => a.time.slice(0, 5)) || [];
     slots = slots.filter(t => !booked.includes(t));
 
-    // ⭐ FIXED — correct column name
     const { data: blocks } = await supabase
       .from("barber_blocks")
       .select("*")
@@ -182,8 +184,10 @@ export default function BookingPage() {
     }
 
     setAvailableTimes(slots);
+    setLoadingTimes(false); // ⭐ Done loading
   }
-async function createAppointment() {
+
+  async function createAppointment() {
     if (!service || !date || !time || !customerName || !customerPhone || !customerEmail) {
       alert(tr.fillAll);
       return;
@@ -215,8 +219,7 @@ async function createAppointment() {
 
     const secret = crypto.randomUUID();
 
-    // INSERT — store ONLY the UUID
-    const { error } = await supabase.from("appointments").insert({
+    await supabase.from("appointments").insert({
       business_id: barber.business_id,
       barber_id: barberId,
       service,
@@ -232,43 +235,22 @@ async function createAppointment() {
       secret_link: secret,
     });
 
-    if (error) {
-      alert(tr.error);
-      return;
-    }
-
-    // ⭐ Save identity for push notifications (customer)
-    localStorage.setItem("flowpay_role", "customer");
-    localStorage.setItem("flowpay_user_id", secret);
-
-    // ⭐ Trigger push notification to the barber
-    await fetch("/api/push/send", {
+    // CUSTOMER EMAIL
+    await fetch("/api/send-confirmation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        userId: barberId,
-        role: "barber",
-        title: "New Appointment",
-        message: `${customerName} booked a ${service} at ${formattedTime}`,
+        customer_email: customerEmail,
+        customer_name: customerName,
+        service,
+        barber_id: barberId,
+        business_id: barber.business_id,
+        date,
+        time: formattedTime,
+        secret_link: `https://flowpaydr.com/customer/${secret}`,
+        lang,
       }),
     });
-
-    // CUSTOMER EMAIL
-await fetch("/api/send-confirmation", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    customer_email: customerEmail,
-    customer_name: customerName,
-    service,
-    barber_id: barberId,
-    business_id: barber.business_id,
-    date,
-    time: formattedTime,
-    secret_link: `https://flowpaydr.com/customer/${secret}`,
-    lang,
-  }),
-});
 
     // BARBER EMAIL
     await fetch("/api/send-barber-notification", {
@@ -289,24 +271,24 @@ await fetch("/api/send-confirmation", {
       }),
     });
 
-   window.location.href = `/customer/${secret}`;
-}
+    window.location.href = `/customer/${secret}`;
+  }
 
-if (loading) return <p className="p-6">Loading...</p>;
-if (!barber) return <p className="p-6">Barber not found.</p>;
+  if (loading) return <p className="p-6">Loading...</p>;
+  if (!barber) return <p className="p-6">Barber not found.</p>;
 
-// ⭐ BLOCKED BARBER PROTECTION
-if (barber?.payment_status === "unpaid" || barber?.blocked) {
+  if (barber?.payment_status === "unpaid" || barber?.blocked) {
+    return (
+      <div className="p-6 text-center">
+        <h1 className="text-2xl font-bold text-red-600">Barber Unavailable</h1>
+        <p>This barber is currently blocked by the administrator.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 text-center">
-      <h1 className="text-2xl font-bold text-red-600">Barber Unavailable</h1>
-      <p>This barber is currently blocked by the administrator.</p>
-    </div>
-  );
-}
+    <div className="max-w-xl mx-auto p-6">
 
-return (
-  <div className="max-w-xl mx-auto p-6">
       {/* ⭐ Language Switch */}
       <div className="flex justify-end gap-2 mb-4">
         <span className="text-sm">{tr.lang}:</span>
@@ -324,7 +306,7 @@ return (
         </button>
       </div>
 
-      {/* ⭐ Barber Header with Photo */}
+      {/* ⭐ Barber Header */}
       <div className="flex items-center gap-4 mb-6 mt-2">
         <img
           src={barber.photo_url || "/default-barber.png"}
@@ -386,31 +368,25 @@ return (
         />
       </div>
 
-      {date && availableTimes.length === 0 && (
+      {date && availableTimes.length === 0 && !loadingTimes && (
         <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-xl text-red-700">
           <p>{tr.blockedDay}</p>
         </div>
       )}
 
-      {/* ⭐ Visual Time Slots */}
-      <div className="mt-4">
-        <label className="block mb-1">{tr.time}</label>
-
-        {availableTimes.length > 0 ? (
-          <div className="grid grid-cols-3 gap-3 mt-2">
-            {availableTimes.map((t) => (
-              <TimeSlot
-                key={t}
-                time={t}
-                selected={time}
-                onSelect={setTime}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500">{tr.selectTime}</p>
-        )}
-      </div>
+      {/* ⭐ Time Slots — NO FLASH */}
+      {!loadingTimes && availableTimes.length > 0 && (
+        <div className="grid grid-cols-3 gap-3 mt-4">
+          {availableTimes.map((t) => (
+            <TimeSlot
+              key={t}
+              time={t}
+              selected={time}
+              onSelect={setTime}
+            />
+          ))}
+        </div>
+      )}
 
       {/* ⭐ Customer Info */}
       <div className="mt-4">

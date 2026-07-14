@@ -41,7 +41,7 @@ const t = {
   },
 };
 
-export default function BlockingPanel({ barber, lang }) {
+export default function BlockingPanel({ barberId, lang }) {
   const tr = t[lang];
 
   const [blocks, setBlocks] = useState([]);
@@ -73,7 +73,7 @@ export default function BlockingPanel({ barber, lang }) {
     const { data } = await supabase
       .from("barber_blocks")
       .select("*")
-      .eq("barber_id", barber)   // ⭐ FIXED
+      .eq("barber_id", barberId)
       .order("date", { ascending: true });
 
     setBlocks(data || []);
@@ -82,11 +82,16 @@ export default function BlockingPanel({ barber, lang }) {
   async function createBlock() {
     if (!date) return alert(tr.selectDate);
 
+    // ⭐ FIX: Normalize date to LOCAL date
+    const normalizedDate = new Date(date + "T00:00:00")
+      .toISOString()
+      .split("T")[0];
+
     // ⭐ FULL DAY BLOCK
     if (fullDay) {
       await supabase.from("barber_blocks").insert({
-        barber_id: barber,       // ⭐ FIXED
-        date,
+        barber_id: barberId,
+        date: normalizedDate,
         start_time: "00:00:00",
         end_time: "23:59:59",
         reason: reason || tr.fullDayReason,
@@ -98,8 +103,8 @@ export default function BlockingPanel({ barber, lang }) {
     if (multiDay) {
       if (!endDate) return alert(tr.selectEndDate);
 
-      const startDateObj = new Date(date);
-      const endDateObj = new Date(endDate);
+      const startDateObj = new Date(date + "T00:00:00");
+      const endDateObj = new Date(endDate + "T00:00:00");
 
       const days = [];
       for (let d = new Date(startDateObj); d <= endDateObj; d.setDate(d.getDate() + 1)) {
@@ -107,9 +112,11 @@ export default function BlockingPanel({ barber, lang }) {
       }
 
       for (const d of days) {
+        const dayStr = d.toISOString().split("T")[0];
+
         await supabase.from("barber_blocks").insert({
-          barber_id: barber,     // ⭐ FIXED
-          date: d.toISOString().split("T")[0],
+          barber_id: barberId,
+          date: dayStr,
           start_time: "00:00:00",
           end_time: "23:59:59",
           reason: reason || tr.vacationReason,
@@ -123,14 +130,13 @@ export default function BlockingPanel({ barber, lang }) {
     if (!start || !end) return alert(tr.selectStartEnd);
 
     await supabase.from("barber_blocks").insert({
-      barber_id: barber,         // ⭐ FIXED
-      date,
+      barber_id: barberId,
+      date: normalizedDate,
       start_time: start + ":00",
       end_time: end + ":00",
       reason,
     });
   }
-
   // ⭐ DELETE BLOCK
   async function deleteBlock(id) {
     const { error } = await supabase

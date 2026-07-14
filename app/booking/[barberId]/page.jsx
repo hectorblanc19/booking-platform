@@ -91,7 +91,6 @@ export default function BookingPage() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // ⭐ NEW — prevents UI flash
   const [loadingTimes, setLoadingTimes] = useState(false);
 
   useEffect(() => {
@@ -109,18 +108,14 @@ export default function BookingPage() {
     setLoading(false);
 
     if (data?.payment_status === "unpaid") {
-      setBarber({
-        ...data,
-        blocked: true,
-      });
+      setBarber({ ...data, blocked: true });
     }
   }
 
-  // ⭐ Load available time slots
   async function loadAvailableTimes(selectedDate) {
     if (!selectedDate) return;
 
-    setLoadingTimes(true); // ⭐ Prevent flash
+    setLoadingTimes(true);
 
     const dayOfWeek = new Date(selectedDate)
       .toLocaleDateString("en-US", { weekday: "long" })
@@ -175,16 +170,21 @@ export default function BookingPage() {
       });
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA");
 
     if (selectedDate === today) {
       const now = new Date();
-      const currentTime = now.toTimeString().slice(0, 5);
+      const currentTime = now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
       slots = slots.filter(slot => slot >= currentTime);
     }
 
     setAvailableTimes(slots);
-    setLoadingTimes(false); // ⭐ Done loading
+    setLoadingTimes(false);
   }
 
   async function createAppointment() {
@@ -235,7 +235,6 @@ export default function BookingPage() {
       secret_link: secret,
     });
 
-    // CUSTOMER EMAIL
     await fetch("/api/send-confirmation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -252,7 +251,6 @@ export default function BookingPage() {
       }),
     });
 
-    // BARBER EMAIL
     await fetch("/api/send-barber-notification", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -285,7 +283,6 @@ export default function BookingPage() {
       </div>
     );
   }
-
   return (
     <div className="max-w-xl mx-auto p-6">
 
@@ -360,10 +357,12 @@ export default function BookingPage() {
         <input
           type="date"
           className="w-full p-3 border rounded-xl"
-          min={new Date().toISOString().split("T")[0]}
+          min={new Date().toLocaleDateString("en-CA")}
           onChange={(e) => {
-            setDate(e.target.value);
-            loadAvailableTimes(e.target.value);
+            const raw = e.target.value;
+            const normalized = new Date(raw + "T00:00:00").toLocaleDateString("en-CA");
+            setDate(normalized);
+            loadAvailableTimes(normalized);
           }}
         />
       </div>
@@ -374,7 +373,7 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* ⭐ Time Slots — NO FLASH */}
+      {/* ⭐ Time Slots */}
       {!loadingTimes && availableTimes.length > 0 && (
         <div className="grid grid-cols-3 gap-3 mt-4">
           {availableTimes.map((t) => (
@@ -433,6 +432,7 @@ export default function BookingPage() {
       >
         {tr.book}
       </button>
+
     </div>
   );
 }

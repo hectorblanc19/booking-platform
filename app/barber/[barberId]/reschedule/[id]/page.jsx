@@ -83,7 +83,8 @@ export default function ReschedulePage() {
 
     setLoadingTimes(true);
 
-    const dayOfWeek = new Date(selectedDate)
+    // ⭐ FIXED: Local-time date parsing to avoid wrong weekday at night
+    const dayOfWeek = new Date(selectedDate + "T00:00:00")
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
 
@@ -139,13 +140,7 @@ export default function ReschedulePage() {
       });
     }
 
-    // Same-day: remove past times
-    const today = new Date().toISOString().split("T")[0];
-    if (selectedDate === today) {
-      const now = new Date();
-      const currentTime = now.toTimeString().slice(0, 5);
-      slots = slots.filter((slot) => slot >= currentTime);
-    }
+    // ⭐ SAME-DAY FILTER REMOVED — allow booking ANY time today
 
     setAvailableTimes(slots);
     setLoadingTimes(false);

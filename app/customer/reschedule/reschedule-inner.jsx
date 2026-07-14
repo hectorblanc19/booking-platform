@@ -93,7 +93,8 @@ export default function RescheduleInner() {
 
     setLoadingTimes(true);
 
-    const dayOfWeek = new Date(selectedDate)
+    // ⭐ FIXED: Local-time date parsing to avoid wrong weekday at night
+    const dayOfWeek = new Date(selectedDate + "T00:00:00")
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
 
@@ -148,14 +149,6 @@ export default function RescheduleInner() {
       });
     }
 
-    // Same-day: remove past times
-    const today = new Date().toISOString().split("T")[0];
-    if (selectedDate === today) {
-      const now = new Date();
-      const currentTime = now.toTimeString().slice(0, 5);
-      slots = slots.filter((slot) => slot >= currentTime);
-    }
-
     setAvailableTimes(slots);
     setLoadingTimes(false);
   }
@@ -177,7 +170,7 @@ export default function RescheduleInner() {
     const formattedTime = newTime + ":00";
 
     // Load availability again for safety
-    const dayOfWeek = new Date(newDate)
+    const dayOfWeek = new Date(newDate + "T00:00:00")
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
 
@@ -252,19 +245,32 @@ export default function RescheduleInner() {
       return;
     }
 
-    // Same-day past time
-    const today = new Date().toISOString().split("T")[0];
-    if (newDate === today) {
-      const currentTime = new Date().toTimeString().slice(0, 5);
-      if (newTime < currentTime) {
-        alert(
-          lang === "es"
-            ? "No puede seleccionar una hora pasada."
-            : "You cannot select a past time today."
-        );
-        return;
-      }
-    }
+    // ⭐ Correct same-day past-time validation (LOCAL TIME)
+function toMinutes(t) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+const today = new Date().toLocaleDateString("en-CA");
+
+// Only block past times if the selected date is TODAY
+if (newDate === today) {
+  const now = new Date();
+  const currentTime = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  if (toMinutes(newTime) < toMinutes(currentTime)) {
+    alert(
+      lang === "es"
+        ? "No puede seleccionar una hora pasada."
+        : "You cannot select a past time today."
+    );
+    return;
+  }
+}
 
     // ⭐ UPDATE APPOINTMENT
     await supabase

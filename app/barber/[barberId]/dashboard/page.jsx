@@ -141,41 +141,46 @@ export default function BarberDashboard() {
   }, [view]);
 
   async function loadAppointments() {
-    setLoading(true);
+  setLoading(true);
 
-    const today = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1);
+  // ⭐ FIX: Force local midnight to avoid UTC rollover
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-    const nextWeek = new Date();
-    nextWeek.setDate(today.getDate() + 7);
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(today.getDate() + 1);
 
-    let fromDate;
-    let toDate;
+  const nextWeek = new Date();
+  nextWeek.setHours(0, 0, 0, 0);
+  nextWeek.setDate(today.getDate() + 7);
 
-    if (view === "today") {
-      fromDate = today.toISOString().split("T")[0];
-      toDate = fromDate;
-    } else if (view === "tomorrow") {
-      fromDate = tomorrow.toISOString().split("T")[0];
-      toDate = fromDate;
-    } else {
-      fromDate = today.toISOString().split("T")[0];
-      toDate = nextWeek.toISOString().split("T")[0];
-    }
+  let fromDate;
+  let toDate;
 
-    const { data } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("barber_id", barberId)
-      .gte("date", fromDate)
-      .lte("date", toDate)
-      .order("date", { ascending: true })
-      .order("time", { ascending: true });
-
-    setAppointments(data || []);
-    setLoading(false);
+  if (view === "today") {
+    fromDate = today.toLocaleDateString("en-CA");
+    toDate = fromDate;
+  } else if (view === "tomorrow") {
+    fromDate = tomorrow.toLocaleDateString("en-CA");
+    toDate = fromDate;
+  } else {
+    fromDate = today.toLocaleDateString("en-CA");
+    toDate = nextWeek.toLocaleDateString("en-CA");
   }
+
+  const { data } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("barber_id", barberId)
+    .gte("date", fromDate)
+    .lte("date", toDate)
+    .order("date", { ascending: true })
+    .order("time", { ascending: true });
+
+  setAppointments(data || []);
+  setLoading(false);
+}
 
   async function cancelAppointment(id) {
     if (!confirm(tr.cancel)) return;
@@ -192,7 +197,7 @@ export default function BarberDashboard() {
     <div className="min-h-screen bg-gray-100 py-10">
       <div className="max-w-2xl mx-auto bg-white shadow-lg rounded-xl p-6">
 
-        {/* ⭐ Push Subscription for Barber */}
+                {/* ⭐ Push Subscription for Barber */}
         <ServiceWorkerClient role="business" barber_id={barberId} />
 
         {/* Language Toggle */}
@@ -367,7 +372,8 @@ export default function BarberDashboard() {
 
         {/* ⭐ Blocking Panel */}
         <div id="block-panel" className="mt-10">
-          <BlockingPanel barber={barberId} lang={lang} />
+          {/* ⭐ FIX: Correct prop name */}
+          <BlockingPanel barberId={barberId} lang={lang} />
         </div>
 
       </div>

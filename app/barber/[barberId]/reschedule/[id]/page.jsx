@@ -83,7 +83,15 @@ export default function ReschedulePage() {
 
     setLoadingTimes(true);
 
-    // ⭐ FIXED: Local-time date parsing to avoid wrong weekday at night
+    // ⭐ Block past dates completely
+    const todayDate = new Date().toISOString().split("T")[0];
+    if (selectedDate < todayDate) {
+      setAvailableTimes([]);
+      setLoadingTimes(false);
+      return;
+    }
+
+    // ⭐ FIXED: Local-time date parsing
     const dayOfWeek = new Date(selectedDate + "T00:00:00")
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
@@ -102,12 +110,24 @@ export default function ReschedulePage() {
       return;
     }
 
-    const startHour = parseInt(availability.start_time.split(":")[0]);
-    const endHour = parseInt(availability.end_time.split(":")[0]);
-
+    // ⭐ Duration-aware slot generation
     let slots = [];
-    for (let hour = startHour; hour < endHour; hour++) {
-      slots.push(`${hour.toString().padStart(2, "0")}:00`);
+
+    let current = new Date(`${selectedDate}T${availability.start_time}`);
+    const end = new Date(`${selectedDate}T${availability.end_time}`);
+
+    const selectedDuration = appointment.duration || 60;
+
+    while (current < end) {
+      const slotStr = current.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      slots.push(slotStr);
+
+      current = new Date(current.getTime() + selectedDuration * 60 * 1000);
     }
 
     // Booked appointments
@@ -130,17 +150,31 @@ export default function ReschedulePage() {
 
     if (blocks && blocks.length > 0) {
       blocks.forEach((block) => {
-        const blockStartHour = parseInt(block.start_time.split(":")[0]);
-        const blockEndHour = parseInt(block.end_time.split(":")[0]);
+        const blockStart = block.start_time.slice(0, 5);
+        const blockEnd = block.end_time.slice(0, 5);
 
-        for (let h = blockStartHour; h < blockEndHour; h++) {
-          const blockedHour = `${h.toString().padStart(2, "0")}:00`;
-          slots = slots.filter((t) => t !== blockedHour);
-        }
+        slots = slots.filter(
+          (t) => !(t >= blockStart && t < blockEnd)
+        );
       });
     }
 
-    // ⭐ SAME-DAY FILTER REMOVED — allow booking ANY time today
+    // ⭐ SAME-DAY: remove past times
+    if (selectedDate === todayDate) {
+      const now = new Date();
+      const currentTime = now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      const toMinutes = (t) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m;
+      };
+
+      slots = slots.filter((t) => toMinutes(t) >= toMinutes(currentTime));
+    }
 
     setAvailableTimes(slots);
     setLoadingTimes(false);
@@ -152,8 +186,29 @@ export default function ReschedulePage() {
       return;
     }
 
+    // ⭐ Block saving past dates
+    const todayDate = new Date().toISOString().split("T")[0];
+    if (newDate < todayDate) {
+      alert(
+        lang === "es"
+          ? "No puede seleccionar una fecha pasada."
+          : "You cannot select a past date."
+      );
+      return;
+    }
+
+    // Prevent rescheduling past appointments
+    const now = new Date();
+    const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+
+    if (apptDateTime < now) {
+      alert(tr.past);
+      return;
+    }
+
     const formattedTime = newTime + ":00";
 
+    // ⭐ UPDATE APPOINTMENT
     await supabase
       .from("appointments")
       .update({

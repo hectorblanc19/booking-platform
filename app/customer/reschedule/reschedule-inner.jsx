@@ -38,14 +38,14 @@ const t = {
   },
 };
 
-// Simple visual time slot button
+// Time slot button
 function TimeSlot({ time, selected, onSelect }) {
   return (
     <button
       onClick={() => onSelect(time)}
-      className={`px-4 py-2 rounded-xl border text-center
-        ${selected === time ? "bg-black text-white" : "bg-white text-black"}
-      `}
+      className={`px-4 py-2 rounded-xl border text-center ${
+        selected === time ? "bg-black text-white" : "bg-white text-black"
+      }`}
     >
       {time}
     </button>
@@ -93,11 +93,20 @@ export default function RescheduleInner() {
 
     setLoadingTimes(true);
 
-    // ⭐ FIXED: Local-time date parsing to avoid wrong weekday at night
+    // ⭐ Block past dates completely
+    const todayDate = new Date().toISOString().split("T")[0];
+    if (selectedDate < todayDate) {
+      setAvailableTimes([]);
+      setLoadingTimes(false);
+      return;
+    }
+
+    // ⭐ FIXED: Local-time date parsing
     const dayOfWeek = new Date(selectedDate + "T00:00:00")
       .toLocaleDateString("en-US", { weekday: "long" })
       .toLowerCase();
 
+    // Barber availability
     const { data: availability } = await supabase
       .from("barber_availability")
       .select("*")
@@ -111,23 +120,35 @@ export default function RescheduleInner() {
       return;
     }
 
-    const startHour = parseInt(availability.start_time.split(":")[0]);
-    const endHour = parseInt(availability.end_time.split(":")[0]);
-
+    // ⭐ Duration-aware slot generation
     let slots = [];
-    for (let hour = startHour; hour < endHour; hour++) {
-      slots.push(`${hour.toString().padStart(2, "0")}:00`);
+
+    let current = new Date(`${selectedDate}T${availability.start_time}`);
+    const end = new Date(`${selectedDate}T${availability.end_time}`);
+
+    const selectedDuration = appointment.duration || 60;
+
+    while (current < end) {
+      const slotStr = current.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      slots.push(slotStr);
+
+      current = new Date(current.getTime() + selectedDuration * 60 * 1000);
     }
 
-    // Existing confirmed appointments
-    const { data: appointments } = await supabase
+    // Booked appointments
+    const { data: bookedAppts } = await supabase
       .from("appointments")
       .select("*")
       .eq("barber_id", appointment.barber_id)
       .eq("date", selectedDate)
       .eq("status", "confirmed");
 
-    const booked = appointments?.map((a) => a.time.slice(0, 5)) || [];
+    const booked = bookedAppts?.map((a) => a.time.slice(0, 5)) || [];
     slots = slots.filter((t) => !booked.includes(t));
 
     // Barber blocks
@@ -139,22 +160,50 @@ export default function RescheduleInner() {
 
     if (blocks && blocks.length > 0) {
       blocks.forEach((block) => {
-        const blockStartHour = parseInt(block.start_time.split(":")[0]);
-        const blockEndHour = parseInt(block.end_time.split(":")[0]);
+        const blockStart = block.start_time.slice(0, 5);
+        const blockEnd = block.end_time.slice(0, 5);
 
-        for (let h = blockStartHour; h < blockEndHour; h++) {
-          const blockedHour = `${h.toString().padStart(2, "0")}:00`;
-          slots = slots.filter((t) => t !== blockedHour);
-        }
+        slots = slots.filter(
+          (t) => !(t >= blockStart && t < blockEnd)
+        );
       });
+    }
+
+    // ⭐ SAME-DAY: remove past times
+    if (selectedDate === todayDate) {
+      const now = new Date();
+      const currentTime = now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      const toMinutes = (t) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m;
+      };
+
+      slots = slots.filter((t) => toMinutes(t) >= toMinutes(currentTime));
     }
 
     setAvailableTimes(slots);
     setLoadingTimes(false);
   }
+
   async function saveChanges() {
     if (!newDate || !newTime) {
       alert(tr.selectDateTime);
+      return;
+    }
+
+    // ⭐ Block saving past dates
+    const todayDate = new Date().toISOString().split("T")[0];
+    if (newDate < todayDate) {
+      alert(
+        lang === "es"
+          ? "No puede seleccionar una fecha pasada."
+          : "You cannot select a past date."
+      );
       return;
     }
 
@@ -168,109 +217,6 @@ export default function RescheduleInner() {
     }
 
     const formattedTime = newTime + ":00";
-
-    // Load availability again for safety
-    const dayOfWeek = new Date(newDate + "T00:00:00")
-      .toLocaleDateString("en-US", { weekday: "long" })
-      .toLowerCase();
-
-    const { data: availability } = await supabase
-      .from("barber_availability")
-      .select("*")
-      .eq("barber_id", appointment.barber_id)
-      .eq("day_of_week", dayOfWeek)
-      .single();
-
-    if (!availability || availability.is_closed) {
-      alert(
-        lang === "es"
-          ? "El barbero no trabaja este día."
-          : "Barber is not available on this day."
-      );
-      return;
-    }
-
-    const selectedTime = newTime + ":00";
-
-    if (
-      selectedTime < availability.start_time ||
-      selectedTime >= availability.end_time
-    ) {
-      alert(
-        lang === "es"
-          ? `El barbero solo trabaja de ${availability.start_time} a ${availability.end_time}.`
-          : `Barber only works from ${availability.start_time} to ${availability.end_time}.`
-      );
-      return;
-    }
-
-    // Blocks
-    const { data: blocks } = await supabase
-      .from("barber_blocks")
-      .select("*")
-      .eq("barber_id", appointment.barber_id)
-      .eq("date", newDate);
-
-    if (blocks && blocks.length > 0) {
-      for (const block of blocks) {
-        if (
-          selectedTime >= block.start_time &&
-          selectedTime < block.end_time
-        ) {
-          alert(
-            lang === "es"
-              ? "Esta hora está bloqueada por el barbero."
-              : "This time is blocked by the barber."
-          );
-          return;
-        }
-      }
-    }
-
-    // Already booked
-    const { data: existing } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("barber_id", appointment.barber_id)
-      .eq("date", newDate)
-      .eq("status", "confirmed");
-
-    const booked = existing.map((a) => a.time.slice(0, 5));
-    if (booked.includes(newTime)) {
-      alert(
-        lang === "es"
-          ? "Esta hora ya está ocupada."
-          : "This time is already booked."
-      );
-      return;
-    }
-
-    // ⭐ Correct same-day past-time validation (LOCAL TIME)
-function toMinutes(t) {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
-const today = new Date().toLocaleDateString("en-CA");
-
-// Only block past times if the selected date is TODAY
-if (newDate === today) {
-  const now = new Date();
-  const currentTime = now.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-
-  if (toMinutes(newTime) < toMinutes(currentTime)) {
-    alert(
-      lang === "es"
-        ? "No puede seleccionar una hora pasada."
-        : "You cannot select a past time today."
-    );
-    return;
-  }
-}
 
     // ⭐ UPDATE APPOINTMENT
     await supabase

@@ -66,11 +66,11 @@ const t = {
 
 // Service dropdown options
 const SERVICE_OPTIONS = [
-  { value: "Haircut", es: "Corte" },
-  { value: "Beard", es: "Barba" },
-  { value: "Haircut + Beard", es: "Corte + Barba" },
-  { value: "Fade", es: "Fade" },
-  { value: "Other", es: "Otro" },
+  { value: "Haircut", es: "Corte", duration: 30 },
+  { value: "Beard", es: "Barba", duration: 20 },
+  { value: "Haircut + Beard", es: "Corte + Barba", duration: 45 },
+  { value: "Fade", es: "Fade", duration: 40 },
+  { value: "Other", es: "Otro", duration: 0 },
 ];
 
 export default function BookingPage() {
@@ -134,12 +134,24 @@ export default function BookingPage() {
       return;
     }
 
-    const startHour = parseInt(availability.start_time.split(":")[0]);
-    const endHour = parseInt(availability.end_time.split(":")[0]);
-
     let slots = [];
-    for (let hour = startHour; hour < endHour; hour++) {
-      slots.push(`${hour.toString().padStart(2, "0")}:00`);
+
+    let current = new Date(`${selectedDate}T${availability.start_time}`);
+    const end = new Date(`${selectedDate}T${availability.end_time}`);
+
+    const selectedDuration =
+      SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60;
+
+    while (current < end) {
+      const slotStr = current.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      slots.push(slotStr);
+
+      current = new Date(current.getTime() + selectedDuration * 60 * 1000);
     }
 
     const { data: appointments } = await supabase
@@ -160,13 +172,10 @@ export default function BookingPage() {
 
     if (blocks && blocks.length > 0) {
       blocks.forEach(block => {
-        const blockStart = parseInt(block.start_time.split(":")[0]);
-        const blockEnd = parseInt(block.end_time.split(":")[0]);
+        const blockStart = block.start_time.slice(0, 5);
+        const blockEnd = block.end_time.slice(0, 5);
 
-        for (let h = blockStart; h < blockEnd; h++) {
-          const blockedHour = `${h.toString().padStart(2, "0")}:00`;
-          slots = slots.filter(t => t !== blockedHour);
-        }
+        slots = slots.filter(t => !(t >= blockStart && t < blockEnd));
       });
     }
 
@@ -196,7 +205,11 @@ export default function BookingPage() {
     const formattedTime = time + ":00";
 
     const newStart = new Date(`${date}T${formattedTime}`);
-    const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
+
+    const selectedDuration =
+      SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60;
+
+    const newEnd = new Date(newStart.getTime() + selectedDuration * 60 * 1000);
 
     const { data: existing } = await supabase
       .from("appointments")
@@ -208,7 +221,10 @@ export default function BookingPage() {
     if (existing && existing.length > 0) {
       for (const appt of existing) {
         const existingStart = new Date(`${appt.date}T${appt.time}`);
-        const existingEnd = new Date(existingStart.getTime() + 60 * 60 * 1000);
+
+        const existingEnd = new Date(
+          existingStart.getTime() + (appt.duration || 60) * 60 * 1000
+        );
 
         if (existingStart < newEnd && existingEnd > newStart) {
           alert(tr.slotTaken);
@@ -225,7 +241,7 @@ export default function BookingPage() {
       service,
       date,
       time: formattedTime,
-      duration: 60,
+      duration: SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60,
       customer_name: customerName,
       customer_phone: customerPhone,
       customer_email: customerEmail,
@@ -283,6 +299,7 @@ export default function BookingPage() {
       </div>
     );
   }
+
   return (
     <div className="max-w-xl mx-auto p-6">
 
@@ -304,7 +321,7 @@ export default function BookingPage() {
       </div>
 
       {/* ⭐ Barber Header */}
-      <div className="flex items-center gap-4 mb-6 mt-2">
+      <div className="flex items-center gap-4 mb-6 mt-2 p-4 bg-white rounded-xl shadow-sm">
         <img
           src={barber.photo_url || "/default-barber.png"}
           alt={barber.name}
@@ -316,9 +333,22 @@ export default function BookingPage() {
             {tr.title} {barber.name}
           </h1>
 
-          <p className="text-gray-500">
-            {tr.business}: {barber.businesses?.name || "Unknown"}
-          </p>
+          {/* Shop Name */}
+          {barber.businesses?.name && (
+            <p className="text-gray-500">
+              {tr.business}: {barber.businesses.name}
+            </p>
+          )}
+
+          {/* Shop Address */}
+          {barber.businesses?.address && (
+            <p className="text-sm text-gray-500">📍 {barber.businesses.address}</p>
+          )}
+
+          {/* Shop Phone */}
+          {barber.businesses?.phone && (
+            <p className="text-sm text-gray-500">📞 {barber.businesses.phone}</p>
+          )}
         </div>
       </div>
 
@@ -334,7 +364,9 @@ export default function BookingPage() {
 
           {SERVICE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
-              {lang === "en" ? opt.value : opt.es}
+              {lang === "en"
+                ? `${opt.value} — ${opt.duration} min`
+                : `${opt.es} — ${opt.duration} min`}
             </option>
           ))}
         </select>

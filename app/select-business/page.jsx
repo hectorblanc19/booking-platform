@@ -8,6 +8,9 @@ export default function WelcomePage() {
   const [lang, setLang] = useState("es");
   const [businesses, setBusinesses] = useState([]);
 
+  // Independent barbers
+  const [independentBarbers, setIndependentBarbers] = useState([]);
+
   const t = {
     es: {
       title: "Reserva Fácil. Rápido. Profesional.",
@@ -16,6 +19,10 @@ export default function WelcomePage() {
       viewAll: "Ver todos los negocios",
       login: "Entrar al Panel",
       footer: "FlowPayDR — Plataforma de Reservas",
+      independent: "Barberos Independientes",
+      noIndependent: "No hay barberos independientes.",
+      phone: "Teléfono",
+      days: "Días",
     },
     en: {
       title: "Easy Booking. Fast. Professional.",
@@ -24,6 +31,10 @@ export default function WelcomePage() {
       viewAll: "View all businesses",
       login: "Login to Dashboard",
       footer: "FlowPayDR — Booking Platform",
+      independent: "Independent Barbers",
+      noIndependent: "No independent barbers available.",
+      phone: "Phone",
+      days: "Days",
     },
   };
 
@@ -31,11 +42,22 @@ export default function WelcomePage() {
 
   useEffect(() => {
     loadBusinesses();
+    loadIndependentBarbers();
   }, []);
 
   async function loadBusinesses() {
     const { data } = await supabase.from("businesses").select("*").limit(4);
     setBusinesses(data || []);
+  }
+
+  // Load independent barbers
+  async function loadIndependentBarbers() {
+    const { data } = await supabase
+      .from("barbers")
+      .select("*")
+      .is("business_id", null);
+
+    setIndependentBarbers(data || []);
   }
 
   return (
@@ -44,13 +66,17 @@ export default function WelcomePage() {
       {/* Language Toggle */}
       <div className="flex justify-end p-4 gap-2">
         <button
-          className={`px-3 py-1 rounded ${lang === "es" ? "bg-black text-white" : "bg-gray-200"}`}
+          className={`px-3 py-1 rounded ${
+            lang === "es" ? "bg-black text-white" : "bg-gray-200"
+          }`}
           onClick={() => setLang("es")}
         >
           ES
         </button>
         <button
-          className={`px-3 py-1 rounded ${lang === "en" ? "bg-black text-white" : "bg-gray-200"}`}
+          className={`px-3 py-1 rounded ${
+            lang === "en" ? "bg-black text-white" : "bg-gray-200"
+          }`}
           onClick={() => setLang("en")}
         >
           EN
@@ -69,7 +95,6 @@ export default function WelcomePage() {
             </button>
           </Link>
 
-          {/* ⭐ FIXED: Now goes to /barber/login instead of /admin */}
           <Link href="/barber/login">
             <button className="bg-gray-200 px-6 py-3 rounded-xl text-lg shadow">
               {tr.login}
@@ -97,6 +122,37 @@ export default function WelcomePage() {
           <Link href="/select-business" className="text-blue-600 underline">
             {tr.viewAll}
           </Link>
+        </div>
+      </div>
+
+      {/* INDEPENDENT BARBERS */}
+      <div className="mt-16 px-6 max-w-4xl mx-auto w-full">
+        <h2 className="text-2xl font-bold mb-6">{tr.independent}</h2>
+
+        {independentBarbers.length === 0 && (
+          <p className="text-gray-500 text-sm">{tr.noIndependent}</p>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {independentBarbers.map((barber) => (
+            <Link key={barber.id} href={`/booking/${barber.id}`}>
+              <div className="p-5 bg-white rounded-xl shadow hover:shadow-lg transition cursor-pointer">
+                <h3 className="text-xl font-semibold">{barber.name}</h3>
+
+                {barber.phone && (
+                  <p className="text-gray-600">
+                    {tr.phone}: {barber.phone}
+                  </p>
+                )}
+
+                {barber.working_days && (
+                  <p className="text-gray-600">
+                    {tr.days}: {barber.working_days.join(", ").toUpperCase()}
+                  </p>
+                )}
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
 

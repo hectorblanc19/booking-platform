@@ -91,15 +91,19 @@ export default function AdminPanel() {
     loadAll();
   }
 
-  // ⭐ UPDATED Add Barber
+  // ⭐ UPDATED Add Barber — supports independent barbers
   async function addBarber() {
     if (!newBarberName || !newBarberEmail || !newBarberBusiness)
       return alert("Fill all fields");
 
+    // ⭐ Convert "none" → null
+    const businessValue =
+      newBarberBusiness === "none" ? null : newBarberBusiness;
+
     const { error } = await supabase.from("barbers").insert({
       name: newBarberName,
       email: newBarberEmail,
-      business_id: newBarberBusiness,
+      business_id: businessValue,
       phone: newBarberPhone,
       working_days: newBarberWorkingDays,
     });
@@ -146,40 +150,39 @@ export default function AdminPanel() {
     loadAll();
   }
 
-// ⭐ Block Barber
-async function blockBarber(id) {
-  const { error } = await supabase
-    .from("barbers")
-    .update({ payment_status: "unpaid" })
-    .eq("id", id);
+  // ⭐ Block Barber
+  async function blockBarber(id) {
+    const { error } = await supabase
+      .from("barbers")
+      .update({ payment_status: "unpaid" })
+      .eq("id", id);
 
-  if (error) {
-    console.error("Error blocking barber:", error);
-    showMessage("error", "Error blocking barber: " + error.message);
-    return;
+    if (error) {
+      console.error("Error blocking barber:", error);
+      showMessage("error", "Error blocking barber: " + error.message);
+      return;
+    }
+
+    showMessage("success", "Barber blocked");
+    loadAll();
   }
 
-  showMessage("success", "Barber blocked");
-  loadAll();
-}
+  // ⭐ Unblock Barber
+  async function unblockBarber(id) {
+    const { error } = await supabase
+      .from("barbers")
+      .update({ payment_status: "paid" })
+      .eq("id", id);
 
-// ⭐ Unblock Barber
-async function unblockBarber(id) {
-  const { error } = await supabase
-    .from("barbers")
-    .update({ payment_status: "paid" })
-    .eq("id", id);
+    if (error) {
+      console.error("Error unblocking barber:", error);
+      showMessage("error", "Error unblocking barber: " + error.message);
+      return;
+    }
 
-  if (error) {
-    console.error("Error unblocking barber:", error);
-    showMessage("error", "Error unblocking barber: " + error.message);
-    return;
+    showMessage("success", "Barber unblocked");
+    loadAll();
   }
-
-  showMessage("success", "Barber unblocked");
-  loadAll();
-}
-
 
   if (loading) return <p className="p-6">Loading admin panel...</p>;
 
@@ -311,209 +314,214 @@ async function unblockBarber(id) {
             Add Business
           </button>
         </div>
-{/* Business List */}
-<div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
-  {filteredBusinesses.map((b) => (
-    <div
-      key={b.id}
-      className="flex justify-between items-center border-b last:border-none py-2"
-    >
-      <div>
-        <p className="font-semibold text-sm">{b.name}</p>
 
-        {b.phone && (
-          <p className="text-xs text-gray-600">Phone: {b.phone}</p>
-        )}
+        {/* Business List */}
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
+          {filteredBusinesses.map((b) => (
+            <div
+              key={b.id}
+              className="flex justify-between items-center border-b last:border-none py-2"
+            >
+              <div>
+                <p className="font-semibold text-sm">{b.name}</p>
 
-        {b.address && (
-          <p className="text-xs text-gray-600">Address: {b.address}</p>
-        )}
+                {b.phone && (
+                  <p className="text-xs text-gray-600">Phone: {b.phone}</p>
+                )}
 
-        {/* ⭐ SHOW BUSINESS HOURS */}
-        {b.open_time && b.close_time && (
-          <p className="text-xs text-gray-600">
-            Hours: {b.open_time} - {b.close_time}
-          </p>
-        )}
-      </div>
+                {b.address && (
+                  <p className="text-xs text-gray-600">Address: {b.address}</p>
+                )}
 
-      <button
-        className="text-red-600 text-sm"
-        onClick={() => deleteBusiness(b.id)}
-      >
-        Delete
-      </button>
-    </div>
-  ))}
+                {/* ⭐ SHOW BUSINESS HOURS */}
+                {b.open_time && b.close_time && (
+                  <p className="text-xs text-gray-600">
+                    Hours: {b.open_time} - {b.close_time}
+                  </p>
+                )}
+              </div>
 
-  {filteredBusinesses.length === 0 && (
-    <p className="text-xs text-gray-500">No businesses found.</p>
-  )}
-</div>
-</section>
+              <button
+                className="text-red-600 text-sm"
+                onClick={() => deleteBusiness(b.id)}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
 
-{/* ⭐ BARBERS SECTION ⭐ */}
-<section className="space-y-4">
-  <div className="flex items-center justify-between">
-    <h2 className="text-xl font-semibold">Barbers</h2>
-    <input
-      className="border border-gray-300 rounded-lg px-3 py-1 text-sm bg-white"
-      placeholder="Search barbers..."
-      value={barberSearch}
-      onChange={(e) => setBarberSearch(e.target.value)}
-    />
-  </div>
+          {filteredBusinesses.length === 0 && (
+            <p className="text-xs text-gray-500">No businesses found.</p>
+          )}
+        </div>
+      </section>
 
-  {/* Add Barber Form */}
-  <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3">
+      {/* ⭐ BARBERS SECTION ⭐ */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Barbers</h2>
+          <input
+            className="border border-gray-300 rounded-lg px-3 py-1 text-sm bg-white"
+            placeholder="Search barbers..."
+            value={barberSearch}
+            onChange={(e) => setBarberSearch(e.target.value)}
+          />
+        </div>
 
-    {/* 3-column row */}
-    <div className="grid grid-cols-3 gap-3">
-      <input
-        className="border border-gray-300 p-2 rounded-lg text-sm"
-        placeholder="Barber name"
-        value={newBarberName}
-        onChange={(e) => setNewBarberName(e.target.value)}
-      />
+        {/* Add Barber Form */}
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3">
 
-      <input
-        className="border border-gray-300 p-2 rounded-lg text-sm"
-        placeholder="Barber email"
-        value={newBarberEmail}
-        onChange={(e) => setNewBarberEmail(e.target.value)}
-      />
-
-      <select
-        className="border border-gray-300 p-2 rounded-lg text-sm bg-white"
-        value={newBarberBusiness}
-        onChange={(e) => setNewBarberBusiness(e.target.value)}
-      >
-        <option value="">Select business</option>
-        {businesses.map((b) => (
-          <option key={b.id} value={b.id}>
-            {b.name}
-          </option>
-        ))}
-      </select>
-    </div>
-
-    {/* Phone Number */}
-    <input
-      className="border border-gray-300 p-2 rounded-lg text-sm w-full"
-      placeholder="Phone number"
-      value={newBarberPhone}
-      onChange={(e) => setNewBarberPhone(e.target.value)}
-    />
-
-    {/* Working Days */}
-    <div>
-      <p className="text-sm font-semibold mb-1">Working Days</p>
-
-      <div className="grid grid-cols-4 gap-2 text-sm">
-        {["mon","tue","wed","thu","fri","sat","sun"].map((day) => (
-          <label key={day} className="flex items-center gap-2">
+          {/* 3-column row */}
+          <div className="grid grid-cols-3 gap-3">
             <input
-              type="checkbox"
-              checked={newBarberWorkingDays.includes(day)}
-              onChange={() => {
-                if (newBarberWorkingDays.includes(day)) {
-                  setNewBarberWorkingDays(
-                    newBarberWorkingDays.filter((d) => d !== day)
-                  );
-                } else {
-                  setNewBarberWorkingDays([...newBarberWorkingDays, day]);
-                }
-              }}
+              className="border border-gray-300 p-2 rounded-lg text-sm"
+              placeholder="Barber name"
+              value={newBarberName}
+              onChange={(e) => setNewBarberName(e.target.value)}
             />
-            {day.toUpperCase()}
-          </label>
-        ))}
-      </div>
-    </div>
 
-    <button
-      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm"
-      onClick={addBarber}
-    >
-      Add Barber
-    </button>
-  </div>
+            <input
+              className="border border-gray-300 p-2 rounded-lg text-sm"
+              placeholder="Barber email"
+              value={newBarberEmail}
+              onChange={(e) => setNewBarberEmail(e.target.value)}
+            />
 
-  {/* Barber List */}
-<div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
-  {filteredBarbers.map((b) => (
-    <div
-      key={b.id}
-      className="flex justify-between items-center border-b last:border-none py-2"
-    >
-      <div>
-        <p className="font-semibold text-sm">{b.name}</p>
-        <p className="text-xs text-gray-600">{b.email}</p>
+            <select
+              className="border border-gray-300 p-2 rounded-lg text-sm bg-white"
+              value={newBarberBusiness}
+              onChange={(e) => setNewBarberBusiness(e.target.value)}
+            >
+              <option value="">Select business</option>
 
-        {b.phone && (
-          <p className="text-xs text-gray-600">Phone: {b.phone}</p>
-        )}
+              {/* ⭐ Independent Barber Option */}
+              <option value="none">Independent Barber</option>
 
-        {b.working_days && (
-          <p className="text-xs text-gray-600">
-            Days: {b.working_days.join(", ").toUpperCase()}
-          </p>
-        )}
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <p className="text-xs text-gray-600">
-          Business: {b.businesses?.name || "—"}
-        </p>
+          {/* Phone Number */}
+          <input
+            className="border border-gray-300 p-2 rounded-lg text-sm w-full"
+            placeholder="Phone number"
+            value={newBarberPhone}
+            onChange={(e) => setNewBarberPhone(e.target.value)}
+          />
 
-        {/* STATUS BADGE */}
-        {b.payment_status === "unpaid" ? (
-          <span className="inline-block mt-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
-            BLOCKED
-          </span>
-        ) : (
-          <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
-            ACTIVE
-          </span>
-        )}
-      </div>
+          {/* Working Days */}
+          <div>
+            <p className="text-sm font-semibold mb-1">Working Days</p>
 
-      {/* BUTTONS */}
-      <div className="flex gap-3">
+            <div className="grid grid-cols-4 gap-2 text-sm">
+              {["mon","tue","wed","thu","fri","sat","sun"].map((day) => (
+                <label key={day} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newBarberWorkingDays.includes(day)}
+                    onChange={() => {
+                      if (newBarberWorkingDays.includes(day)) {
+                        setNewBarberWorkingDays(
+                          newBarberWorkingDays.filter((d) => d !== day)
+                        );
+                      } else {
+                        setNewBarberWorkingDays([...newBarberWorkingDays, day]);
+                      }
+                    }}
+                  />
+                  {day.toUpperCase()}
+                </label>
+              ))}
+            </div>
+          </div>
 
-        {/* BLOCK BARBER */}
-        {b.payment_status !== "unpaid" && (
           <button
-            className="bg-red-600 text-white px-3 py-1 rounded text-xs"
-            onClick={() => blockBarber(b.id)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm"
+            onClick={addBarber}
           >
-            Block
+            Add Barber
           </button>
-        )}
+        </div>
 
-        {/* UNBLOCK BARBER */}
-        {b.payment_status === "unpaid" && (
-          <button
-            className="bg-green-600 text-white px-3 py-1 rounded text-xs"
-            onClick={() => unblockBarber(b.id)}
-          >
-            Unblock
-          </button>
-        )}
+        {/* Barber List */}
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
+          {filteredBarbers.map((b) => (
+            <div
+              key={b.id}
+              className="flex justify-between items-center border-b last:border-none py-2"
+            >
+              <div>
+                <p className="font-semibold text-sm">{b.name}</p>
+                <p className="text-xs text-gray-600">{b.email}</p>
 
-        {/* DELETE */}
-        <button
-          className="text-red-600 text-sm"
-          onClick={() => deleteBarber(b.id)}
-        >
-          Delete
-        </button>
+                {b.phone && (
+                  <p className="text-xs text-gray-600">Phone: {b.phone}</p>
+                )}
 
-      </div>
-    </div>
-  ))}
+                {b.working_days && (
+                  <p className="text-xs text-gray-600">
+                    Days: {b.working_days.join(", ").toUpperCase()}
+                  </p>
+                )}
 
-  {filteredBarbers.length === 0 && (
-    <p className="text-xs text-gray-500">No barbers found.</p>
-  )}
+                <p className="text-xs text-gray-600">
+                  Business: {b.businesses?.name || "Independent"}
+                </p>
+
+                {/* STATUS BADGE */}
+                {b.payment_status === "unpaid" ? (
+                  <span className="inline-block mt-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded">
+                    BLOCKED
+                  </span>
+                ) : (
+                  <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded">
+                    ACTIVE
+                  </span>
+                )}
+              </div>
+
+              {/* BUTTONS */}
+              <div className="flex gap-3">
+
+                {/* BLOCK BARBER */}
+                {b.payment_status !== "unpaid" && (
+                  <button
+                    className="bg-red-600 text-white px-3 py-1 rounded text-xs"
+                    onClick={() => blockBarber(b.id)}
+                  >
+                    Block
+                  </button>
+                )}
+
+                {/* UNBLOCK BARBER */}
+                {b.payment_status === "unpaid" && (
+                  <button
+                    className="bg-green-600 text-white px-3 py-1 rounded text-xs"
+                    onClick={() => unblockBarber(b.id)}
+                  >
+                    Unblock
+                  </button>
+                )}
+
+                {/* DELETE */}
+<button
+  className="text-red-600 text-sm"
+  onClick={() => deleteBarber(b.id)}
+>
+  Delete
+</button>
+
+</div>
+</div>
+))}
+
+{filteredBarbers.length === 0 && (
+  <p className="text-xs text-gray-500">No barbers found.</p>
+)}
 </div>
 </section>
 

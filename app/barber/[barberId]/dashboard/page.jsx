@@ -129,14 +129,21 @@ export default function BarberDashboard() {
   }, [view]);
 
   async function loadBarber() {
-    const { data } = await supabase
-      .from("barbers")
-      .select("*, businesses(*)")
-      .eq("id", barberId)
-      .single();
+  const { data, error } = await supabase
+    .from("barbers")
+    .select(`
+      *,
+      businesses(*)
+    `)
+    .eq("id", barberId)
+    .single();
 
-    setBarberData(data);
+  if (error) {
+    console.error("Error loading barber:", error);
   }
+
+  setBarberData(data);
+}
 
   async function handlePhotoUpload(event) {
     const file = event.target.files[0];

@@ -321,36 +321,51 @@ export default function BookingPage() {
       </div>
 
       {/* ⭐ Barber Header */}
-      <div className="flex items-center gap-4 mb-6 mt-2 p-4 bg-white rounded-xl shadow-sm">
-        <img
-          src={barber.photo_url || "/default-barber.png"}
-          alt={barber.name}
-          className="w-20 h-20 rounded-full object-cover border shadow"
-        />
+<div className="flex items-center gap-4 mb-6 mt-2 p-4 bg-white rounded-xl shadow-sm">
+  <img
+    src={barber.photo_url || "/default-barber.png"}
+    alt={barber.name}
+    className="w-20 h-20 rounded-full object-cover border shadow"
+  />
 
-        <div>
-          <h1 className="text-2xl font-bold">
-            {tr.title} {barber.name}
-          </h1>
+  <div>
+    <h1 className="text-2xl font-bold">
+      {tr.title} {barber.name}
+    </h1>
 
-          {/* Shop Name */}
-          {barber.businesses?.name && (
-            <p className="text-gray-500">
-              {tr.business}: {barber.businesses.name}
-            </p>
-          )}
+    {/* ⭐ Business Barber */}
+    {barber.businesses ? (
+      <>
+        <p className="text-gray-500">
+          {tr.business}: {barber.businesses.name}
+        </p>
 
-          {/* Shop Address */}
-          {barber.businesses?.address && (
-            <p className="text-sm text-gray-500">📍 {barber.businesses.address}</p>
-          )}
+        {barber.businesses.address && (
+          <p className="text-sm text-gray-500">📍 {barber.businesses.address}</p>
+        )}
 
-          {/* Shop Phone */}
-          {barber.businesses?.phone && (
-            <p className="text-sm text-gray-500">📞 {barber.businesses.phone}</p>
-          )}
-        </div>
-      </div>
+        {barber.businesses.phone && (
+          <p className="text-sm text-gray-500">📞 {barber.businesses.phone}</p>
+        )}
+      </>
+    ) : (
+      /* ⭐ Independent Barber */
+      <>
+        <p className="text-gray-500">
+          {tr.business}: Independent Barber
+        </p>
+
+        {barber.address && (
+          <p className="text-sm text-gray-500">📍 {barber.address}</p>
+        )}
+
+        {barber.phone && (
+          <p className="text-sm text-gray-500">📞 {barber.phone}</p>
+        )}
+      </>
+    )}
+  </div>
+</div>
 
       {/* ⭐ Service */}
       <div className="mt-4">

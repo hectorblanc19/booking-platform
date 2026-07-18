@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+
 // ⭐ Visual Time Slot Component
 function TimeSlot({ time, selected, onSelect }) {
   return (
@@ -75,6 +76,7 @@ const SERVICE_OPTIONS = [
 
 export default function BookingPage() {
   const { barberId } = useParams();
+console.log("barberId:", barberId);
 
   const [lang, setLang] = useState("en");
   const tr = t[lang];
@@ -93,9 +95,21 @@ export default function BookingPage() {
 
   const [loadingTimes, setLoadingTimes] = useState(false);
 
-  useEffect(() => {
-    loadBarber();
-  }, []);
+  // ⭐ Reviews state
+const [reviews, setReviews] = useState([]);
+const [showReviews, setShowReviews] = useState(false);   // ⭐ ADD THIS LINE
+
+// ⭐ Load barber first
+useEffect(() => {
+  loadBarber();
+}, []);
+
+// ⭐ Load reviews AFTER barberId is available
+useEffect(() => {
+  if (barberId) {
+    loadReviews();
+  }
+}, [barberId]);
 
   async function loadBarber() {
     const { data, error } = await supabase
@@ -112,6 +126,18 @@ export default function BookingPage() {
     }
   }
 
+  // ⭐ Load reviews
+  async function loadReviews() {
+    const { data, error } = await supabase
+      .from("ratings")
+      .select("rating, review_text, created_at")
+      .eq("barber_id", barberId)
+      .order("created_at", { ascending: false });
+
+    if (!error) setReviews(data || []);
+  }
+
+  // ⭐ Available times logic (unchanged)
   async function loadAvailableTimes(selectedDate) {
     if (!selectedDate) return;
 
@@ -321,51 +347,108 @@ export default function BookingPage() {
       </div>
 
       {/* ⭐ Barber Header */}
-<div className="flex items-center gap-4 mb-6 mt-2 p-4 bg-white rounded-xl shadow-sm">
-  <img
-    src={barber.photo_url || "/default-barber.png"}
-    alt={barber.name}
-    className="w-20 h-20 rounded-full object-cover border shadow"
-  />
+      <div className="flex items-center gap-4 mb-6 mt-2 p-4 bg-white rounded-xl shadow-sm">
+        <img
+          src={barber.photo_url || "/default-barber.png"}
+          alt={barber.name}
+          className="w-20 h-20 rounded-full object-cover border shadow"
+        />
 
-  <div>
-    <h1 className="text-2xl font-bold">
-      {tr.title} {barber.name}
-    </h1>
+        <div>
+          <h1 className="text-2xl font-bold">
+            {tr.title} {barber.name}
+          </h1>
 
-    {/* ⭐ Business Barber */}
-    {barber.businesses ? (
-      <>
-        <p className="text-gray-500">
-          {tr.business}: {barber.businesses.name}
-        </p>
+          {/* ⭐ Business Barber */}
+          {barber.businesses ? (
+            <>
+              <p className="text-gray-500">
+                {tr.business}: {barber.businesses.name}
+              </p>
 
-        {barber.businesses.address && (
-          <p className="text-sm text-gray-500">📍 {barber.businesses.address}</p>
-        )}
+              {barber.businesses.address && (
+                <p className="text-sm text-gray-500">📍 {barber.businesses.address}</p>
+              )}
 
-        {barber.businesses.phone && (
-          <p className="text-sm text-gray-500">📞 {barber.businesses.phone}</p>
-        )}
-      </>
-    ) : (
-      /* ⭐ Independent Barber */
-      <>
-        <p className="text-gray-500">
-          {tr.business}: Independent Barber
-        </p>
+              {barber.businesses.phone && (
+                <p className="text-sm text-gray-500">📞 {barber.businesses.phone}</p>
+              )}
+            </>
+          ) : (
+            /* ⭐ Independent Barber */
+            <>
+              <p className="text-gray-500">
+                {tr.business}: Independent Barber
+              </p>
 
-        {barber.address && (
-          <p className="text-sm text-gray-500">📍 {barber.address}</p>
-        )}
+              {barber.address && (
+                <p className="text-sm text-gray-500">📍 {barber.address}</p>
+              )}
 
-        {barber.phone && (
-          <p className="text-sm text-gray-500">📞 {barber.phone}</p>
-        )}
-      </>
-    )}
-  </div>
+              {barber.phone && (
+                <p className="text-sm text-gray-500">📞 {barber.phone}</p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+{/* ⭐ Barber Rating Summary (compact + toggle) */}
+<div className="mb-6 p-4 bg-white rounded-xl shadow">
+  <h2 className="text-xl font-bold mb-2">
+    {lang === "en" ? "Barber Rating" : "Calificación del Barbero"}
+  </h2>
+
+  {reviews.length > 0 ? (
+    <>
+      <p className="text-lg font-semibold">
+        ⭐ {(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)} / 5
+      </p>
+
+      <p className="text-gray-600 text-sm">
+        {reviews.length} {lang === "en" ? "reviews" : "reseñas"}
+      </p>
+
+      <button
+        className="mt-2 text-blue-600 underline text-sm"
+        onClick={() => setShowReviews(!showReviews)}
+      >
+        {showReviews
+          ? lang === "en" ? "Hide Reviews" : "Ocultar Reseñas"
+          : lang === "en" ? "Show Reviews" : "Mostrar Reseñas"}
+      </button>
+    </>
+  ) : (
+    <p className="text-gray-500 text-sm">
+      {lang === "en" ? "No reviews yet" : "No hay reseñas todavía"}
+    </p>
+  )}
 </div>
+
+{/* ⭐ Reviews Section (hidden by default, limited to 5) */}
+{showReviews && (
+  <div className="mb-6 p-4 bg-white rounded-xl shadow">
+    <h2 className="text-xl font-bold mb-3">
+      {lang === "en" ? "Reviews" : "Reseñas"}
+    </h2>
+
+    {reviews.slice(0, 5).map((rev, index) => (
+      <div key={index} className="mb-4 border-b pb-3">
+        <p className="text-yellow-500 font-bold">
+          ⭐ {rev.rating} / 5
+        </p>
+
+       <p className="text-gray-700 mt-1 text-sm">
+  “{rev.review_text || (lang === "en" ? "No comment" : "Sin comentario")}”
+</p>
+
+        <p className="text-gray-400 text-xs mt-1">
+          {new Date(rev.created_at).toLocaleDateString()}
+        </p>
+      </div>
+    ))}
+  </div>
+)}
 
       {/* ⭐ Service */}
       <div className="mt-4">

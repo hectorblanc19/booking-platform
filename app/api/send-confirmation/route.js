@@ -31,7 +31,7 @@ export async function POST(req) {
     time,
     secret_link,
     lang = "en",
-    customer_id, // still received but NOT used for push
+    customer_id,
   } = body;
 
   if (!customer_email) {
@@ -81,24 +81,37 @@ export async function POST(req) {
     },
   }[langCode];
 
-  // ⭐ FETCH BUSINESS INFO
-  const { data: businessInfo } = await supabase
-    .from("businesses")
-    .select("name, address, phone")
-    .eq("id", business_id)
-    .single();
+  // ⭐ FETCH BUSINESS INFO (if any)
+  let businessInfo = null;
 
-  // ⭐ FETCH BARBER INFO
+  if (business_id) {
+    const { data } = await supabase
+      .from("businesses")
+      .select("name, address, phone")
+      .eq("id", business_id)
+      .single();
+
+    businessInfo = data;
+  }
+
+  // ⭐ FETCH BARBER INFO (always needed)
   const { data: barberInfo } = await supabase
     .from("barbers")
-    .select("name")
+    .select("name, address, phone")
     .eq("id", barber_id)
     .single();
 
+  // ⭐ Determine final values for independent vs business barbers
+  const finalBusinessName = businessInfo?.name || barberInfo.name;
+  const finalBusinessLabel = businessInfo?.name || "Independent Barber";
+  const finalAddress = businessInfo?.address || barberInfo.address || "N/A";
+  const finalPhone = businessInfo?.phone || barberInfo.phone || "N/A";
+
   // ⭐ Auto-generate Google Maps link
-  const mapsLink = businessInfo?.address
-    ? `https://maps.google.com/?q=${encodeURIComponent(businessInfo.address)}`
-    : null;
+  const mapsLink =
+    finalAddress !== "N/A"
+      ? `https://maps.google.com/?q=${encodeURIComponent(finalAddress)}`
+      : null;
 
   // ⭐ SEND EMAIL
   try {
@@ -110,14 +123,14 @@ export async function POST(req) {
         <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 550px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
           
           <h2 style="text-align:center;">${tr.title}</h2>
-          <p style="text-align:center;">${tr.thanks} <strong>${businessInfo?.name}</strong></p>
+          <p style="text-align:center;">${tr.thanks} <strong>${finalBusinessName}</strong></p>
 
           <h3>${tr.details}</h3>
           <p><strong>${tr.service}:</strong> ${translatedService}</p>
           <p><strong>${tr.barber}:</strong> ${barberInfo?.name}</p>
-          <p><strong>${tr.business}:</strong> ${businessInfo?.name}</p>
-          <p><strong>${tr.address}:</strong> ${businessInfo?.address || "N/A"}</p>
-          <p><strong>${tr.phone}:</strong> ${businessInfo?.phone || "N/A"}</p>
+          <p><strong>${tr.business}:</strong> ${finalBusinessLabel}</p>
+          <p><strong>${tr.address}:</strong> ${finalAddress}</p>
+          <p><strong>${tr.phone}:</strong> ${finalPhone}</p>
           <p><strong>${tr.date}:</strong> ${date}</p>
           <p><strong>${tr.time}:</strong> ${time}</p>
 
@@ -150,12 +163,12 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to send email" });
   }
 
-  // ⭐ SEND PUSH NOTIFICATION TO CUSTOMER (FIXED)
+  // ⭐ SEND PUSH NOTIFICATION TO CUSTOMER
   try {
     const { data: tokens } = await supabase
       .from("push_tokens")
       .select("subscription")
-      .eq("user_id", secret_link)   // ⭐ FIXED — use secret_link
+      .eq("user_id", secret_link)
       .eq("role", "customer");
 
     if (tokens && tokens.length > 0) {

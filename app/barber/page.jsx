@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-export default function BarberLoginPage() {
+export default function BarberSelectorPage() {
   const router = useRouter();
   const [barbers, setBarbers] = useState([]);
 
@@ -27,7 +27,7 @@ export default function BarberLoginPage() {
 
   return (
     <div className="max-w-xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Barber Login</h1>
+      <h1 className="text-2xl font-bold mb-4">Select Barber</h1>
 
       {barbers.map((barber) => (
         <div

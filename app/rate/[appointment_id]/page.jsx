@@ -1,3 +1,4 @@
+// force rebuild 29
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,12 +8,38 @@ export default function RatePage({ params }) {
 
   const [loading, setLoading] = useState(true);
   const [appointment, setAppointment] = useState(null);
-
-  // ⭐ IMPORTANT: force rating to start at 0 on first render
   const [rating, setRating] = useState(0);
-
   const [review, setReview] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [animateSuccess, setAnimateSuccess] = useState(false);
+
+  // ⭐ Language dictionary
+  const t = {
+    en: {
+      notFoundTitle: "Appointment not found",
+      alreadyRatedTitle: "Thank you for your review",
+      alreadyRatedText: "You already rated this appointment.",
+      thanksTitle: "Thank you!",
+      thanksText: "Your review was submitted successfully.",
+      rateTitle: "Rate your experience",
+      placeholder: "Write a review (optional)",
+      submit: "Submit Review",
+      selectRating: "Please select a rating.",
+      loading: "Loading...",
+    },
+    es: {
+      notFoundTitle: "Cita no encontrada",
+      alreadyRatedTitle: "Gracias por tu reseña",
+      alreadyRatedText: "Ya calificaste esta cita.",
+      thanksTitle: "¡Gracias!",
+      thanksText: "Tu reseña fue enviada correctamente.",
+      rateTitle: "Califica tu experiencia",
+      placeholder: "Escribe una reseña (opcional)",
+      submit: "Enviar Reseña",
+      selectRating: "Por favor selecciona una calificación.",
+      loading: "Cargando...",
+    },
+  };
 
   // ⭐ Fetch appointment info
   useEffect(() => {
@@ -21,9 +48,7 @@ export default function RatePage({ params }) {
         const res = await fetch(`/api/rate/get?id=${appointmentId}`);
         const data = await res.json();
 
-        // ⭐ Force rating reset BEFORE setting appointment
-        setRating(0);
-
+        setRating(0); // reset stars
         setAppointment(data);
       } catch (err) {
         console.error("Error loading appointment:", err);
@@ -35,14 +60,17 @@ export default function RatePage({ params }) {
     fetchAppointment();
   }, [appointmentId]);
 
+  // ⭐ Determine language from appointment
+  const lang = appointment?.lang === "es" ? "es" : "en";
+
   // ⭐ Loading state
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <p>{t[lang].loading}</p>;
 
   // ⭐ Appointment not found
   if (!appointment) {
     return (
       <div className="p-6 text-center">
-        <h2 className="text-xl font-bold">Cita no encontrada</h2>
+        <h2 className="text-xl font-bold">{t[lang].notFoundTitle}</h2>
       </div>
     );
   }
@@ -51,61 +79,67 @@ export default function RatePage({ params }) {
   if (appointment.rating_submitted) {
     return (
       <div className="p-6 text-center">
-        <h2 className="text-xl font-bold">Gracias por tu reseña</h2>
-        <p>Ya calificaste esta cita.</p>
+        <h2 className="text-xl font-bold">{t[lang].alreadyRatedTitle}</h2>
+        <p>{t[lang].alreadyRatedText}</p>
       </div>
     );
   }
 
-  // ⭐ After submitting
+  // ⭐ After submitting (with success animation)
   if (submitted) {
     return (
       <div className="p-6 text-center">
-        <h2 className="text-2xl font-bold mb-4">¡Gracias!</h2>
-        <p>Tu reseña fue enviada correctamente.</p>
+        {animateSuccess && (
+          <div className="flex justify-center mb-4">
+            <div className="animate-bounce text-green-500 text-6xl">✔</div>
+          </div>
+        )}
+        <h2 className="text-2xl font-bold mb-4">{t[lang].thanksTitle}</h2>
+        <p>{t[lang].thanksText}</p>
       </div>
     );
   }
 
- // ⭐ Submit rating
-async function submitRating() {
-  if (rating === 0) return alert("Por favor selecciona una calificación.");
+  // ⭐ Submit rating
+  async function submitRating() {
+    if (rating === 0) return alert(t[lang].selectRating);
 
-  const res = await fetch("/api/ratings/create", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      appointment_id: appointment.id,
-      barber_id: appointment.barber_id,
-      business_id: appointment.business_id,
-      customer_id: appointment.customer_id || null,
-      rating,
-      review_text: review,   // ⭐ FIXED — correct column name
-    }),
-  });
+    const res = await fetch("/api/ratings/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        appointment_id: appointment.id,
+        barber_id: appointment.barber_id,
+        business_id: appointment.business_id,
+        customer_id: appointment.customer_id || null,
+        rating,
+        review_text: review,
+      }),
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (data.success) {
-    setSubmitted(true);
-  } else {
-    alert("Error al enviar la reseña.");
+    if (data.success) {
+      setAnimateSuccess(true);
+      setSubmitted(true);
+    } else {
+      alert("Error submitting review.");
+    }
   }
-}
 
   return (
     <div className="p-6 max-w-lg mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Califica tu experiencia</h2>
+      <h2 className="text-2xl font-bold mb-4">{t[lang].rateTitle}</h2>
 
-      {/* ⭐ Star rating */}
+      {/* ⭐ Star rating with hover + bounce animation */}
       <div className="flex gap-2 mb-4">
         {[1, 2, 3, 4, 5].map((star) => (
           <span
             key={star}
             onClick={() => setRating(star)}
-            className={`cursor-pointer text-3xl ${
+            className={`cursor-pointer text-3xl transition-all duration-200 ${
               rating >= star ? "text-yellow-400" : "text-gray-300"
-            }`}
+            } hover:scale-125 active:scale-150`}
           >
             ⭐
           </span>
@@ -116,16 +150,16 @@ async function submitRating() {
       <textarea
         className="w-full p-3 border rounded mb-4"
         rows={4}
-        placeholder="Escribe una reseña (opcional)"
+        placeholder={t[lang].placeholder}
         value={review}
         onChange={(e) => setReview(e.target.value)}
       />
 
       <button
         onClick={submitRating}
-        className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold"
+        className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-all"
       >
-        Enviar Reseña
+        {t[lang].submit}
       </button>
     </div>
   );

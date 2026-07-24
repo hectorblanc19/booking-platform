@@ -1,7 +1,7 @@
-// force rebuild 8
+// force rebuild 25
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
@@ -10,6 +10,41 @@ export default function BarberLoginPage() {
 
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+  const [lang, setLang] = useState("en");
+
+  // Detect browser language
+  useEffect(() => {
+    const browserLang = navigator.language.startsWith("es") ? "es" : "en";
+    setLang(browserLang);
+  }, []);
+
+  const t = {
+    en: {
+      title: "Barber Login",
+      email: "Email",
+      pin: "PIN",
+      login: "Login",
+      empty: "Enter email and PIN",
+      invalid: "Invalid login",
+      loading: "Logging in...",
+      show: "Show",
+      hide: "Hide",
+    },
+    es: {
+      title: "Inicio de Barbero",
+      email: "Correo",
+      pin: "PIN",
+      login: "Entrar",
+      empty: "Ingresa correo y PIN",
+      invalid: "Login inválido",
+      loading: "Entrando...",
+      show: "Mostrar",
+      hide: "Ocultar",
+    },
+  };
 
   async function subscribeToPush(barberId) {
     try {
@@ -20,7 +55,6 @@ export default function BarberLoginPage() {
         applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
       });
 
-      // Save subscription to Supabase
       await supabase.from("push_tokens").upsert({
         user_id: barberId,
         role: "barber",
@@ -34,59 +68,104 @@ export default function BarberLoginPage() {
   }
 
   async function loginBarber() {
-    if (!email || !pin) {
-      alert("Enter email and PIN");
+    setError("");
+
+    if (!email.trim() || !pin.trim()) {
+      setError(t[lang].empty);
       return;
     }
+
+    setLoading(true);
 
     const { data: barber } = await supabase
       .from("barbers")
       .select("*")
-      .eq("email", email)
-      .eq("pin", pin)
+      .eq("email", email.trim().toLowerCase())
+      .eq("pin", pin.trim())
       .single();
 
     if (!barber) {
-      alert("Invalid login");
+      setLoading(false);
+      setError(t[lang].invalid);
       return;
     }
 
-    // ⭐ Save identity for push notifications
     localStorage.setItem("flowpay_role", "barber");
     localStorage.setItem("flowpay_user_id", barber.id);
 
-    // ⭐ Create push subscription BEFORE redirect
     await subscribeToPush(barber.id);
 
-    // ⭐ Redirect to the REAL dashboard
     router.push(`/barber/${barber.id}/dashboard`);
   }
 
   return (
     <div className="max-w-sm mx-auto p-6 mt-20">
-      <h1 className="text-2xl font-bold mb-6 text-center">Barber Login</h1>
 
-      <input
-        className="w-full border p-3 rounded mb-3"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+      {/* ES / EN side-by-side toggle */}
+      <div className="flex justify-end gap-4 mb-4">
+        <span
+          className={`cursor-pointer ${
+            lang === "es" ? "font-bold text-black" : "text-gray-500"
+          }`}
+          onClick={() => setLang("es")}
+        >
+          ES
+        </span>
 
-      <input
-        className="w-full border p-3 rounded mb-3"
-        placeholder="PIN"
-        type="password"
-        value={pin}
-        onChange={(e) => setPin(e.target.value)}
-      />
+        <span
+          className={`cursor-pointer ${
+            lang === "en" ? "font-bold text-black" : "text-gray-500"
+          }`}
+          onClick={() => setLang("en")}
+        >
+          EN
+        </span>
+      </div>
 
-      <button
-        className="w-full bg-black text-white py-3 rounded-xl"
-        onClick={loginBarber}
-      >
-        Login
-      </button>
+      <h1 className="text-2xl font-bold mb-6 text-center">{t[lang].title}</h1>
+
+      <div className="space-y-4">
+        <div>
+          <input
+            className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-black/50"
+            placeholder={t[lang].email}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+
+        <div className="relative">
+          <input
+            className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-black/50"
+            placeholder={t[lang].pin}
+            type={showPin ? "text" : "password"}
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+          />
+
+          <button
+            type="button"
+            className="absolute right-3 top-3 text-sm text-gray-600"
+            onClick={() => setShowPin(!showPin)}
+          >
+            {showPin ? t[lang].hide : t[lang].show}
+          </button>
+        </div>
+
+        {error && (
+          <p className="text-red-600 text-sm font-medium">{error}</p>
+        )}
+
+        <button
+          className={`w-full bg-black text-white py-3 rounded-xl transition-all ${
+            loading ? "opacity-70" : "hover:bg-black/90"
+          }`}
+          onClick={loginBarber}
+          disabled={loading}
+        >
+          {loading ? t[lang].loading : t[lang].login}
+        </button>
+      </div>
     </div>
   );
 }

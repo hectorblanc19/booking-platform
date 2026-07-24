@@ -14,7 +14,7 @@ export async function GET(req) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 
-  // ⭐ FIX: include ratings join so review_text loads
+  // ⭐ FIX: include `lang` so rating page shows correct language
   const { data, error } = await supabase
     .from("appointments")
     .select(`
@@ -26,6 +26,7 @@ export async function GET(req) {
       date,
       time,
       notes,
+      lang,
       rating_sent,
       rating_submitted,
       ratings (

@@ -78,8 +78,15 @@ export default function BookingPage() {
   const { barberId } = useParams();
 console.log("barberId:", barberId);
 
-  const [lang, setLang] = useState("en");
-  const tr = t[lang];
+  // ⭐ Auto-detect language from browser
+const [lang, setLang] = useState(
+  typeof navigator !== "undefined" &&
+  navigator.language.toLowerCase().startsWith("es")
+    ? "es"
+    : "en"
+);
+
+const tr = t[lang];
 
   const [barber, setBarber] = useState(null);
   const [service, setService] = useState("");

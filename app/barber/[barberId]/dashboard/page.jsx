@@ -274,41 +274,60 @@ export default function BarberDashboard() {
     });
   }
 
+ // ⭐ EARLY RETURN — stop dashboard completely
+if (barberData?.payment_status === "unpaid") {
   return (
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        {/* Top bar: language + push status */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm">{tr.langLabel}:</span>
-            <button
-              className={`px-2 py-1 text-sm rounded ${
-                lang === "es" ? "bg-black text-white" : "bg-gray-200"
-              }`}
-              onClick={() => setLang("es")}
-            >
-              {tr.es}
-            </button>
-            <button
-              className={`px-2 py-1 text-sm rounded ${
-                lang === "en" ? "bg-black text-white" : "bg-gray-200"
-              }`}
-              onClick={() => setLang("en")}
-            >
-              {tr.en}
-            </button>
-          </div>
+        <div className="mt-6 p-6 bg-white rounded-xl shadow text-center">
+          <h1 className="text-2xl font-bold text-red-600">
+            Barber Unavailable
+          </h1>
+          <p className="text-gray-600 mt-2">
+            This barber is currently blocked by the administrator.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <span className="inline-flex items-center gap-1">
-              <span className="text-lg">🔔</span>
-              {pushActive ? tr.pushActive : tr.pushInactive}
-            </span>
-          </div>
+return (
+  <div className="min-h-screen bg-gray-100 py-8">
+    <div className="max-w-4xl mx-auto px-4">
+
+      {/* Top bar: language + push status */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{tr.langLabel}:</span>
+          <button
+            className={`px-2 py-1 text-sm rounded ${
+              lang === "es" ? "bg-black text-white" : "bg-gray-200"
+            }`}
+            onClick={() => setLang("es")}
+          >
+            {tr.es}
+          </button>
+          <button
+            className={`px-2 py-1 text-sm rounded ${
+              lang === "en" ? "bg-black text-white" : "bg-gray-200"
+            }`}
+            onClick={() => setLang("en")}
+          >
+            {tr.en}
+          </button>
         </div>
 
-        {/* Push subscription */}
-        <ServiceWorkerClient role="business" barber_id={barberId} />
+        <div className="flex items-center gap-2 text-xs text-gray-600">
+          <span className="inline-flex items-center gap-1">
+            <span className="text-lg">🔔</span>
+            {pushActive ? tr.pushActive : tr.pushInactive}
+          </span>
+        </div>
+      </div>
+
+      {/* Push subscription */}
+      <ServiceWorkerClient role="business" barber_id={barberId} />
 
         {/* Header card */}
         <div className="bg-white rounded-2xl shadow-md p-5 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -476,28 +495,39 @@ export default function BarberDashboard() {
                     </div>
 
                     {/* Middle: details */}
-                    <div className="flex-1 text-sm">
-                      <p className="text-gray-700">
-                        <strong>{tr.service}:</strong>{" "}
-                        {serviceNames[appt.service]?.[lang] || appt.service}
-                      </p>
-                      <p className="text-gray-700 mt-1">
-                        <strong>{tr.customer}:</strong>{" "}
-                        {appt.customer_name || "N/A"}
-                      </p>
-                      <p className="text-gray-700 mt-1">
-                        <strong>{tr.phone}:</strong>{" "}
-                        {appt.customer_phone || "N/A"}
-                      </p>
-                      <p className="text-gray-700 mt-1">
-                        <strong>{tr.email}:</strong>{" "}
-                        {appt.customer_email || "N/A"}
-                      </p>
-                      <p className="text-gray-700 mt-1">
-                        <strong>{tr.notes}:</strong>{" "}
-                        {appt.notes || tr.noNotes}
-                      </p>
-                    </div>
+<div className="flex-1 text-sm">
+  <p className="text-gray-700">
+    <strong>{tr.service}:</strong>{" "}
+    {serviceNames[appt.service]?.[lang] || appt.service}
+  </p>
+
+  <p className="text-gray-700 mt-1">
+    <strong>{tr.customer}:</strong>{" "}
+    {appt.customer_name || "N/A"}
+  </p>
+
+  <p className="text-gray-700 mt-1">
+    <strong>{tr.phone}:</strong>{" "}
+    <a
+      href={`https://wa.me/${appt.customer_phone}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-green-600 underline flex items-center gap-1"
+    >
+      <span>💬</span> {appt.customer_phone}
+    </a>
+  </p>
+
+  <p className="text-gray-700 mt-1">
+    <strong>{tr.email}:</strong>{" "}
+    {appt.customer_email || "N/A"}
+  </p>
+
+  <p className="text-gray-700 mt-1">
+    <strong>{tr.notes}:</strong>{" "}
+    {appt.notes || tr.noNotes}
+  </p>
+</div>
 
                     {/* Right: actions */}
                     <div className="flex flex-col gap-2 md:w-40">

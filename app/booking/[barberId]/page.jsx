@@ -119,19 +119,31 @@ useEffect(() => {
 }, [barberId]);
 
   async function loadBarber() {
-    const { data, error } = await supabase
-      .from("barbers")
-      .select("*, businesses(*)")
-      .eq("id", barberId)
-      .single();
+  const { data, error } = await supabase
+    .from("barbers")
+    .select(`
+      id,
+      name,
+      email,
+      phone,
+      address,
+      map_url,
+      business_id,
+      photo_url,
+      payment_status,
+      working_days,
+      businesses(*)
+    `)
+    .eq("id", barberId)
+    .single();
 
-    if (!error) setBarber(data);
-    setLoading(false);
+  if (!error) setBarber(data);
+  setLoading(false);
 
-    if (data?.payment_status === "unpaid") {
-      setBarber({ ...data, blocked: true });
-    }
+  if (data?.payment_status === "unpaid") {
+    setBarber({ ...data, blocked: true });
   }
+}
 
   // ⭐ Load reviews
   async function loadReviews() {
@@ -354,51 +366,79 @@ useEffect(() => {
       </div>
 
       {/* ⭐ Barber Header */}
-      <div className="flex items-center gap-4 mb-6 mt-2 p-4 bg-white rounded-xl shadow-sm">
-        <img
-          src={barber.photo_url || "/default-barber.png"}
-          alt={barber.name}
-          className="w-20 h-20 rounded-full object-cover border shadow"
-        />
+<div className="flex items-center gap-4 mb-6 mt-2 p-4 bg-white rounded-xl shadow-sm">
+  <img
+    src={barber.photo_url || "/default-barber.png"}
+    alt={barber.name}
+    className="w-20 h-20 rounded-full object-cover border shadow"
+  />
 
-        <div>
-          <h1 className="text-2xl font-bold">
-            {tr.title} {barber.name}
-          </h1>
+  <div>
+    <h1 className="text-2xl font-bold">
+      {tr.title} {barber.name}
+    </h1>
 
-          {/* ⭐ Business Barber */}
-          {barber.businesses ? (
-            <>
-              <p className="text-gray-500">
-                {tr.business}: {barber.businesses.name}
-              </p>
+    {/* ⭐ Business Barber */}
+    {barber.businesses ? (
+      <>
+        <p className="text-gray-500">
+          {tr.business}: {barber.businesses.name}
+        </p>
 
-              {barber.businesses.address && (
-                <p className="text-sm text-gray-500">📍 {barber.businesses.address}</p>
-              )}
+        {barber.businesses.address && (
+          <p className="text-sm text-gray-500">📍 {barber.businesses.address}</p>
+        )}
 
-              {barber.businesses.phone && (
-                <p className="text-sm text-gray-500">📞 {barber.businesses.phone}</p>
-              )}
-            </>
-          ) : (
-            /* ⭐ Independent Barber */
-            <>
-              <p className="text-gray-500">
-                {tr.business}: Independent Barber
-              </p>
+        {barber.businesses.phone && (
+          <p className="text-sm text-gray-500">📞 {barber.businesses.phone}</p>
+        )}
 
-              {barber.address && (
-                <p className="text-sm text-gray-500">📍 {barber.address}</p>
-              )}
+        {/* ⭐ Google Maps URL (Business) */}
+        {barber.map_url && (
+          <a
+            href={barber.map_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline text-sm mt-1 inline-block"
+          >
+            {lang === "es"
+              ? "Ver ubicación exacta en Google Maps"
+              : "Open exact location in Google Maps"}
+          </a>
+        )}
+      </>
+    ) : (
+      /* ⭐ Independent Barber */
+      <>
+        <p className="text-gray-500">
+          {tr.business}: Independent Barber
+        </p>
 
-              {barber.phone && (
-                <p className="text-sm text-gray-500">📞 {barber.phone}</p>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+        {barber.address && (
+          <p className="text-sm text-gray-500">📍 {barber.address}</p>
+        )}
+
+        {barber.phone && (
+          <p className="text-sm text-gray-500">📞 {barber.phone}</p>
+        )}
+
+        {/* ⭐ Google Maps URL (Independent Barber) */}
+        {barber.map_url && (
+          <a
+            href={barber.map_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline text-sm mt-1 inline-block"
+          >
+            {lang === "es"
+              ? "Ver ubicación exacta en Google Maps"
+              : "Open exact location in Google Maps"}
+          </a>
+        )}
+      </>
+    )}
+  </div>
+</div>
 
 {/* ⭐ Barber Rating Summary (compact + toggle) */}
 <div className="mb-6 p-4 bg-white rounded-xl shadow">

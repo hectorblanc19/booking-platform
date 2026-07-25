@@ -22,8 +22,11 @@ export default function AdminPanel() {
   const [newBarberName, setNewBarberName] = useState("");
   const [newBarberEmail, setNewBarberEmail] = useState("");
   const [newBarberBusiness, setNewBarberBusiness] = useState("");
+// ⭐ NEW — Barber Address
+const [newBarberAddress, setNewBarberAddress] = useState("");
+ const [editingBarber, setEditingBarber] = useState(null);
 
-  // ⭐ NEW STATES
+ // ⭐ NEW STATES
   const [newBarberPhone, setNewBarberPhone] = useState("");
   const [newBarberWorkingDays, setNewBarberWorkingDays] = useState([]);
 
@@ -39,24 +42,43 @@ export default function AdminPanel() {
   useEffect(() => {
     loadAll();
   }, []);
+// ⭐ LOAD ALL — FIXED VERSION
+async function loadAll() {
+  setLoading(true);
 
-  async function loadAll() {
-    setLoading(true);
+  const { data: biz } = await supabase.from("businesses").select("*");
 
-    const { data: biz } = await supabase.from("businesses").select("*");
-    const { data: bar } = await supabase.from("barbers").select("*, businesses(*)");
-    const { data: appt } = await supabase
-      .from("appointments")
-      .select("*, barbers(name), businesses(name)")
-      .order("date", { ascending: false });
+  const { data: bar } = await supabase
+    .from("barbers")
+    .select(`
+      id,
+      name,
+      email,
+      phone,
+      address,
+      business_id,
+      working_days,
+      payment_status,
+      businesses:business_id(name)
+    `);
 
-    setBusinesses(biz || []);
-    setBarbers(bar || []);
-    setAppointments(appt || []);
+  const { data: appt } = await supabase
+    .from("appointments")
+    .select(`
+      *,
+      barbers:barber_id(name),
+      businesses:business_id(name)
+    `)
+    .order("date", { ascending: false });
 
-    setLoading(false);
-  }
+  setBusinesses(biz || []);
+  setBarbers(bar || []);
+  setAppointments(appt || []);
 
+  setLoading(false);
+}
+
+  
   function showMessage(type, text) {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 3000);
@@ -101,12 +123,13 @@ export default function AdminPanel() {
       newBarberBusiness === "none" ? null : newBarberBusiness;
 
     const { error } = await supabase.from("barbers").insert({
-      name: newBarberName,
-      email: newBarberEmail,
-      business_id: businessValue,
-      phone: newBarberPhone,
-      working_days: newBarberWorkingDays,
-    });
+  name: newBarberName,
+  email: newBarberEmail,
+  business_id: businessValue,
+  phone: newBarberPhone,
+  address: newBarberAddress,   // ⭐ REQUIRED
+  working_days: newBarberWorkingDays,
+});
 
     if (error) {
       console.error("Error adding barber:", error);
@@ -167,24 +190,45 @@ export default function AdminPanel() {
     loadAll();
   }
 
-  // ⭐ Unblock Barber
-  async function unblockBarber(id) {
-    const { error } = await supabase
-      .from("barbers")
-      .update({ payment_status: "paid" })
-      .eq("id", id);
+ // ⭐ Unblock Barber
+async function unblockBarber(id) {
+  const { error } = await supabase
+    .from("barbers")
+    .update({ payment_status: "paid" })
+    .eq("id", id);
 
-    if (error) {
-      console.error("Error unblocking barber:", error);
-      showMessage("error", "Error unblocking barber: " + error.message);
-      return;
-    }
-
-    showMessage("success", "Barber unblocked");
-    loadAll();
+  if (error) {
+    console.error("Error unblocking barber:", error);
+    showMessage("error", "Error unblocking barber: " + error.message);
+    return;
   }
 
-  if (loading) return <p className="p-6">Loading admin panel...</p>;
+  showMessage("success", "Barber unblocked");
+  loadAll();
+}
+
+// ⭐ Save Barber Edit (FINAL FIX)
+async function saveBarberEdit() {
+  const { id, name, phone, address, map_url } = editingBarber;
+
+  const { error } = await supabase
+    .from("barbers")
+    .update({ name, phone, address, map_url })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error updating barber:", error);
+    showMessage("error", "Error updating barber: " + error.message);
+    return;
+  }
+
+  showMessage("success", "Barber updated");
+  setEditingBarber(null);
+  loadAll();
+}
+
+if (loading) return <p className="p-6">Loading admin panel...</p>;
+
 
   // Filtered lists
   const filteredBusinesses = businesses.filter((b) =>
@@ -413,6 +457,15 @@ export default function AdminPanel() {
             onChange={(e) => setNewBarberPhone(e.target.value)}
           />
 
+{/* Barber Address */}
+<input
+  className="border border-gray-300 p-2 rounded-lg text-sm w-full"
+  placeholder="Address"
+  value={newBarberAddress}
+  onChange={(e) => setNewBarberAddress(e.target.value)}
+/>
+
+
           {/* Working Days */}
           <div>
             <p className="text-sm font-semibold mb-1">Working Days</p>
@@ -485,35 +538,43 @@ export default function AdminPanel() {
               </div>
 
               {/* BUTTONS */}
-              <div className="flex gap-3">
+<div className="flex gap-3">
 
-                {/* BLOCK BARBER */}
-                {b.payment_status !== "unpaid" && (
-                  <button
-                    className="bg-red-600 text-white px-3 py-1 rounded text-xs"
-                    onClick={() => blockBarber(b.id)}
-                  >
-                    Block
-                  </button>
-                )}
+  {/* EDIT BARBER */}
+  <button
+    className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+    onClick={() => setEditingBarber(b)}
+  >
+    Edit
+  </button>
 
-                {/* UNBLOCK BARBER */}
-                {b.payment_status === "unpaid" && (
-                  <button
-                    className="bg-green-600 text-white px-3 py-1 rounded text-xs"
-                    onClick={() => unblockBarber(b.id)}
-                  >
-                    Unblock
-                  </button>
-                )}
+  {/* BLOCK BARBER */}
+  {b.payment_status !== "unpaid" && (
+    <button
+      className="bg-red-600 text-white px-3 py-1 rounded text-xs"
+      onClick={() => blockBarber(b.id)}
+    >
+      Block
+    </button>
+  )}
 
-                {/* DELETE */}
-<button
-  className="text-red-600 text-sm"
-  onClick={() => deleteBarber(b.id)}
->
-  Delete
-</button>
+  {/* UNBLOCK BARBER */}
+  {b.payment_status === "unpaid" && (
+    <button
+      className="bg-green-600 text-white px-3 py-1 rounded text-xs"
+      onClick={() => unblockBarber(b.id)}
+    >
+      Unblock
+    </button>
+  )}
+
+  {/* DELETE */}
+  <button
+    className="text-red-600 text-sm"
+    onClick={() => deleteBarber(b.id)}
+  >
+    Delete
+  </button>
 
 </div>
 </div>
@@ -581,6 +642,78 @@ export default function AdminPanel() {
     )}
   </div>
 </section>
-</div>
-);
+
+{/* ⭐ EDIT BARBER MODAL ⭐ */}
+      {editingBarber && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-xl w-96 space-y-3 shadow-lg">
+            <h3 className="text-lg font-semibold">Edit Barber</h3>
+
+            {/* Name */}
+            <input
+              className="border p-2 rounded w-full"
+              value={editingBarber.name || ""}
+              onChange={(e) =>
+                setEditingBarber({
+                  ...editingBarber,
+                  name: e.target.value,
+                })
+              }
+            />
+
+            {/* Phone */}
+            <input
+              className="border p-2 rounded w-full"
+              value={editingBarber.phone || ""}
+              onChange={(e) =>
+                setEditingBarber({
+                  ...editingBarber,
+                  phone: e.target.value,
+                })
+              }
+            />
+
+            {/* Address */}
+            <input
+              className="border p-2 rounded w-full"
+              value={editingBarber.address || ""}
+              onChange={(e) =>
+                setEditingBarber({
+                  ...editingBarber,
+                  address: e.target.value,
+                })
+              }
+            />
+
+            {/* ⭐ Google Maps Pin URL */}
+            <input
+              className="border p-2 rounded w-full"
+              placeholder="Google Maps URL (Pin)"
+              value={editingBarber.map_url || ""}
+              onChange={(e) =>
+                setEditingBarber({
+                  ...editingBarber,
+                  map_url: e.target.value,
+                })
+              }
+            />
+
+            <button
+              className="bg-green-600 text-white px-4 py-2 rounded w-full"
+              onClick={saveBarberEdit}
+            >
+              Save Changes
+            </button>
+
+            <button
+              className="text-red-600 text-sm w-full mt-2"
+              onClick={() => setEditingBarber(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

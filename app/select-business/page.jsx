@@ -21,6 +21,8 @@ export default function WelcomePage() {
       noIndependent: "No hay barberos independientes.",
       phone: "Teléfono",
       days: "Días",
+      mapLink: "Ver ubicación exacta en Google Maps",
+      noRatings: "Sin calificaciones",
     },
     en: {
       title: "Easy Booking. Fast. Professional.",
@@ -33,6 +35,8 @@ export default function WelcomePage() {
       noIndependent: "No independent barbers available.",
       phone: "Phone",
       days: "Days",
+      mapLink: "View exact location on Google Maps",
+      noRatings: "No ratings yet",
     },
   };
 
@@ -43,7 +47,6 @@ export default function WelcomePage() {
     loadIndependentBarbers();
   }, []);
 
-  // ⭐ BUSINESS RATINGS ADDED HERE
   async function loadBusinesses() {
     const { data: businesses } = await supabase
       .from("businesses")
@@ -55,9 +58,7 @@ export default function WelcomePage() {
       return;
     }
 
-    // ⭐ Add rating to each business
     for (const business of businesses) {
-      // Fetch barbers inside this business
       const { data: barbers } = await supabase
         .from("barbers")
         .select("id")
@@ -68,7 +69,6 @@ export default function WelcomePage() {
         continue;
       }
 
-      // Fetch ratings for all barbers in this business
       const barberIds = barbers.map((b) => b.id);
 
       const { data: ratings } = await supabase
@@ -99,7 +99,6 @@ export default function WelcomePage() {
       return;
     }
 
-    // ⭐ Fetch average rating for each independent barber
     for (const barber of barbers) {
       const { data: ratings } = await supabase
         .from("ratings")
@@ -171,16 +170,27 @@ export default function WelcomePage() {
               <div className="p-5 bg-white rounded-xl shadow hover:shadow-lg transition cursor-pointer">
                 <h3 className="text-xl font-semibold">{b.name}</h3>
 
-                {/* ⭐ BUSINESS RATING */}
                 {b.avgRating ? (
                   <p className="text-yellow-500 font-bold">
                     ⭐ {b.avgRating} / 5
                   </p>
                 ) : (
-                  <p className="text-gray-400 text-sm">No ratings yet</p>
+                  <p className="text-gray-400 text-sm">{tr.noRatings}</p>
                 )}
 
                 <p className="text-gray-600">{b.address || "Sin dirección"}</p>
+
+                {b.map_url && (
+                  <a
+                    href={b.map_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline text-sm block mt-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {tr.mapLink}
+                  </a>
+                )}
               </div>
             </Link>
           ))}
@@ -237,13 +247,12 @@ export default function WelcomePage() {
                 <div className="p-5 bg-white rounded-xl shadow hover:shadow-lg transition cursor-pointer">
                   <h3 className="text-xl font-semibold">{barber.name}</h3>
 
-                  {/* ⭐ Rating */}
                   {barber.avgRating ? (
                     <p className="text-yellow-500 font-bold">
                       ⭐ {barber.avgRating} / 5
                     </p>
                   ) : (
-                    <p className="text-gray-400 text-sm">No ratings yet</p>
+                    <p className="text-gray-400 text-sm">{tr.noRatings}</p>
                   )}
 
                   {barber.phone && (

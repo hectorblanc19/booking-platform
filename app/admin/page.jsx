@@ -25,6 +25,7 @@ export default function AdminPanel() {
 // ⭐ NEW — Barber Address
 const [newBarberAddress, setNewBarberAddress] = useState("");
  const [editingBarber, setEditingBarber] = useState(null);
+const [editingBusiness, setEditingBusiness] = useState(null);
 
  // ⭐ NEW STATES
   const [newBarberPhone, setNewBarberPhone] = useState("");
@@ -227,6 +228,26 @@ async function saveBarberEdit() {
   loadAll();
 }
 
+// ⭐ Save Business Edit (NEW)
+async function saveBusinessEdit() {
+  const { id, name, phone, address, map_url } = editingBusiness;
+
+  const { error } = await supabase
+    .from("businesses")
+    .update({ name, phone, address, map_url })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error updating business:", error);
+    showMessage("error", "Error updating business: " + error.message);
+    return;
+  }
+
+  showMessage("success", "Business updated");
+  setEditingBusiness(null);
+  loadAll();
+}
+
 if (loading) return <p className="p-6">Loading admin panel...</p>;
 
 
@@ -360,44 +381,66 @@ if (loading) return <p className="p-6">Loading admin panel...</p>;
         </div>
 
         {/* Business List */}
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
-          {filteredBusinesses.map((b) => (
-            <div
-              key={b.id}
-              className="flex justify-between items-center border-b last:border-none py-2"
-            >
-              <div>
-                <p className="font-semibold text-sm">{b.name}</p>
+<div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-2">
+  {filteredBusinesses.map((b) => (
+    <div
+      key={b.id}
+      className="flex justify-between items-center border-b last:border-none py-2"
+    >
+      <div>
+        <p className="font-semibold text-sm">{b.name}</p>
 
-                {b.phone && (
-                  <p className="text-xs text-gray-600">Phone: {b.phone}</p>
-                )}
+        {b.phone && (
+          <p className="text-xs text-gray-600">Phone: {b.phone}</p>
+        )}
 
-                {b.address && (
-                  <p className="text-xs text-gray-600">Address: {b.address}</p>
-                )}
+        {b.address && (
+          <p className="text-xs text-gray-600">Address: {b.address}</p>
+        )}
 
-                {/* ⭐ SHOW BUSINESS HOURS */}
-                {b.open_time && b.close_time && (
-                  <p className="text-xs text-gray-600">
-                    Hours: {b.open_time} - {b.close_time}
-                  </p>
-                )}
-              </div>
+        {/* ⭐ Google Maps Link */}
+        {b.map_url && (
+          <a
+            href={b.map_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline text-xs"
+          >
+            Open exact location in Google Maps
+          </a>
+        )}
 
-              <button
-                className="text-red-600 text-sm"
-                onClick={() => deleteBusiness(b.id)}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
+        {/* ⭐ SHOW BUSINESS HOURS */}
+        {b.open_time && b.close_time && (
+          <p className="text-xs text-gray-600">
+            Hours: {b.open_time} - {b.close_time}
+          </p>
+        )}
+      </div>
 
-          {filteredBusinesses.length === 0 && (
-            <p className="text-xs text-gray-500">No businesses found.</p>
-          )}
-        </div>
+      {/* ⭐ EDIT + DELETE BUTTONS */}
+      <div className="flex gap-3">
+        <button
+          className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+          onClick={() => setEditingBusiness(b)}
+        >
+          Edit
+        </button>
+
+        <button
+          className="text-red-600 text-sm"
+          onClick={() => deleteBusiness(b.id)}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  ))}
+
+  {filteredBusinesses.length === 0 && (
+    <p className="text-xs text-gray-500">No businesses found.</p>
+  )}
+</div>
       </section>
 
       {/* ⭐ BARBERS SECTION ⭐ */}
@@ -644,76 +687,117 @@ if (loading) return <p className="p-6">Loading admin panel...</p>;
 </section>
 
 {/* ⭐ EDIT BARBER MODAL ⭐ */}
-      {editingBarber && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-xl w-96 space-y-3 shadow-lg">
-            <h3 className="text-lg font-semibold">Edit Barber</h3>
+{editingBarber && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-xl w-96 space-y-3 shadow-lg">
+      <h3 className="text-lg font-semibold">Edit Barber</h3>
 
-            {/* Name */}
-            <input
-              className="border p-2 rounded w-full"
-              value={editingBarber.name || ""}
-              onChange={(e) =>
-                setEditingBarber({
-                  ...editingBarber,
-                  name: e.target.value,
-                })
-              }
-            />
+      <input
+        className="border p-2 rounded w-full"
+        value={editingBarber.name || ""}
+        onChange={(e) =>
+          setEditingBarber({ ...editingBarber, name: e.target.value })
+        }
+      />
 
-            {/* Phone */}
-            <input
-              className="border p-2 rounded w-full"
-              value={editingBarber.phone || ""}
-              onChange={(e) =>
-                setEditingBarber({
-                  ...editingBarber,
-                  phone: e.target.value,
-                })
-              }
-            />
+      <input
+        className="border p-2 rounded w-full"
+        value={editingBarber.phone || ""}
+        onChange={(e) =>
+          setEditingBarber({ ...editingBarber, phone: e.target.value })
+        }
+      />
 
-            {/* Address */}
-            <input
-              className="border p-2 rounded w-full"
-              value={editingBarber.address || ""}
-              onChange={(e) =>
-                setEditingBarber({
-                  ...editingBarber,
-                  address: e.target.value,
-                })
-              }
-            />
+      <input
+        className="border p-2 rounded w-full"
+        value={editingBarber.address || ""}
+        onChange={(e) =>
+          setEditingBarber({ ...editingBarber, address: e.target.value })
+        }
+      />
 
-            {/* ⭐ Google Maps Pin URL */}
-            <input
-              className="border p-2 rounded w-full"
-              placeholder="Google Maps URL (Pin)"
-              value={editingBarber.map_url || ""}
-              onChange={(e) =>
-                setEditingBarber({
-                  ...editingBarber,
-                  map_url: e.target.value,
-                })
-              }
-            />
+      <input
+        className="border p-2 rounded w-full"
+        placeholder="Google Maps URL (Pin)"
+        value={editingBarber.map_url || ""}
+        onChange={(e) =>
+          setEditingBarber({ ...editingBarber, map_url: e.target.value })
+        }
+      />
 
-            <button
-              className="bg-green-600 text-white px-4 py-2 rounded w-full"
-              onClick={saveBarberEdit}
-            >
-              Save Changes
-            </button>
+      <button
+        className="bg-green-600 text-white px-4 py-2 rounded w-full"
+        onClick={saveBarberEdit}
+      >
+        Save Changes
+      </button>
 
-            <button
-              className="text-red-600 text-sm w-full mt-2"
-              onClick={() => setEditingBarber(null)}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      <button
+        className="text-red-600 text-sm w-full mt-2"
+        onClick={() => setEditingBarber(null)}
+      >
+        Cancel
+      </button>
     </div>
-  );
+  </div>
+)}
+
+{/* ⭐ EDIT BUSINESS MODAL ⭐ */}
+{editingBusiness && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-xl w-96 space-y-3 shadow-lg">
+      <h3 className="text-lg font-semibold">Edit Business</h3>
+
+      <input
+        className="border p-2 rounded w-full"
+        value={editingBusiness.name || ""}
+        onChange={(e) =>
+          setEditingBusiness({ ...editingBusiness, name: e.target.value })
+        }
+      />
+
+      <input
+        className="border p-2 rounded w-full"
+        value={editingBusiness.phone || ""}
+        onChange={(e) =>
+          setEditingBusiness({ ...editingBusiness, phone: e.target.value })
+        }
+      />
+
+      <input
+        className="border p-2 rounded w-full"
+        value={editingBusiness.address || ""}
+        onChange={(e) =>
+          setEditingBusiness({ ...editingBusiness, address: e.target.value })
+        }
+      />
+
+      <input
+        className="border p-2 rounded w-full"
+        placeholder="Google Maps URL (Pin)"
+        value={editingBusiness.map_url || ""}
+        onChange={(e) =>
+          setEditingBusiness({ ...editingBusiness, map_url: e.target.value })
+        }
+      />
+
+      <button
+        className="bg-green-600 text-white px-4 py-2 rounded w-full"
+        onClick={saveBusinessEdit}
+      >
+        Save Changes
+      </button>
+
+      <button
+        className="text-red-600 text-sm w-full mt-2"
+        onClick={() => setEditingBusiness(null)}
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
+
+</div>
+);
 }

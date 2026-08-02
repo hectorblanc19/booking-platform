@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
 import ReviewsClient from "./ReviewsClient";
+import ShareProfileButton from "./ShareProfileButton";
 
 const translations = {
   en: {
@@ -17,6 +18,9 @@ const translations = {
     email: "Email",
     map: "View map",
     noPhoto: "No photo",
+    aboutMe: "About Me",
+    topReview: "Top Review",
+    shareProfile: "Share Profile",
   },
   es: {
     business: "Negocio",
@@ -32,6 +36,9 @@ const translations = {
     email: "Correo",
     map: "Ver mapa",
     noPhoto: "Sin foto",
+    aboutMe: "Sobre mí",
+    topReview: "Mejor Reseña",
+    shareProfile: "Compartir Perfil",
   }
 };
 
@@ -119,23 +126,63 @@ export default async function BarberProfilePage({ params, searchParams }) {
         </a>
       </div>
 
-      {/* Banner */}
-      <div className="relative h-80 w-full rounded-xl overflow-hidden shadow-sm">
-        {barber.photo_url ? (
+      {/* Banner - Premium Hero Style with Parallax + Floating Button */}
+      <div
+        className="relative w-full h-[600px] rounded-xl overflow-hidden shadow-lg"
+        style={{ perspective: "1000px" }}
+      >
+        {/* Parallax Background */}
+        <div
+          className="absolute inset-0"
+          style={{ transform: "translateZ(-20px) scale(1.1)" }}
+        >
           <Image
             src={barber.photo_url}
             alt={barber.name}
             fill
-            sizes="100vw"
+            className="object-cover blur-xl opacity-60"
             unoptimized
             loading="eager"
-            className="object-cover object-center"
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-slate-200 text-slate-600">
-            {t.noPhoto}
+        </div>
+
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent"></div>
+
+        {/* Centered Main Photo */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="relative w-64 h-64 rounded-full overflow-hidden shadow-2xl border-4 border-white">
+            <Image
+              src={barber.photo_url}
+              alt={barber.name}
+              fill
+              className="object-cover object-center"
+              unoptimized
+            />
           </div>
-        )}
+
+          {/* Name + Rating inside Hero */}
+          <div className="mt-6 text-center">
+            <h1 className="text-3xl font-bold text-white drop-shadow-lg">
+              {barber.name}
+            </h1>
+
+            {averageRating > 0 && (
+              <p className="text-lg text-yellow-300 font-semibold drop-shadow-md">
+                ⭐ {averageRating.toFixed(1)} / 5
+              </p>
+            )}
+          </div>
+
+          {/* Floating Book Now Button */}
+          <a
+            href={`/booking/${barber.id}?lang=${lang}`}
+            className="mt-6 px-6 py-3 rounded-full bg-blue-600 text-white text-lg font-semibold shadow-xl hover:bg-blue-700 transition-all"
+            style={{ backdropFilter: "blur(10px)" }}
+          >
+            {t.bookNow}
+          </a>
+        </div>
       </div>
 
       {/* Header */}
@@ -171,26 +218,43 @@ export default async function BarberProfilePage({ params, searchParams }) {
         {barber.email && <p>✉️ {t.email}: {barber.email}</p>}
       </div>
 
-      {/* Actions */}
-      <div className="mt-4 flex gap-3">
-        {(barber.map_url || business?.map_url) && (
-          <a
-            href={(barber.map_url || business.map_url) + `?lang=${lang}`}
-            target="_blank"
-            className="rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
-          >
-            {t.map}
-          </a>
-        )}
+      {/* Barber Bio / About Me */}
+      {barber.bio && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-slate-900">{t.aboutMe}</h2>
+          <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+            {barber.bio}
+          </p>
+        </div>
+      )}
 
-        <a
-          href={`/booking/${barber.id}?lang=${lang}`}
-          className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-700"
-        >
-          {t.bookNow}
-        </a>
-      </div>
+     {/* Actions */}
+<div className="mt-4 flex gap-3">
+  {(barber.map_url || business?.map_url) && (
+    <a
+      href={(barber.map_url || business.map_url) + `?lang=${lang}`}
+      target="_blank"
+      className="rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
+    >
+      {t.map}
+    </a>
+  )}
 
+  <a
+    href={`/booking/${barber.id}?lang=${lang}`}
+    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-700"
+  >
+    {t.bookNow}
+  </a>
+
+  {/* Share Profile Button (Client Component) */}
+  <ShareProfileButton
+    lang={lang}
+    barberName={barber.name}
+    shareUrl={`${process.env.NEXT_PUBLIC_BASE_URL}/barbers/${barber.id}?lang=${lang}`}
+  />
+</div>
+       
       {/* Availability */}
       <div className="mt-10">
         <h2 className="text-lg font-semibold text-slate-900">{t.availability}</h2>
@@ -273,6 +337,30 @@ export default async function BarberProfilePage({ params, searchParams }) {
           <p className="mt-3 text-sm text-slate-600">{t.noPhoto}</p>
         )}
       </div>
+
+      {/* Top Review Highlight */}
+      {reviews?.length > 0 && (
+        <div className="mt-10 p-5 rounded-xl bg-slate-50 border border-slate-200 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900 mb-3">
+            {t.topReview}
+          </h2>
+
+          {(() => {
+            const top = reviews.reduce((best, r) =>
+              r.rating > best.rating ? r : best
+            );
+            return (
+              <div className="space-y-2">
+                <p className="text-yellow-500 text-xl">⭐ {top.rating}</p>
+                <p className="text-sm text-slate-800">{top.comment}</p>
+                <p className="text-xs text-slate-500">
+                  {new Date(top.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* ⭐ ReviewsClient */}
       <ReviewsClient

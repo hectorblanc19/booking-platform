@@ -229,7 +229,7 @@ export default function MarketplaceClient({
             className="overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
           >
             {/* Photo */}
-            <div className="relative h-72 w-full">
+            <div className="relative h-96 w-full">
               {barber.photo_url ? (
                 <Image
                   src={barber.photo_url}
@@ -274,12 +274,34 @@ export default function MarketplaceClient({
                 </p>
               )}
 
-              {/* ⭐ Distance */}
-              {barber.distance && (
-                <p className="text-sm font-medium text-blue-600">
-                  {barber.distance.toFixed(1)} {t.away}
-                </p>
-              )}
+             {/* ⭐ Distance + Navigation */}
+{barber.distance && barber.lat && barber.lng && userLocation && (
+  <div className="flex items-center gap-3">
+    <span className="text-sm font-medium text-blue-600">
+      🧭 {barber.distance.toFixed(1)} {t.away}
+    </span>
+
+    {/* Google Maps */}
+    <a
+      href={`https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${barber.lat},${barber.lng}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs font-medium text-blue-600 underline"
+    >
+      Google Maps
+    </a>
+
+    {/* Waze */}
+    <a
+      href={`https://waze.com/ul?ll=${barber.lat},${barber.lng}&navigate=yes`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs font-medium text-blue-600 underline"
+    >
+      Waze
+    </a>
+  </div>
+)}
 
               {/* Services */}
               <div className="flex flex-wrap gap-2">

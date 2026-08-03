@@ -52,12 +52,12 @@ export async function POST(req) {
       );
     }
 
-    // ⭐ Build rating link
-    const ratingLink = `https://flowpaydr.com/rate/${appointment_id}`;
-
     // ⭐ Determine language
     const langCode = appt.lang === "es" ? "es" : "en";
     const tr = TR[langCode];
+
+    // ⭐ Build rating link WITH LANGUAGE
+    const ratingLink = `https://flowpaydr.com/rate/${appointment_id}?lang=${langCode}`;
 
     // ⭐ Send rating email
     await resend.emails.send({

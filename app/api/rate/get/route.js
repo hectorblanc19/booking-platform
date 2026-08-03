@@ -14,7 +14,7 @@ export async function GET(req) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 
-  // ⭐ FIX: include `lang` so rating page shows correct language
+  // ⭐ FIX: return appointment_id instead of id
   const { data, error } = await supabase
     .from("appointments")
     .select(`
@@ -40,8 +40,27 @@ export async function GET(req) {
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Appointment not found" },
+      { status: 404 }
+    );
   }
 
-  return NextResponse.json(data, { status: 200 });
+  // ⭐ FIX: rename id → appointment_id
+  const response = {
+    appointment_id: data.id,
+    barber_id: data.barber_id,
+    business_id: data.business_id,
+    customer_id: data.customer_id,
+    service: data.service,
+    date: data.date,
+    time: data.time,
+    notes: data.notes,
+    lang: data.lang,
+    rating_sent: data.rating_sent,
+    rating_submitted: data.rating_submitted,
+    ratings: data.ratings,
+  };
+
+  return NextResponse.json(response, { status: 200 });
 }

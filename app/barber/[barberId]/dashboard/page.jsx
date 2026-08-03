@@ -330,57 +330,73 @@ return (
       <ServiceWorkerClient role="business" barber_id={barberId} />
 
         {/* Header card */}
-        <div className="bg-white rounded-2xl shadow-md p-5 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <img
-              src={barberData?.photo_url || "/default-barber.png"}
-              alt="Barber Photo"
-              className="w-20 h-20 rounded-full object-cover border shadow"
-            />
-            <div>
-              <h1 className="text-2xl font-bold">
-                {barberData?.name || tr.barber}
-              </h1>
-              <p className="text-gray-500 text-sm">
-                {barberData?.businesses?.name || ""}
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
-                  ● {tr.statusOnline}
-                </span>
-                {availabilityToday && (
-                  <span className="text-xs text-gray-500">
-                    {tr.availabilityToday}:{" "}
-                    {formatTime(availabilityToday.start)} –{" "}
-                    {formatTime(availabilityToday.end)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+<div className="bg-white rounded-2xl shadow-md p-5 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+  <div className="flex items-center gap-4">
+    <img
+      src={barberData?.photo_url || "/default-barber.png"}
+      alt="Barber Photo"
+      className="w-20 h-20 rounded-full object-cover border shadow"
+    />
+    <div>
+      <h1 className="text-2xl font-bold">
+        {barberData?.name || tr.barber}
+      </h1>
+      <p className="text-gray-500 text-sm">
+        {barberData?.businesses?.name || ""}
+      </p>
+      <div className="mt-2 flex items-center gap-2">
+        <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
+          ● {tr.statusOnline}
+        </span>
+        {availabilityToday && (
+          <span className="text-xs text-gray-500">
+            {tr.availabilityToday}:{" "}
+            {formatTime(availabilityToday.start)} –{" "}
+            {formatTime(availabilityToday.end)}
+          </span>
+        )}
+      </div>
+    </div>
+  </div>
 
-          <div className="flex flex-col items-center gap-3">
-            <label className="bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm">
-              {tr.uploadPhoto}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handlePhotoUpload}
-              />
-            </label>
-            <button
-              className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm"
-              onClick={() =>
-                (window.location.href = `/barber/${barberId}/edit`)
-              }
-            >
-              ✏️ {tr.editProfile}
-            </button>
-          </div>
-        </div>
+  <div className="flex flex-col items-center gap-3">
+    <label className="bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm">
+      {tr.uploadPhoto}
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handlePhotoUpload}
+      />
+    </label>
 
-        {/* Quick actions */}
+    <button
+      className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm"
+      onClick={() =>
+        (window.location.href = `/barber/${barberId}/edit`)
+      }
+    >
+      ✏️ {tr.editProfile}
+    </button>
+
+    {/* ⭐ NEW BUTTONS ADDED HERE */}
+    <a
+      href={`/barbers/${barberId}?lang=${lang}`}
+      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm text-center w-full"
+    >
+      {lang === "es" ? "Ver Perfil Público" : "View Public Profile"}
+    </a>
+
+    <a
+      href={`/booking/${barberId}?lang=${lang}`}
+      className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm text-center w-full"
+    >
+      {lang === "es" ? "Ver Página de Reservas" : "View Booking Page"}
+    </a>
+  </div>
+</div>
+
+{/* Quick actions */}
         <div className="bg-white rounded-2xl shadow-md p-4 mb-6">
           <h3 className="text-lg font-semibold mb-3">{tr.quickActions}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -1,10 +1,11 @@
-// force rebuild 29
 "use client";
 
-import { useState, useEffect } from "react";
+import { use, useState, useEffect } from "react";
 
 export default function RatePage({ params }) {
-  const appointmentId = params.appointment_id;
+  // ⭐ FIX 1: unwrap params (Next.js 16)
+  const { appointment_id } = use(params);
+  const appointmentId = appointment_id;
 
   const [loading, setLoading] = useState(true);
   const [appointment, setAppointment] = useState(null);
@@ -108,7 +109,8 @@ export default function RatePage({ params }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        appointment_id: appointment.id,
+        // ⭐ FIX 2: correct field name from API response
+        appointment_id: appointment.appointment_id,
         barber_id: appointment.barber_id,
         business_id: appointment.business_id,
         customer_id: appointment.customer_id || null,
@@ -131,7 +133,7 @@ export default function RatePage({ params }) {
     <div className="p-6 max-w-lg mx-auto">
       <h2 className="text-2xl font-bold mb-4">{t[lang].rateTitle}</h2>
 
-      {/* ⭐ Star rating with hover + bounce animation */}
+      {/* ⭐ Star rating */}
       <div className="flex gap-2 mb-4">
         {[1, 2, 3, 4, 5].map((star) => (
           <span

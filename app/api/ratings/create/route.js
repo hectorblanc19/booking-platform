@@ -17,7 +17,7 @@ export async function POST(req) {
       business_id,
       customer_id,
       rating,
-      review_text,   // ⭐ FIX: read correct field
+      review_text,
     } = body;
 
     // ⭐ Validate rating
@@ -28,14 +28,20 @@ export async function POST(req) {
       );
     }
 
+    // ⭐ Sanitize UUIDs (prevent "undefined" errors)
+    const safeAppointmentId = appointment_id ?? null;
+    const safeBarberId = barber_id ?? null;
+    const safeBusinessId = business_id ?? null;
+    const safeCustomerId = customer_id ?? null;
+
     // ⭐ Insert rating into "ratings" table
     const { error: insertError } = await supabase.from("ratings").insert({
-      appointment_id,
-      barber_id,
-      business_id,
-      customer_id,
+      appointment_id: safeAppointmentId,
+      barber_id: safeBarberId,
+      business_id: safeBusinessId,
+      customer_id: safeCustomerId,
       rating,
-      review_text,   // ⭐ FIX: save correct field
+      review_text,
     });
 
     if (insertError) {
@@ -50,7 +56,7 @@ export async function POST(req) {
     const { error: updateError } = await supabase
       .from("appointments")
       .update({ rating_submitted: true })
-      .eq("id", appointment_id);
+      .eq("id", safeAppointmentId);
 
     if (updateError) {
       console.error("Appointment update error:", updateError);

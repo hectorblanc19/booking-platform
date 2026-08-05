@@ -296,29 +296,31 @@ async function deleteGalleryPhoto(photoId) {
     setLoading(false);
   }
 
-  async function loadTodayAvailability() {
-    const today = new Date();
-    const dayOfWeek = today
-      .toLocaleDateString("en-US", { weekday: "long" })
-      .toLowerCase();
+ async function loadTodayAvailability() {
+  const today = new Date();
 
-    const { data } = await supabase
-      .from("barber_availability")
-      .select("*")
-      .eq("barber_id", barberId)
-      .eq("day_of_week", dayOfWeek)
-      .single();
+  // ⭐ Always return english day names
+  const dayOfWeek = new Intl.DateTimeFormat("en-US", { weekday: "long" })
+    .format(today)
+    .toLowerCase();
 
-    if (!data || data.is_closed) {
-      setAvailabilityToday(null);
-      return;
-    }
+  const { data } = await supabase
+    .from("barber_availability")
+    .select("*")
+    .eq("barber_id", barberId)
+    .eq("day_of_week", dayOfWeek)
+    .single();
 
-    setAvailabilityToday({
-      start: data.start_time.slice(0, 5),
-      end: data.end_time.slice(0, 5),
-    });
+  if (!data || data.is_closed) {
+    setAvailabilityToday(null);
+    return;
   }
+
+  setAvailabilityToday({
+    start: data.start_time.slice(0, 5),
+    end: data.end_time.slice(0, 5),
+  });
+}
 
   async function cancelAppointment(id) {
     if (!confirm(lang === "es" ? "¿Cancelar esta cita?" : "Cancel this appointment?")) return;

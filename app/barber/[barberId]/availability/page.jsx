@@ -4,6 +4,44 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+// ⭐ Bilingual dictionary
+const t = {
+  es: {
+    title: "Horario de Trabajo",
+    loading: "Cargando disponibilidad...",
+    open: "Abierto",
+    closed: "Cerrado",
+    save: "Guardar",
+    saving: "Guardando...",
+    dayNames: {
+      monday: "Lunes",
+      tuesday: "Martes",
+      wednesday: "Miércoles",
+      thursday: "Jueves",
+      friday: "Viernes",
+      saturday: "Sábado",
+      sunday: "Domingo",
+    },
+  },
+  en: {
+    title: "Weekly Availability",
+    loading: "Loading availability...",
+    open: "Open",
+    closed: "Closed",
+    save: "Save",
+    saving: "Saving...",
+    dayNames: {
+      monday: "Monday",
+      tuesday: "Tuesday",
+      wednesday: "Wednesday",
+      thursday: "Thursday",
+      friday: "Friday",
+      saturday: "Saturday",
+      sunday: "Sunday",
+    },
+  },
+};
+
 const DAYS = [
   "monday",
   "tuesday",
@@ -19,6 +57,9 @@ export default function AvailabilityPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [lang, setLang] = useState("es");
+
+  const tr = t[lang];
 
   useEffect(() => {
     loadAvailability();
@@ -30,15 +71,14 @@ export default function AvailabilityPage() {
       .select("*")
       .eq("barber_id", barberId);
 
-    // Build full week (ensure no missing days)
     const fullWeek = DAYS.map((day) => {
       const existing = data?.find((r) => r.day_of_week === day);
       return (
         existing || {
           barber_id: barberId,
           day_of_week: day,
-          start_time: "08:00:00",
-          end_time: "22:00:00",
+          start_time: "08:00",
+          end_time: "22:00",
           is_closed: false,
         }
       );
@@ -49,26 +89,26 @@ export default function AvailabilityPage() {
   }
 
   async function saveRow(row) {
-    setSaving(true);
+  setSaving(true);
 
-    const { error } = await supabase.from("barber_availability").upsert(
-      {
-        barber_id: barberId,
-        day_of_week: row.day_of_week,
-        start_time: row.start_time,
-        end_time: row.end_time,
-        is_closed: row.is_closed,
-      },
-      { onConflict: "barber_id,day_of_week" }
-    );
+  const { error } = await supabase.from("barber_availability").upsert(
+    {
+      barber_id: barberId,
+      day_of_week: row.day_of_week,
+      start_time: row.start_time,
+      end_time: row.end_time,
+      is_closed: row.is_closed,
+    },
+    { onConflict: "barber_id,day_of_week" }   // ⭐ FINAL FIX
+  );
 
-    if (error) {
-      alert("Error saving availability");
-      console.error(error);
-    }
-
-    setSaving(false);
+  if (error) {
+    alert("Error saving availability");
+    console.error(error);
   }
+
+  setSaving(false);
+}
 
   function updateField(day, field, value) {
     const updated = rows.map((r) =>
@@ -77,18 +117,40 @@ export default function AvailabilityPage() {
     setRows(updated);
   }
 
-  if (loading) return <p className="p-6">Loading availability...</p>;
+  if (loading) return <p className="p-6">{tr.loading}</p>;
 
   return (
     <div className="max-w-xl mx-auto p-6 bg-white rounded-xl shadow">
-      <h1 className="text-2xl font-bold mb-4">Weekly Availability</h1>
+      {/* ⭐ Language Switch */}
+      <div className="flex justify-end mb-4 gap-2">
+        <button
+          className={`px-3 py-1 rounded ${
+            lang === "es" ? "bg-black text-white" : "bg-gray-200"
+          }`}
+          onClick={() => setLang("es")}
+        >
+          ES
+        </button>
+        <button
+          className={`px-3 py-1 rounded ${
+            lang === "en" ? "bg-black text-white" : "bg-gray-200"
+          }`}
+          onClick={() => setLang("en")}
+        >
+          EN
+        </button>
+      </div>
+
+      <h1 className="text-2xl font-bold mb-4">{tr.title}</h1>
 
       {rows.map((row) => (
         <div
           key={row.day_of_week}
           className="flex items-center justify-between border-b py-3"
         >
-          <div className="w-24 capitalize font-semibold">{row.day_of_week}</div>
+          <div className="w-24 capitalize font-semibold">
+            {tr.dayNames[row.day_of_week]}
+          </div>
 
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2">
@@ -99,33 +161,25 @@ export default function AvailabilityPage() {
                   updateField(row.day_of_week, "is_closed", !e.target.checked)
                 }
               />
-              Open
+              {row.is_closed ? tr.closed : tr.open}
             </label>
 
             {!row.is_closed && (
               <>
                 <input
                   type="time"
-                  value={row.start_time.slice(0, 5)}
+                  value={row.start_time}
                   onChange={(e) =>
-                    updateField(
-                      row.day_of_week,
-                      "start_time",
-                      e.target.value + ":00"
-                    )
+                    updateField(row.day_of_week, "start_time", e.target.value)
                   }
                   className="border p-2 rounded"
                 />
 
                 <input
                   type="time"
-                  value={row.end_time.slice(0, 5)}
+                  value={row.end_time}
                   onChange={(e) =>
-                    updateField(
-                      row.day_of_week,
-                      "end_time",
-                      e.target.value + ":00"
-                    )
+                    updateField(row.day_of_week, "end_time", e.target.value)
                   }
                   className="border p-2 rounded"
                 />
@@ -136,13 +190,13 @@ export default function AvailabilityPage() {
               onClick={() => saveRow(row)}
               className="px-3 py-2 bg-blue-600 text-white rounded-lg"
             >
-              Save
+              {tr.save}
             </button>
           </div>
         </div>
       ))}
 
-      {saving && <p className="text-green-600 mt-3">Saving...</p>}
+      {saving && <p className="text-green-600 mt-3">{tr.saving}</p>}
     </div>
   );
 }

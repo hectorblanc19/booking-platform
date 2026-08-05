@@ -85,9 +85,10 @@ export default async function BarberProfilePage({ params, searchParams }) {
     .single();
 
   const { data: gallery } = await supabase
-    .from("barber_photos")
-    .select("*")
-    .eq("barber_id", id);
+  .from("barber_gallery")
+  .select("*")
+  .eq("barber_id", id)
+  .order("created_at", { ascending: false });
 
   const { data: slots } = await supabase
     .from("availability")
@@ -311,32 +312,32 @@ export default async function BarberProfilePage({ params, searchParams }) {
         </div>
       </div>
 
-      {/* Gallery */}
-      <div className="mt-10">
-        <h2 className="text-lg font-semibold text-slate-900">{t.gallery}</h2>
+     {/* Gallery */}
+<div className="mt-10">
+  <h2 className="text-lg font-semibold text-slate-900">{t.gallery}</h2>
 
-        {gallery?.length > 0 ? (
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {gallery.map((photo) => (
-              <div
-                key={photo.id}
-                className="relative h-40 w-full rounded-lg overflow-hidden shadow-sm"
-              >
-                <Image
-                  src={photo.url}
-                  alt="Barber work"
-                  fill
-                  sizes="50vw"
-                  unoptimized
-                  className="object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-slate-600">{t.noPhoto}</p>
-        )}
-      </div>
+  {gallery?.length > 0 ? (
+    <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {gallery.map((photo) => (
+        <div
+          key={photo.id}
+          className="relative h-40 w-full rounded-lg overflow-hidden shadow-sm"
+        >
+          <Image
+            src={photo.photo_url}
+            alt="Barber work"
+            fill
+            sizes="50vw"
+            unoptimized
+            className="object-cover"
+          />
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="mt-3 text-sm text-slate-600">{t.noPhoto}</p>
+  )}
+</div>
 
       {/* Top Review Highlight */}
       {reviews?.length > 0 && (

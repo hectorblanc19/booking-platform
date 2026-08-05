@@ -101,13 +101,18 @@ export default function BarberDashboard() {
   const [view, setView] = useState("today");
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState("es");
-  const [pushActive, setPushActive] = useState(true); // visual only
+  const [pushActive, setPushActive] = useState(true);
   const [availabilityToday, setAvailabilityToday] = useState(null);
+
+  // ⭐ Gallery state
+  const [gallery, setGallery] = useState([]);
 
   const tr = t[lang];
 
+  // ⭐ Load barber + gallery on page load
   useEffect(() => {
     loadBarber();
+    loadGallery();   // ⭐ REQUIRED
   }, []);
 
   useEffect(() => {
@@ -128,23 +133,36 @@ export default function BarberDashboard() {
     loadTodayAvailability();
   }, [view]);
 
+  // ⭐ Load barber profile
   async function loadBarber() {
-  const { data, error } = await supabase
-    .from("barbers")
-    .select(`
-      *,
-      businesses(*)
-    `)
-    .eq("id", barberId)
-    .single();
+    const { data, error } = await supabase
+      .from("barbers")
+      .select(`*, businesses(*)`)
+      .eq("id", barberId)
+      .single();
 
-  if (error) {
-    console.error("Error loading barber:", error);
+    if (error) console.error("Error loading barber:", error);
+
+    setBarberData(data);
   }
 
-  setBarberData(data);
-}
+  // ⭐ Load gallery photos
+  async function loadGallery() {
+    const { data, error } = await supabase
+      .from("barber_gallery")
+      .select("*")
+      .eq("barber_id", barberId)
+      .order("created_at", { ascending: false });
 
+    if (error) {
+      console.error("Error loading gallery:", error);
+      return;
+    }
+
+    setGallery(data || []);
+  }
+
+  // ⭐ Upload profile photo
   async function handlePhotoUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -172,6 +190,58 @@ export default function BarberDashboard() {
     loadBarber();
   }
 
+  async function handleGalleryUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // ⭐ Limit to 3 photos
+  if (gallery.length >= 3) {
+    alert(lang === "es"
+      ? "Solo puedes subir 3 fotos a la galería."
+      : "You can only upload 3 gallery photos.");
+    return;
+  }
+
+  const fileName = `${barberId}-gallery-${Date.now()}.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("barber-gallery")
+    .upload(fileName, file);
+
+  if (uploadError) {
+    alert("Error uploading gallery photo");
+    return;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("barber-gallery")
+    .getPublicUrl(fileName);
+
+  await fetch("/api/gallery/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      barber_id: barberId,
+      photo_url: urlData.publicUrl,
+    }),
+  });
+
+  loadGallery();
+}
+// ⭐ DELETE GALLERY PHOTO — PLACE IT HERE
+async function deleteGalleryPhoto(photoId) {
+  if (!confirm(lang === "es"
+    ? "¿Eliminar esta foto?"
+    : "Delete this photo?")) return;
+
+  await fetch("/api/gallery/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: photoId }),
+  });
+
+  loadGallery();
+}
   async function loadAppointments() {
     setLoading(true);
 
@@ -199,7 +269,6 @@ export default function BarberDashboard() {
       fromDate = today.toLocaleDateString("en-CA");
       toDate = nextWeek.toLocaleDateString("en-CA");
     } else {
-      // "all", "past", "cancelled"
       fromDate = "1900-01-01";
       toDate = "2999-12-31";
     }
@@ -273,8 +342,7 @@ export default function BarberDashboard() {
       hour12: true,
     });
   }
-
- // ⭐ EARLY RETURN — stop dashboard completely
+// ⭐ EARLY RETURN — stop dashboard completely
 if (barberData?.payment_status === "unpaid") {
   return (
     <div className="min-h-screen bg-gray-100 py-8">
@@ -296,7 +364,7 @@ return (
   <div className="min-h-screen bg-gray-100 py-8">
     <div className="max-w-4xl mx-auto px-4">
 
-      {/* Top bar: language + push status */}
+      {/* Top bar */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <span className="text-sm">{tr.langLabel}:</span>
@@ -329,251 +397,308 @@ return (
       {/* Push subscription */}
       <ServiceWorkerClient role="business" barber_id={barberId} />
 
-        {/* Header card */}
-<div className="bg-white rounded-2xl shadow-md p-5 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-  <div className="flex items-center gap-4">
-    <img
-      src={barberData?.photo_url || "/default-barber.png"}
-      alt="Barber Photo"
-      className="w-20 h-20 rounded-full object-cover border shadow"
-    />
-    <div>
-      <h1 className="text-2xl font-bold">
-        {barberData?.name || tr.barber}
-      </h1>
-      <p className="text-gray-500 text-sm">
-        {barberData?.businesses?.name || ""}
-      </p>
-      <div className="mt-2 flex items-center gap-2">
-        <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
-          ● {tr.statusOnline}
-        </span>
-        {availabilityToday && (
-          <span className="text-xs text-gray-500">
-            {tr.availabilityToday}:{" "}
-            {formatTime(availabilityToday.start)} –{" "}
-            {formatTime(availabilityToday.end)}
-          </span>
-        )}
-      </div>
-    </div>
-  </div>
-
-  <div className="flex flex-col items-center gap-3">
-    <label className="bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm">
-      {tr.uploadPhoto}
-      <input
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handlePhotoUpload}
-      />
-    </label>
-
-    <button
-      className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm"
-      onClick={() =>
-        (window.location.href = `/barber/${barberId}/edit`)
-      }
-    >
-      ✏️ {tr.editProfile}
-    </button>
-
-    {/* ⭐ NEW BUTTONS ADDED HERE */}
-    <a
-      href={`/barbers/${barberId}?lang=${lang}`}
-      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm text-center w-full"
-    >
-      {lang === "es" ? "Ver Perfil Público" : "View Public Profile"}
-    </a>
-
-    <a
-      href={`/booking/${barberId}?lang=${lang}`}
-      className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm text-center w-full"
-    >
-      {lang === "es" ? "Ver Página de Reservas" : "View Booking Page"}
-    </a>
-  </div>
-</div>
-
-{/* Quick actions */}
-        <div className="bg-white rounded-2xl shadow-md p-4 mb-6">
-          <h3 className="text-lg font-semibold mb-3">{tr.quickActions}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <button
-              className="flex items-center justify-center gap-2 bg-black text-white py-2 rounded-lg text-sm"
-              onClick={() =>
-                document.getElementById("block-panel")?.scrollIntoView({
-                  behavior: "smooth",
-                })
-              }
-            >
-              🕒 {tr.blockTime}
-            </button>
-            <button
-              className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
-              onClick={() =>
-                (window.location.href = `/barber/${barberId}/availability`)
-              }
-            >
-              🗓 {tr.workingHours}
-            </button>
-            <button
-              className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
-              onClick={() =>
-                alert(
-                  lang === "es"
-                    ? "Gestión de vacaciones próximamente."
-                    : "Vacation management coming soon."
-                )
-              }
-            >
-              🌴 {tr.vacations}
-            </button>
-            <button
-              className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
-              onClick={() =>
-                alert(
-                  lang === "es"
-                    ? "Gestión de descansos próximamente."
-                    : "Breaks management coming soon."
-                )
-              }
-            >
-              🍽 {tr.breaks}
-            </button>
+      {/* Header card */}
+      <div className="bg-white rounded-2xl shadow-md p-5 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <img
+            src={barberData?.photo_url || "/default-barber.png"}
+            alt="Barber Photo"
+            className="w-20 h-20 rounded-full object-cover border shadow"
+          />
+          <div>
+            <h1 className="text-2xl font-bold">
+              {barberData?.name || tr.barber}
+            </h1>
+            <p className="text-gray-500 text-sm">
+              {barberData?.businesses?.name || ""}
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
+                ● {tr.statusOnline}
+              </span>
+              {availabilityToday && (
+                <span className="text-xs text-gray-500">
+                  {tr.availabilityToday}:{" "}
+                  {formatTime(availabilityToday.start)} –{" "}
+                  {formatTime(availabilityToday.end)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          {[
-            { key: "today", label: tr.today },
-            { key: "tomorrow", label: tr.tomorrow },
-            { key: "week", label: tr.week },
-            { key: "all", label: tr.all },
-            { key: "past", label: tr.past },
-            { key: "cancelled", label: tr.cancelled },
-          ].map((f) => (
-            <button
-              key={f.key}
-              className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${
-                view === f.key
-                  ? "bg-black text-white"
-                  : "bg-gray-200 text-gray-800"
-              }`}
-              onClick={() => setView(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="flex flex-col items-center gap-3 w-full md:w-auto">
+          {/* Upload Profile Photo */}
+          <label className="bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm w-full text-center">
+            {tr.uploadPhoto}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
+          </label>
+
+          {/* Upload Gallery Photo */}
+          <label className="bg-purple-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm w-full text-center">
+            {lang === "es" ? "Subir Foto a Galería" : "Upload Gallery Photo"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleGalleryUpload}
+            />
+          </label>
+
+          {/* Edit Profile */}
+          <button
+            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm w-full"
+            onClick={() =>
+              (window.location.href = `/barber/${barberId}/edit`)
+            }
+          >
+            ✏️ {tr.editProfile}
+          </button>
+
+          {/* Public profile + booking links */}
+          <a
+            href={`/barbers/${barberId}?lang=${lang}`}
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm text-center w-full"
+          >
+            {lang === "es" ? "Ver Perfil Público" : "View Public Profile"}
+          </a>
+
+          <a
+            href={`/booking/${barberId}?lang=${lang}`}
+            className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm text-center w-full"
+          >
+            {lang === "es" ? "Ver Página de Reservas" : "View Booking Page"}
+          </a>
         </div>
+      </div>
 
-        {/* Appointment list */}
-        <div className="bg-white rounded-2xl shadow-md p-4">
-          {loading ? (
-            <p className="text-sm text-gray-500">{tr.loading}</p>
-          ) : appointments.length === 0 ? (
-            <p className="text-sm text-gray-500">{tr.none}</p>
-          ) : (
-            <div className="space-y-4">
-              {appointments.map((appt) => {
-                const isConfirmed = appt.status === "confirmed";
-                const duration = appt.duration || 60;
+      {/* Quick actions */}
+      <div className="bg-white rounded-2xl shadow-md p-4 mb-6">
+        <h3 className="text-lg font-semibold mb-3">{tr.quickActions}</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <button
+            className="flex items-center justify-center gap-2 bg-black text-white py-2 rounded-lg text-sm"
+            onClick={() =>
+              document.getElementById("block-panel")?.scrollIntoView({
+                behavior: "smooth",
+              })
+            }
+          >
+            🕒 {tr.blockTime}
+          </button>
+          <button
+            className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
+            onClick={() =>
+              (window.location.href = `/barber/${barberId}/availability`)
+            }
+          >
+            🗓 {tr.workingHours}
+          </button>
+          <button
+            className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
+            onClick={() =>
+              alert(
+                lang === "es"
+                  ? "Gestión de vacaciones próximamente."
+                  : "Vacation management coming soon."
+              )
+            }
+          >
+            🌴 {tr.vacations}
+          </button>
+          <button
+            className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
+            onClick={() =>
+              alert(
+                lang === "es"
+                  ? "Gestión de descansos próximamente."
+                  : "Breaks management coming soon."
+              )
+            }
+          >
+            🍽 {tr.breaks}
+          </button>
+        </div>
+      </div>
 
-                return (
-                  <div
-                    key={appt.id}
-                    className="p-4 border rounded-xl bg-white shadow-sm flex flex-col md:flex-row md:items-start md:justify-between gap-3"
-                  >
-                    {/* Left: time + status */}
-                    <div className="flex flex-col gap-1 min-w-[120px]">
-                      <p className="text-lg font-semibold">
-                        {formatTime(appt.time)}
-                      </p>
-                      <span className="text-xs text-gray-500">
-                        {tr.date}: {appt.date}
-                      </span>
-                      <span className="inline-flex items-center px-2 py-1 text-xs rounded-full mt-1 w-fit">
-                        {isConfirmed ? (
-                          <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                            {lang === "es" ? "Confirmado" : "Confirmed"}
-                          </span>
-                        ) : (
-                          <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full">
-                            {lang === "es" ? "Cancelado" : "Cancelled"}
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-xs text-gray-500 mt-1">
-                        {duration} min
-                      </span>
-                    </div>
-
-                    {/* Middle: details */}
-<div className="flex-1 text-sm">
-  <p className="text-gray-700">
-    <strong>{tr.service}:</strong>{" "}
-    {serviceNames[appt.service]?.[lang] || appt.service}
-  </p>
-
-  <p className="text-gray-700 mt-1">
-    <strong>{tr.customer}:</strong>{" "}
-    {appt.customer_name || "N/A"}
-  </p>
-
-  <p className="text-gray-700 mt-1">
-    <strong>{tr.phone}:</strong>{" "}
-    <a
-      href={`https://wa.me/${appt.customer_phone}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-green-600 underline flex items-center gap-1"
+      {/* Filters */}
+<div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+  {[
+    { key: "today", label: tr.today },
+    { key: "tomorrow", label: tr.tomorrow },
+    { key: "week", label: tr.week },
+    { key: "all", label: tr.all },
+    { key: "past", label: tr.past },
+    { key: "cancelled", label: tr.cancelled },
+  ].map((f) => (
+    <button
+      key={f.key}
+      className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${
+        view === f.key
+          ? "bg-black text-white"
+          : "bg-gray-200 text-gray-800"
+      }`}
+      onClick={() => setView(f.key)}
     >
-      <span>💬</span> {appt.customer_phone}
-    </a>
-  </p>
-
-  <p className="text-gray-700 mt-1">
-    <strong>{tr.email}:</strong>{" "}
-    {appt.customer_email || "N/A"}
-  </p>
-
-  <p className="text-gray-700 mt-1">
-    <strong>{tr.notes}:</strong>{" "}
-    {appt.notes || tr.noNotes}
-  </p>
+      {f.label}
+    </button>
+  ))}
 </div>
 
-                    {/* Right: actions */}
-                    <div className="flex flex-col gap-2 md:w-40">
-                      {isConfirmed && (
-                        <>
-                          <button
-                            className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
-                            onClick={() =>
-                              (window.location.href = `/barber/${barberId}/reschedule/${appt.id}`)
-                            }
-                          >
-                            🔄 {tr.reschedule}
-                          </button>
-                          <button
-                            className="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
-                            onClick={() => cancelAppointment(appt.id)}
-                          >
-                            ❌ {tr.cancel}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+      {/* Appointment list */}
+      <div className="bg-white rounded-2xl shadow-md p-4 mb-6">
+        {loading ? (
+          <p className="text-sm text-gray-500">{tr.loading}</p>
+        ) : appointments.length === 0 ? (
+          <p className="text-sm text-gray-500">{tr.none}</p>
+        ) : (
+          <div className="space-y-4">
+            {appointments.map((appt) => {
+              const isConfirmed = appt.status === "confirmed";
+              const duration = appt.duration || 60;
 
-        {/* Blocking panel */}
+              return (
+                <div
+                  key={appt.id}
+                  className="p-4 border rounded-xl bg-white shadow-sm flex flex-col md:flex-row md:items-start md:justify-between gap-3"
+                >
+                  {/* Left: time + status */}
+                  <div className="flex flex-col gap-1 min-w-[120px]">
+                    <p className="text-lg font-semibold">
+                      {formatTime(appt.time)}
+                    </p>
+                    <span className="text-xs text-gray-500">
+                      {tr.date}: {appt.date}
+                    </span>
+                    <span className="inline-flex items-center px-2 py-1 text-xs rounded-full mt-1 w-fit">
+                      {isConfirmed ? (
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                          {lang === "es" ? "Confirmado" : "Confirmed"}
+                        </span>
+                      ) : (
+                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full">
+                          {lang === "es" ? "Cancelado" : "Cancelled"}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      {duration} min
+                    </span>
+                  </div>
+
+                  {/* Middle: details */}
+                  <div className="flex-1 text-sm">
+                    <p className="text-gray-700">
+                      <strong>{tr.service}:</strong>{" "}
+                      {serviceNames[appt.service]?.[lang] || appt.service}
+                    </p>
+
+                    <p className="text-gray-700 mt-1">
+                      <strong>{tr.customer}:</strong>{" "}
+                      {appt.customer_name || "N/A"}
+                    </p>
+
+                    <p className="text-gray-700 mt-1">
+                      <strong>{tr.phone}:</strong>{" "}
+                      <a
+                        href={`https://wa.me/${appt.customer_phone}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-600 underline flex items-center gap-1"
+                      >
+                        <span>💬</span> {appt.customer_phone}
+                      </a>
+                    </p>
+
+                    <p className="text-gray-700 mt-1">
+                      <strong>{tr.email}:</strong>{" "}
+                      {appt.customer_email || "N/A"}
+                    </p>
+
+                    <p className="text-gray-700 mt-1">
+                      <strong>{tr.notes}:</strong>{" "}
+                      {appt.notes || tr.noNotes}
+                    </p>
+                  </div>
+
+                  {/* Right: actions */}
+                  <div className="flex flex-col gap-2 md:w-40">
+                    {isConfirmed && (
+                      <>
+                        <button
+                          className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
+                          onClick={() =>
+                            (window.location.href = `/barber/${barberId}/reschedule/${appt.id}`)
+                          }
+                        >
+                          🔄 {tr.reschedule}
+                        </button>
+                        <button
+                          className="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
+                          onClick={() => cancelAppointment(appt.id)}
+                        >
+                          ❌ {tr.cancel}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ⭐ Gallery Preview */}
+<div className="bg-white rounded-2xl shadow-md p-4 mb-6">
+  <h3 className="text-lg font-semibold mb-3">
+    {lang === "es" ? "Galería de Fotos" : "Photo Gallery"}
+  </h3>
+
+  {/* ⭐ Limit message */}
+  {gallery.length >= 3 && (
+    <p className="text-xs text-red-600 mb-2">
+      {lang === "es"
+        ? "Límite alcanzado: máximo 3 fotos."
+        : "Limit reached: maximum 3 photos."}
+    </p>
+  )}
+
+  {gallery.length === 0 ? (
+    <p className="text-sm text-gray-500">
+      {lang === "es"
+        ? "No hay fotos en la galería."
+        : "No gallery photos yet."}
+    </p>
+  ) : (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {gallery.map((photo) => (
+        <div key={photo.id} className="relative">
+          <img
+            src={photo.photo_url}
+            alt="Gallery"
+            className="w-full h-32 object-cover rounded-lg shadow"
+          />
+
+          {/* ⭐ Delete button */}
+          <button
+            onClick={() => deleteGalleryPhoto(photo.id)}
+            className="absolute top-1 right-1 bg-red-600 text-white text-xs px-2 py-1 rounded shadow"
+          >
+            ✖
+          </button>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+      {/* Blocking panel */}
         <div id="block-panel" className="mt-8">
           <BlockingPanel barberId={barberId} lang={lang} />
         </div>

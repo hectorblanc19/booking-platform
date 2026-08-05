@@ -135,84 +135,134 @@ export default function RegisterBarberPage() {
   const dayOptions = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
   const toggleService = (service: string) => {
-    setForm((prev) => ({
-      ...prev,
-      services: prev.services.includes(service)
-        ? prev.services.filter((s) => s !== service)
-        : [...prev.services, service],
-    }));
-  };
+  setForm((prev) => ({
+    ...prev,
+    services: prev.services.includes(service)
+      ? prev.services.filter((s) => s !== service)
+      : [...prev.services, service],
+  }));
+};
 
-  const toggleDay = (day: string) => {
-    setForm((prev) => ({
-      ...prev,
-      working_days: prev.working_days.includes(day)
-        ? prev.working_days.filter((d) => d !== day)
-        : [...prev.working_days, day],
-    }));
-  };
+const toggleDay = (day: string) => {
+  setForm((prev) => ({
+    ...prev,
+    working_days: prev.working_days.includes(day)
+      ? prev.working_days.filter((d) => d !== day)
+      : [...prev.working_days, day],
+  }));
+};
 
-  const handlePhotoChange = (file: File | null) => {
-    setPhoto(file);
-    if (file) {
-      setPhotoPreview(URL.createObjectURL(file));
-    }
-  };
+const handlePhotoChange = (file: File | null) => {
+  setPhoto(file);
+  if (file) {
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+};
 
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
+const handleSubmit = async (e: any) => {
+  e.preventDefault();
+  setLoading(true);
 
-    let photo_url = null;
-
-    if (photo) {
-      const safeId = Math.random().toString(36).substring(2);
-      const fileName = `${safeId}-${Date.now()}.jpg`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("barber-photos")
-        .upload(fileName, photo);
-
-      if (uploadError) {
-        alert(t.uploadError);
-        setLoading(false);
-        return;
-      }
-
-      photo_url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/barber-photos/${fileName}`;
-    }
-
-    const { data: barberData, error } = await supabase
-      .from("barbers")
-      .insert({
-        name: form.name,
-        email: form.email.toLowerCase(),
-        phone: form.phone,
-        pin: form.pin,
-        address: form.address,
-        map_url: form.map_url,
-        category: form.category,
-        services: form.services,
-        working_days: form.working_days,
-        photo_url,
-        active: true,
-        payment_status: "paid",
-        featured: false,
-      })
-      .select()
-      .single();
-
+  // ⭐ 0️⃣ BASIC VALIDATION (NEW)
+  if (!form.name || !form.email || !form.phone || !form.pin) {
+    alert("Todos los campos son obligatorios.");
     setLoading(false);
+    return;
+  }
 
-    if (error) {
-      alert(t.error);
+  if (!form.email.includes("@") || !form.email.includes(".")) {
+    alert("Correo inválido.");
+    setLoading(false);
+    return;
+  }
+
+  if (form.phone.length < 10) {
+    alert("Número de teléfono inválido.");
+    setLoading(false);
+    return;
+  }
+
+  if (form.pin.length !== 4) {
+    alert("El PIN debe tener 4 dígitos.");
+    setLoading(false);
+    return;
+  }
+
+  if (form.services.length === 0) {
+    alert("Selecciona al menos un servicio.");
+    setLoading(false);
+    return;
+  }
+
+  if (form.working_days.length === 0) {
+    alert("Selecciona al menos un día laboral.");
+    setLoading(false);
+    return;
+  }
+
+  let photo_url = null;
+
+  if (photo) {
+    const safeId = Math.random().toString(36).substring(2);
+    const fileName = `${safeId}-${Date.now()}.jpg`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("barber-photos")
+      .upload(fileName, photo);
+
+    if (uploadError) {
+      alert(t.uploadError);
+      setLoading(false);
       return;
     }
 
-    alert(t.success);
+    photo_url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/barber-photos/${fileName}`;
+  }
 
-    router.push(`/barber/login?lang=${lang}`);
-  };
+  // ⭐ 1️⃣ EMAIL ALREADY EXISTS CHECK
+  const { data: existing } = await supabase
+    .from("barbers")
+    .select("id")
+    .eq("email", form.email.toLowerCase())
+    .single();
+
+  if (existing) {
+    alert("Este correo ya está registrado.");
+    setLoading(false);
+    return;
+  }
+
+  // ⭐ 2️⃣ INSERT BARBER
+  const { data: barberData, error } = await supabase
+    .from("barbers")
+    .insert({
+      name: form.name,
+      email: form.email.toLowerCase(),
+      phone: form.phone,
+      pin: form.pin,
+      address: form.address,
+      map_url: form.map_url,
+      category: form.category,
+      services: form.services,
+      working_days: form.working_days,
+      photo_url,
+      active: true,
+      payment_status: "paid",
+      featured: false,
+    })
+    .select()
+    .single();
+
+  setLoading(false);
+
+  if (error) {
+    alert(t.error);
+    return;
+  }
+
+  alert(t.success);
+  router.push(`/barber/login?lang=${lang}`);
+};
 
   return (
     <div className="max-w-xl mx-auto p-6">

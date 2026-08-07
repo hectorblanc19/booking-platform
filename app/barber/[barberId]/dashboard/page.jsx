@@ -93,6 +93,58 @@ const t = {
   },
 };
 
+/* ⭐ WEEKLY AVAILABILITY COMPONENT — INSERTED HERE */
+function WeeklyAvailability({ barberId, lang }) {
+  const [week, setWeek] = useState([]);
+
+  useEffect(() => {
+    async function loadWeek() {
+      const { data } = await supabase
+        .from("barber_availability")
+        .select("*")
+        .eq("barber_id", barberId)
+        .order("day_of_week", { ascending: true });
+
+      setWeek(data || []);
+    }
+
+    loadWeek();
+  }, [barberId]);
+
+  const dayNames = {
+    monday: lang === "es" ? "Lunes" : "Monday",
+    tuesday: lang === "es" ? "Martes" : "Tuesday",
+    wednesday: lang === "es" ? "Miércoles" : "Wednesday",
+    thursday: lang === "es" ? "Jueves" : "Thursday",
+    friday: lang === "es" ? "Viernes" : "Friday",
+    saturday: lang === "es" ? "Sábado" : "Saturday",
+    sunday: lang === "es" ? "Domingo" : "Sunday",
+  };
+
+  return (
+    <div className="space-y-2">
+      {week.map((row) => (
+        <div
+          key={row.day_of_week}
+          className="flex justify-between border-b pb-2"
+        >
+          <span className="font-semibold">{dayNames[row.day_of_week]}</span>
+
+          {row.is_closed ? (
+            <span className="text-red-600">
+              {lang === "es" ? "Cerrado" : "Closed"}
+            </span>
+          ) : (
+            <span className="text-gray-700">
+              {row.start_time.slice(0, 5)} – {row.end_time.slice(0, 5)}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function BarberDashboard() {
   const { barberId } = useParams();
 
@@ -115,18 +167,30 @@ export default function BarberDashboard() {
     loadGallery();   // ⭐ REQUIRED
   }, []);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("appointments-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "appointments" },
-        () => loadAppointments()
-      )
-      .subscribe();
+ useEffect(() => {
+  const channel = supabase
+    .channel("appointments-realtime")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "appointments" },
+      () => loadAppointments()
+    )
+    .subscribe();
 
-    return () => supabase.removeChannel(channel);
-  }, []);
+  return () => supabase.removeChannel(channel);
+}, []);
+
+// ⭐ Add this block right here
+useEffect(() => {
+  const channel = supabase
+    .channel("availability-updates")
+    .on("broadcast", { event: "updated" }, () => {
+      loadTodayAvailability();   // refresh today's hours automatically
+    })
+    .subscribe();
+
+  return () => supabase.removeChannel(channel);
+}, []);
 
   useEffect(() => {
     loadAppointments();
@@ -480,55 +544,58 @@ return (
       </div>
 
       {/* Quick actions */}
-      <div className="bg-white rounded-2xl shadow-md p-4 mb-6">
-        <h3 className="text-lg font-semibold mb-3">{tr.quickActions}</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button
-            className="flex items-center justify-center gap-2 bg-black text-white py-2 rounded-lg text-sm"
-            onClick={() =>
-              document.getElementById("block-panel")?.scrollIntoView({
-                behavior: "smooth",
-              })
-            }
-          >
-            🕒 {tr.blockTime}
-          </button>
-          <button
-            className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
-            onClick={() =>
-              (window.location.href = `/barber/${barberId}/availability`)
-            }
-          >
-            🗓 {tr.workingHours}
-          </button>
-          <button
-            className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
-            onClick={() =>
-              alert(
-                lang === "es"
-                  ? "Gestión de vacaciones próximamente."
-                  : "Vacation management coming soon."
-              )
-            }
-          >
-            🌴 {tr.vacations}
-          </button>
-          <button
-            className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
-            onClick={() =>
-              alert(
-                lang === "es"
-                  ? "Gestión de descansos próximamente."
-                  : "Breaks management coming soon."
-              )
-            }
-          >
-            🍽 {tr.breaks}
-          </button>
-        </div>
-      </div>
+<div className="bg-white rounded-2xl shadow-md p-4 mb-6">
+  <h3 className="text-lg font-semibold mb-3">{tr.quickActions}</h3>
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <button
+      className="flex items-center justify-center gap-2 bg-black text-white py-2 rounded-lg text-sm"
+      onClick={() =>
+        document.getElementById("block-panel")?.scrollIntoView({
+          behavior: "smooth",
+        })
+      }
+    >
+      🕒 {tr.blockTime}
+    </button>
 
-      {/* Filters */}
+    <button
+      className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
+      onClick={() =>
+        (window.location.href = `/barber/${barberId}/availability`)
+      }
+    >
+      🗓 {tr.workingHours}
+    </button>
+
+    <button
+      className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
+      onClick={() =>
+        alert(
+          lang === "es"
+            ? "Gestión de vacaciones próximamente."
+            : "Vacation management coming soon."
+        )
+      }
+    >
+      🌴 {tr.vacations}
+    </button>
+
+    <button
+      className="flex items-center justify-center gap-2 bg-gray-200 text-black py-2 rounded-lg text-sm"
+      onClick={() =>
+        alert(
+          lang === "es"
+            ? "Gestión de descansos próximamente."
+            : "Breaks management coming soon."
+        )
+      }
+    >
+      🍽 {tr.breaks}
+    </button>
+  </div>
+</div> 
+
+{/* Filters */}
 <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
   {[
     { key: "today", label: tr.today },

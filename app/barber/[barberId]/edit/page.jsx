@@ -100,14 +100,15 @@ export default function EditProfile() {
     setSaving(true);
 
     await supabase
-      .from("barbers")
-      .update({
-        name: barber.name,
-        email: barber.email,
-        phone: barber.phone,
-        business_id: barber.business_id,
-      })
-      .eq("id", barberId);
+  .from("barbers")
+  .update({
+    name: barber.name,
+    email: barber.email,
+    phone: barber.phone,
+    business_id: barber.business_id,
+    map_url: barber.map_url,
+  })
+  .eq("id", barberId);
 
     alert(tr.success);
     window.location.href = `/barber/${barberId}/dashboard`;
@@ -178,26 +179,40 @@ export default function EditProfile() {
         </div>
 
         {/* Phone */}
-        <div className="mb-4">
-          <label className="block mb-1">{tr.phone}</label>
-          <input
-            type="tel"
-            className="w-full p-3 border rounded-xl"
-            value={barber.phone || ""}
-            onChange={(e) => setBarber({ ...barber, phone: e.target.value })}
-          />
-        </div>
+<div className="mb-4">
+  <label className="block mb-1">{tr.phone}</label>
+  <input
+    type="tel"
+    className="w-full p-3 border rounded-xl"
+    value={barber.phone || ""}
+    onChange={(e) => setBarber({ ...barber, phone: e.target.value })}
+  />
+</div>
 
-        {/* Business Name (optional) */}
-        <div className="mb-4">
-          <label className="block mb-1">{tr.business}</label>
-          <input
-            type="text"
-            className="w-full p-3 border rounded-xl"
-            value={barber.businesses?.name || ""}
-            disabled
-          />
-        </div>
+{/* ⭐ Google Maps URL — INSERT HERE */}
+<div className="mb-4">
+  <label className="block mb-1">
+    {lang === "es" ? "URL de Google Maps" : "Google Maps URL"}
+  </label>
+  <input
+    type="text"
+    className="w-full p-3 border rounded-xl"
+    value={barber.map_url || ""}
+    placeholder="https://maps.google.com/..."
+    onChange={(e) => setBarber({ ...barber, map_url: e.target.value })}
+  />
+</div>
+
+{/* Business Name (optional) */}
+<div className="mb-4">
+  <label className="block mb-1">{tr.business}</label>
+  <input
+    type="text"
+    className="w-full p-3 border rounded-xl"
+    value={barber.businesses?.name || ""}
+    disabled
+  />
+</div>
 
         {/* Save Button */}
         <button

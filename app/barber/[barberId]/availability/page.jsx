@@ -88,24 +88,26 @@ export default function AvailabilityPage() {
     setLoading(false);
   }
 
-  async function saveRow(row) {
+async function saveRow(row) {
   setSaving(true);
 
-  const { error } = await supabase.from("barber_availability").upsert(
-    {
+  await fetch("/api/sync-working-hours", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       barber_id: barberId,
       day_of_week: row.day_of_week,
       start_time: row.start_time,
       end_time: row.end_time,
       is_closed: row.is_closed,
-    },
-    { onConflict: "barber_id,day_of_week" }   // ⭐ FINAL FIX
-  );
+    }),
+  });
 
-  if (error) {
-    alert("Error saving availability");
-    console.error(error);
-  }
+  // ⭐ Notify dashboard instantly (no refresh needed)
+  supabase.channel("availability-updates").send({
+    type: "updated",
+    barber_id: barberId,
+  });
 
   setSaving(false);
 }

@@ -1,9 +1,16 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+// ⭐ FIX: Add this function right here
+function getDayNameFromDate(dateString) {
+  // Prevent timezone shift by forcing midnight local time
+  const date = new Date(dateString + "T00:00:00");
+  return date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+}
 
 // ⭐ Visual Time Slot Component
 function TimeSlot({ time, selected, onSelect }) {
@@ -162,9 +169,7 @@ useEffect(() => {
 
     setLoadingTimes(true);
 
-    const dayOfWeek = new Date(selectedDate)
-      .toLocaleDateString("en-US", { weekday: "long" })
-      .toLowerCase();
+   const dayOfWeek = getDayNameFromDate(selectedDate);
 
     const { data: availability } = await supabase
       .from("barber_availability")
@@ -187,17 +192,22 @@ useEffect(() => {
     const selectedDuration =
       SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60;
 
-    while (current < end) {
-      const slotStr = current.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
+   while (true) {
+  const slotEnd = new Date(current.getTime() + selectedDuration * 60 * 1000);
 
-      slots.push(slotStr);
+  // ⭐ Only allow slots that END before closing time
+  if (slotEnd > end) break;
 
-      current = new Date(current.getTime() + selectedDuration * 60 * 1000);
-    }
+  const slotStr = current.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  slots.push(slotStr);
+
+  current = slotEnd;
+}
 
     const { data: appointments } = await supabase
       .from("appointments")

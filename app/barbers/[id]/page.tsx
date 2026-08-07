@@ -21,7 +21,8 @@ const translations = {
     aboutMe: "About Me",
     topReview: "Top Review",
     shareProfile: "Share Profile",
-  },
+    independent: "Independent Barber",
+ },
   es: {
     business: "Negocio",
     featured: "Destacado",
@@ -39,7 +40,8 @@ const translations = {
     aboutMe: "Sobre mí",
     topReview: "Mejor Reseña",
     shareProfile: "Compartir Perfil",
-  }
+    independent: "Barbero Independiente",
+ }
 };
 
 const serviceTranslations = {
@@ -192,8 +194,10 @@ export default async function BarberProfilePage({ params, searchParams }) {
           <h1 className="text-2xl font-bold text-slate-900">{barber.name}</h1>
 
           {barber.category && (
-            <p className="text-sm text-blue-700 capitalize">{barber.category}</p>
-          )}
+  <p className="text-sm text-blue-700 capitalize">
+    {t[barber.category] || barber.category}
+  </p>
+)}
 
           {business && (
             <p className="mt-2 text-sm text-slate-700">

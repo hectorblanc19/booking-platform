@@ -12,11 +12,7 @@ export const metadata: Metadata = {
   description: "Booking platform",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <head>
@@ -26,8 +22,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
 
-      <body className="min-h-screen bg-gray-100 flex flex-col">
-        {children}
+      <body className="min-h-screen bg-gray-100">
+        <div className="flex flex-col min-h-screen">
+          {children}
+        </div>
       </body>
     </html>
   );

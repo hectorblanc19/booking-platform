@@ -211,62 +211,139 @@ useEffect(() => {
   }
 
   // ⭐ Load gallery photos
-  async function loadGallery() {
-    const { data, error } = await supabase
-      .from("barber_gallery")
-      .select("*")
-      .eq("barber_id", barberId)
-      .order("created_at", { ascending: false });
+async function loadGallery() {
+  const { data, error } = await supabase
+    .from("barber_gallery")
+    .select("*")
+    .eq("barber_id", barberId)
+    .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error loading gallery:", error);
-      return;
-    }
-
-    setGallery(data || []);
-  }
-
-  // ⭐ Upload profile photo
-  async function handlePhotoUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const fileName = `${barberId}-${Date.now()}.jpg`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("barber-photos")
-      .upload(fileName, file);
-
-    if (uploadError) {
-      alert("Error uploading photo");
-      return;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from("barber-photos")
-      .getPublicUrl(fileName);
-
-    await supabase
-      .from("barbers")
-      .update({ photo_url: urlData.publicUrl })
-      .eq("id", barberId);
-
-    loadBarber();
-  }
-
-  async function handleGalleryUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  // ⭐ Limit to 3 photos
-  if (gallery.length >= 3) {
-    alert(lang === "es"
-      ? "Solo puedes subir 3 fotos a la galería."
-      : "You can only upload 3 gallery photos.");
+  if (error) {
+    console.error("Error loading gallery:", error);
     return;
   }
 
-  const fileName = `${barberId}-gallery-${Date.now()}.jpg`;
+  setGallery(data || []);
+}
+
+// ⭐ Compress image BEFORE uploading (iPhone fix)
+async function compressImage(file, maxWidth = 1200) {
+  const imageBitmap = await createImageBitmap(file);
+
+  const ratio = imageBitmap.width / imageBitmap.height;
+  const newWidth = Math.min(imageBitmap.width, maxWidth);
+  const newHeight = newWidth / ratio;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = newWidth;
+  canvas.height = newHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight);
+
+  const compressedBlob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.8)
+  );
+
+  return new File([compressedBlob], file.name.replace(/\.\w+$/, ".jpg"), {
+    type: "image/jpeg",
+  });
+}
+
+// ⭐ PLACE convertToJpeg() RIGHT HERE
+async function convertToJpeg(file) {
+  // If it's not HEIC, return original file
+  if (
+    !file.type.includes("heic") &&
+    !file.name.toLowerCase().includes("heic")
+  ) {
+    return file;
+  }
+
+  // Convert HEIC → JPEG using canvas
+  const arrayBuffer = await file.arrayBuffer();
+  const blob = new Blob([arrayBuffer]);
+
+  const imageBitmap = await createImageBitmap(blob);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = imageBitmap.width;
+  canvas.height = imageBitmap.height;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(imageBitmap, 0, 0);
+
+  const jpegBlob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.9)
+  );
+
+  return new File([jpegBlob], file.name.replace(/\.heic/i, ".jpg"), {
+    type: "image/jpeg",
+  });
+}
+
+// ⭐ Upload profile photo
+async function handlePhotoUpload(event) {
+  let file = event.target.files[0];
+  if (!file) return;
+
+  // ⭐ Convert HEIC → JPEG
+  file = await convertToJpeg(file);
+
+  // ⭐ Compress image (iPhone fix)
+  file = await compressImage(file);
+
+  // ⭐ Correct extension
+  const ext = file.name.split(".").pop();
+
+  // ⭐ Correct filename for PROFILE photo
+  const fileName = `${barberId}-profile-${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("barber-photos")
+    .upload(fileName, file);
+
+  if (uploadError) {
+    alert("Error uploading photo");
+    return;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("barber-photos")
+    .getPublicUrl(fileName);
+
+  await supabase
+    .from("barbers")
+    .update({ photo_url: urlData.publicUrl })
+    .eq("id", barberId);
+
+  loadBarber();
+}
+
+// ⭐ Upload gallery photo
+async function handleGalleryUpload(event) {
+  let file = event.target.files[0];
+  if (!file) return;
+
+  // ⭐ Convert HEIC → JPEG
+  file = await convertToJpeg(file);
+
+  // ⭐ Compress image (iPhone fix)
+  file = await compressImage(file);
+
+  // ⭐ Limit to 4 photos
+  if (gallery.length >= 4) {
+    alert(lang === "es"
+      ? "Solo puedes subir 4 fotos a la galería."
+      : "You can only upload 4 gallery photos.");
+    return;
+  }
+
+  // ⭐ Correct extension
+  const ext = file.name.split(".").pop();
+
+  // ⭐ Correct filename for GALLERY photo
+  const fileName = `${barberId}-gallery-${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("barber-gallery")
@@ -398,16 +475,43 @@ async function deleteGalleryPhoto(photoId) {
   }
 
   function formatTime(timeStr) {
-    if (!timeStr) return "";
-    const [h, m] = timeStr.split(":");
-    const date = new Date();
-    date.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
-    return date.toLocaleTimeString(lang === "es" ? "es-ES" : "en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  }
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":");
+  const date = new Date();
+  date.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+  return date.toLocaleTimeString(lang === "es" ? "es-ES" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+// ⭐ LOGOUT FUNCTION
+async function handleLogout() {
+  await supabase.auth.signOut();
+  window.location.href = "/barber/login";
+}
+
+// ⭐ DELETE ACCOUNT FUNCTION
+async function handleDeleteAccount() {
+  const confirmDelete = confirm(
+    lang === "es"
+      ? "¿Seguro que deseas eliminar tu cuenta? Esto no se puede deshacer."
+      : "Are you sure you want to delete your account? This cannot be undone."
+  );
+
+  if (!confirmDelete) return;
+
+  await fetch("/api/barber/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ barberId }),
+  });
+
+  await supabase.auth.signOut();
+  window.location.href = "/barber/login";
+}
+
 // ⭐ EARLY RETURN — stop dashboard completely
 if (barberData?.payment_status === "unpaid") {
   return (
@@ -431,34 +535,42 @@ return (
     <div className="max-w-4xl mx-auto px-4">
 
       {/* Top bar */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm">{tr.langLabel}:</span>
-          <button
-            className={`px-2 py-1 text-sm rounded ${
-              lang === "es" ? "bg-black text-white" : "bg-gray-200"
-            }`}
-            onClick={() => setLang("es")}
-          >
-            {tr.es}
-          </button>
-          <button
-            className={`px-2 py-1 text-sm rounded ${
-              lang === "en" ? "bg-black text-white" : "bg-gray-200"
-            }`}
-            onClick={() => setLang("en")}
-          >
-            {tr.en}
-          </button>
-        </div>
+<div className="flex justify-between items-center mb-4">
+  <div className="flex items-center gap-2">
+    <span className="text-sm">{tr.langLabel}:</span>
+    <button
+      className={`px-2 py-1 text-sm rounded ${
+        lang === "es" ? "bg-black text-white" : "bg-gray-200"
+      }`}
+      onClick={() => setLang("es")}
+    >
+      {tr.es}
+    </button>
+    <button
+      className={`px-2 py-1 text-sm rounded ${
+        lang === "en" ? "bg-black text-white" : "bg-gray-200"
+      }`}
+      onClick={() => setLang("en")}
+    >
+      {tr.en}
+    </button>
+  </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-600">
-          <span className="inline-flex items-center gap-1">
-            <span className="text-lg">🔔</span>
-            {pushActive ? tr.pushActive : tr.pushInactive}
-          </span>
-        </div>
-      </div>
+  <div className="flex items-center gap-2 text-xs text-gray-600">
+    <span className="inline-flex items-center gap-1">
+      <span className="text-lg">🔔</span>
+      {pushActive ? tr.pushActive : tr.pushInactive}
+    </span>
+  </div>
+
+  {/* ⭐ Logout button */}
+  <button
+    onClick={handleLogout}
+    className="px-3 py-1 bg-red-600 text-white rounded text-sm"
+  >
+    {lang === "es" ? "Cerrar Sesión" : "Logout"}
+  </button>
+</div>
 
       {/* Push subscription */}
       <ServiceWorkerClient role="business" barber_id={barberId} />
@@ -543,10 +655,12 @@ return (
         </div>
       </div>
 
-      {/* Quick actions */}
+     {/* Quick actions */}
 <div className="bg-white rounded-2xl shadow-md p-4 mb-6">
   <h3 className="text-lg font-semibold mb-3">{tr.quickActions}</h3>
+
   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
     <button
       className="flex items-center justify-center gap-2 bg-black text-white py-2 rounded-lg text-sm"
       onClick={() =>
@@ -592,8 +706,17 @@ return (
     >
       🍽 {tr.breaks}
     </button>
+
+    {/* ⭐ DELETE ACCOUNT BUTTON */}
+    <button
+      className="flex items-center justify-center gap-2 bg-red-700 text-white py-2 rounded-lg text-sm"
+      onClick={handleDeleteAccount}
+    >
+      🗑 {lang === "es" ? "Eliminar Cuenta" : "Delete Account"}
+    </button>
+
   </div>
-</div> 
+</div>
 
 {/* Filters */}
 <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
@@ -775,3 +898,4 @@ return (
     </div>
   );
 }
+

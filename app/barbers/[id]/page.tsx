@@ -99,17 +99,36 @@ export default async function BarberProfilePage({ params, searchParams }) {
     .order("date", { ascending: true });
 
   const { data: reviews } = await supabase
-    .from("ratings")
-    .select("*")
-    .eq("barber_id", id)
-    .order("created_at", { ascending: false });
+  .from("ratings")
+  .select("*")
+  .eq("barber_id", id)
+  .order("created_at", { ascending: false });
+
+// ⭐ ADD THIS RIGHT HERE — WEEKLY HOURS QUERY
+const { data: weekly } = await supabase
+  .from("barber_availability")
+  .select("*")
+  .eq("barber_id", id)
+  .order("day_of_week", { ascending: true });
+
 
   const averageRating =
     reviews?.length > 0
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
       : 0;
+function formatTimeToAMPM(timeString) {
+  if (!timeString) return "";
 
-  return (
+  const [hour, minute] = timeString.split(":");
+  let h = parseInt(hour, 10);
+  const m = minute;
+
+  const suffix = h >= 12 ? "p. m." : "a. m.";
+  h = h % 12 || 12;
+
+  return `${h}:${m} ${suffix}`;
+}
+return (
     <div className="max-w-4xl mx-auto px-4 py-6">
 
       {/* Language Toggle */}
@@ -222,6 +241,29 @@ export default async function BarberProfilePage({ params, searchParams }) {
         {barber.phone && <p>📞 {t.phone}: {barber.phone}</p>}
         {barber.email && <p>✉️ {t.email}: {barber.email}</p>}
       </div>
+
+{/* Today’s Hours */}
+<div className="mt-4">
+  {(() => {
+    const todayIndex = new Date().getDay(); // 0=Sunday, 1=Monday...
+    const map = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+    const todayName = map[todayIndex];
+
+    const today = weekly?.find(w => w.day_of_week === todayName);
+
+    if (!today) return null;
+
+    return (
+      <p className="text-sm text-slate-800 font-medium">
+        {lang === "es" ? "Horario de hoy:" : "Today's Hours:"}{" "}
+        {today.is_closed
+          ? (lang === "es" ? "Cerrado" : "Closed")
+          : `${formatTimeToAMPM(today.start_time)} – ${formatTimeToAMPM(today.end_time)}`}
+      </p>
+    );
+  })()}
+</div>
+
 
       {/* Barber Bio / About Me */}
       {barber.bio && (

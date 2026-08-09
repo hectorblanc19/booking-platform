@@ -49,7 +49,10 @@ export default function ReviewsClient({ reviews, averageRating, lang }) {
               </span>
             </div>
 
-            <p className="mt-2 text-sm text-slate-800">{review.comment}</p>
+            <p className="mt-2 text-sm text-slate-800">
+  {review.review_text}
+</p>
+
 
             {review.customer_name && (
               <p className="mt-1 text-xs text-slate-500">

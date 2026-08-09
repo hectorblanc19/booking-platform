@@ -1,40 +1,69 @@
-const CACHE_NAME = "flowpay-cache-v1";
 
-// Install event: cache basic assets
+const CACHE_VERSION = "flowpay-v26"; // increment on each deploy
+const CACHE_NAME = CACHE_VERSION;
+
+// Files you actually want cached (NOT login or API)
+const STATIC_ASSETS = [
+  "/", 
+  "/icons/icon-192.png",
+  "/icons/icon-512.png"
+];
+
+// Install
 self.addEventListener("install", (event) => {
+  self.skipWaiting(); // force update immediately
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(["/"]);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  console.log("Service worker installed");
 });
 
-// Activate event
-self.addEventListener("activate", () => {
-  console.log("Service worker activated");
+// Activate
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
+      )
+    )
+  );
+  self.clients.claim(); // take control immediately
 });
 
-// Fetch event: do NOT cache the service worker itself
+// Fetch — NETWORK FIRST for login + API
 self.addEventListener("fetch", (event) => {
   const url = event.request.url;
 
-  // Skip caching for service worker files
-  if (url.includes("service-worker.js") || url.includes("sw.js")) {
-    return; // always fetch latest version
+  // NEVER cache login or API routes
+  if (
+    url.includes("/barber/login") ||
+    url.includes("/nail/login") ||
+    url.includes("/api/")
+  ) {
+    event.respondWith(fetch(event.request));
+    return;
   }
 
+  // Static assets: cache first
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    caches.match(event.request).then((cached) => {
+      return (
+        cached ||
+        fetch(event.request).then((response) => {
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+      );
     })
   );
 });
 
-// ⭐ PUSH NOTIFICATIONS (FIXED VERSION)
+// Push notifications
 self.addEventListener("push", (event) => {
   const data = event.data ? event.data.json() : {};
-
   event.waitUntil(
     self.registration.showNotification(data.title || "FlowPayDR", {
       body: data.message || "",
@@ -46,10 +75,9 @@ self.addEventListener("push", (event) => {
   );
 });
 
-// Optional: handle notification click
+// Notification click
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-
   const url = event.notification.data?.url || "/";
   event.waitUntil(clients.openWindow(url));
 });

@@ -180,17 +180,21 @@ export default function BarberDashboard() {
   return () => supabase.removeChannel(channel);
 }, []);
 
-// ⭐ Add this block right here
+// ⭐ Refresh today's availability whenever dashboard is opened
 useEffect(() => {
-  const channel = supabase
-    .channel("availability-updates")
-    .on("broadcast", { event: "updated" }, () => {
-      loadTodayAvailability();   // refresh today's hours automatically
-    })
-    .subscribe();
+  loadTodayAvailability();
+}, [barberId]);
 
-  return () => supabase.removeChannel(channel);
+// ⭐ Refresh when window regains focus
+useEffect(() => {
+  function handleFocus() {
+    loadTodayAvailability();
+  }
+
+  window.addEventListener("focus", handleFocus);
+  return () => window.removeEventListener("focus", handleFocus);
 }, []);
+
 
   useEffect(() => {
     loadAppointments();

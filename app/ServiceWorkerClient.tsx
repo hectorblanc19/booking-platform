@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from "react";
@@ -35,7 +36,8 @@ export default function ServiceWorkerClient({
   barber_id?: string;
 }) {
   useEffect(() => {
-    async function setup() {
+  if (role === "business") return;   // ⭐ DO NOT register SW for barbers
+  async function setup() {
       if (!("serviceWorker" in navigator)) return;
       if (!("PushManager" in window)) return;
 

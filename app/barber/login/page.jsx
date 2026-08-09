@@ -1,5 +1,5 @@
-// force rebuild 25
 "use client";
+export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -67,24 +67,33 @@ export default function BarberLoginPage() {
     }
   }
 
-  async function loginBarber() {
-    setError("");
+useEffect(() => {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      regs.forEach((reg) => reg.unregister());
+    });
+  }
+}, []);
 
-    if (!email.trim() || !pin.trim()) {
-      setError(t[lang].empty);
-      return;
-    }
+async function loginBarber() {
+  setError("");
 
-    setLoading(true);
+  if (!email.trim() || !pin.trim()) {
+    setError(t[lang].empty);
+    return;
+  }
 
-    const { data: barber } = await supabase
+  setLoading(true);
+
+  try {
+    const { data: barber, error: loginError } = await supabase
       .from("barbers")
       .select("*")
-      .eq("email", email.trim().toLowerCase())
+      .ilike("email", email.trim())
       .eq("pin", pin.trim())
       .single();
 
-    if (!barber) {
+    if (loginError || !barber) {
       setLoading(false);
       setError(t[lang].invalid);
       return;
@@ -93,10 +102,16 @@ export default function BarberLoginPage() {
     localStorage.setItem("flowpay_role", "barber");
     localStorage.setItem("flowpay_user_id", barber.id);
 
-    await subscribeToPush(barber.id);
+    // ❌ REMOVE THIS — causes iPhone freeze
+    // await subscribeToPush(barber.id);
 
     router.push(`/barber/${barber.id}/dashboard`);
+  } catch (err) {
+    console.error("Login failed:", err);
+    setLoading(false);
+    setError(t[lang].invalid);
   }
+}
 
   return (
     <div className="max-w-sm mx-auto p-6 mt-20">

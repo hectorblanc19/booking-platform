@@ -1,7 +1,11 @@
+
+
+import OpenStatusClient from "../../../components/OpenStatusClient";
 import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
 import ReviewsClient from "./ReviewsClient";
 import ShareProfileButton from "./ShareProfileButton";
+import TodayStatusBlock from "../../../components/TodayStatusBlock";
 
 const translations = {
   en: {
@@ -112,10 +116,12 @@ const { data: weekly } = await supabase
   .order("day_of_week", { ascending: true });
 
 
-  const averageRating =
-    reviews?.length > 0
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-      : 0;
+ const averageRating =
+  reviews?.length > 0
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+    : 0;
+
+// ⭐ Time formatting helper
 function formatTimeToAMPM(timeString) {
   if (!timeString) return "";
 
@@ -128,8 +134,47 @@ function formatTimeToAMPM(timeString) {
 
   return `${h}:${m} ${suffix}`;
 }
+
+function isBarberOpen(start, end) {
+  if (!start || !end) return false;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+
+  const startMinutes = sh * 60 + sm;
+  const endMinutes = eh * 60 + em;
+
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+}
+
+// ⭐ Animated Gradient Header Styles (inline)
+const gradientHeaderStyle = {
+  background: "linear-gradient(120deg, #1e3a8a, #9333ea, #2563eb)",
+  backgroundSize: "200% 200%",
+  animation: "gradientShift 8s ease infinite",
+};
+
+// ⭐ Keyframes injected inline
+const gradientKeyframes = `
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+`;
+
+// Inject keyframes into the page
+if (typeof document !== "undefined") {
+  const styleTag = document.createElement("style");
+  styleTag.innerHTML = gradientKeyframes;
+  document.head.appendChild(styleTag);
+}
+
 return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+  <div className="max-w-4xl mx-auto px-4 py-6">
 
       {/* Language Toggle */}
       <div className="flex justify-end mb-4 gap-2">
@@ -149,10 +194,10 @@ return (
       </div>
 
       {/* Banner - Premium Hero Style with Parallax + Floating Button */}
-      <div
-        className="relative w-full h-[600px] rounded-xl overflow-hidden shadow-lg"
-        style={{ perspective: "1000px" }}
-      >
+<div
+  className="relative w-full h-[600px] rounded-xl overflow-hidden shadow-lg"
+  style={{ ...gradientHeaderStyle, perspective: "1000px" }}
+>
         {/* Parallax Background */}
         <div
           className="absolute inset-0"
@@ -242,29 +287,21 @@ return (
         {barber.email && <p>✉️ {t.email}: {barber.email}</p>}
       </div>
 
-{/* Today’s Hours */}
+{/* Today’s Status + Hours */}
 <div className="mt-4">
   {(() => {
-    const todayIndex = new Date().getDay(); // 0=Sunday, 1=Monday...
+    const todayIndex = new Date().getDay();
     const map = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
     const todayName = map[todayIndex];
 
     const today = weekly?.find(w => w.day_of_week === todayName);
-
     if (!today) return null;
 
-    return (
-      <p className="text-sm text-slate-800 font-medium">
-        {lang === "es" ? "Horario de hoy:" : "Today's Hours:"}{" "}
-        {today.is_closed
-          ? (lang === "es" ? "Cerrado" : "Closed")
-          : `${formatTimeToAMPM(today.start_time)} – ${formatTimeToAMPM(today.end_time)}`}
-      </p>
-    );
+    return <TodayStatusBlock today={today} lang={lang} />;
   })()}
 </div>
 
-
+       
       {/* Barber Bio / About Me */}
       {barber.bio && (
         <div className="mt-8">

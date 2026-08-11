@@ -1,5 +1,3 @@
-
-
 import OpenStatusClient from "../../../components/OpenStatusClient";
 import { createClient } from "@/utils/supabase/server";
 import Image from "next/image";
@@ -297,8 +295,8 @@ return (
     const today = weekly?.find(w => w.day_of_week === todayName);
     if (!today) return null;
 
-    return <TodayStatusBlock today={today} lang={lang} />;
-  })()}
+    return <TodayStatusBlock today={today} lang={lang} weekly={weekly} />;
+ })()}
 </div>
 
        

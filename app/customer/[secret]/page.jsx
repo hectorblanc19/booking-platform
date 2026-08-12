@@ -64,6 +64,30 @@ export default function CustomerSecretPage() {
   useEffect(() => {
     loadAppointment();
   }, []);
+useEffect(() => {
+  if (!appointment) return;
+
+  const channel = supabase
+    .channel(`appointment-${appointment.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "appointments",
+        filter: `id=eq.${appointment.id}`,
+      },
+      (payload) => {
+        console.log("Realtime update:", payload);
+        loadAppointment();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [appointment]);
 
   async function loadAppointment() {
     const { data: appt } = await supabase
@@ -97,39 +121,39 @@ export default function CustomerSecretPage() {
   }
 
   async function cancelAppointment() {
-    const now = new Date();
-    const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+  const now = new Date();
+  const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
 
-    if (apptDateTime < now) {
-      alert(
-        lang === "es"
-          ? "La cita ya pasó. No se puede cancelar."
-          : "This appointment has already passed. Cannot cancel."
-      );
-      return;
-    }
-
-    // Update appointment status
-    await supabase
-      .from("appointments")
-      .update({ status: "cancelled" })
-      .eq("id", appointment.id);
-
-    // ⭐ SEND PUSH NOTIFICATION TO BARBER
-    await fetch("/api/push/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        role: "business",
-        barber_id: appointment.barber_id,
-        title: "Appointment Cancelled",
-        message: `Client cancelled their appointment for ${appointment.date} at ${appointment.time}.`,
-      }),
-    });
-
-    alert(lang === "es" ? "Cita cancelada" : "Appointment cancelled");
-    loadAppointment();
+  if (apptDateTime < now) {
+    alert(
+      lang === "es"
+        ? "La cita ya pasó. No se puede cancelar."
+        : "This appointment has already passed. Cannot cancel."
+    );
+    return;
   }
+
+  // Update appointment status
+  await supabase
+    .from("appointments")
+    .update({ status: "cancelled" })
+    .eq("id", appointment.id);
+
+  // ⭐ SEND PUSH NOTIFICATION TO BARBER (non-blocking)
+  fetch("/api/push/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      role: "business",
+      barber_id: appointment.barber_id,
+      title: "Appointment Cancelled",
+      message: `Client cancelled their appointment for ${appointment.date} at ${appointment.time}.`,
+    }),
+  }).catch(() => {});
+
+  alert(lang === "es" ? "Cita cancelada" : "Appointment cancelled");
+  loadAppointment();
+}
 
   function shareWhatsApp() {
     const message =

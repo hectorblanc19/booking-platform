@@ -38,20 +38,32 @@ export async function POST(req) {
     process.env.VAPID_PRIVATE_KEY
   );
 
-  // Send notification
-  for (const token of tokens) {
-    try {
-      await webpush.sendNotification(
-        token.subscription,
-        JSON.stringify({
-          title,
-          message,
-        })
-      );
-    } catch (err) {
-      console.error("Push send error:", err);
+  // Send notification with cleanup
+for (const token of tokens) {
+  try {
+    await webpush.sendNotification(
+      token.subscription,
+      JSON.stringify({ title, message })
+    );
+  } catch (err) {
+    console.error("Push send error:", err);
+
+    // ⭐ DELETE EXPIRED / REVOKED TOKENS
+    if (err.statusCode === 410 || err.statusCode === 404) {
+      await supabase
+        .from("push_tokens")
+        .delete()
+        .eq("id", token.id);
+
+      console.log("Deleted expired push token:", token.id);
+    }
+
+    // ⭐ SKIP THROTTLED TOKENS (429)
+    if (err.statusCode === 429) {
+      console.log("Push throttled, skipping retry.");
     }
   }
+}
 
   return NextResponse.json({ success: true });
 }

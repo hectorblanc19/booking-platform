@@ -1,4 +1,3 @@
-
 const CACHE_VERSION = "flowpay-v26"; // increment on each deploy
 const CACHE_NAME = CACHE_VERSION;
 
@@ -31,32 +30,42 @@ self.addEventListener("activate", (event) => {
   self.clients.claim(); // take control immediately
 });
 
-// Fetch — NETWORK FIRST for login + API
+// Fetch — NETWORK FIRST for login + API + SUPABASE
 self.addEventListener("fetch", (event) => {
   const url = event.request.url;
 
-  // NEVER cache login or API routes
-  if (
-    url.includes("/barber/login") ||
-    url.includes("/nail/login") ||
-    url.includes("/api/")
-  ) {
-    event.respondWith(fetch(event.request));
+  // ⭐ NEVER cache Supabase REST or Realtime
+  if (url.includes("supabase.co")) {
+    return; // let browser handle normally
+  }
+
+  // ⭐ NEVER cache API routes
+  if (url.includes("/api/")) {
     return;
   }
 
-  // Static assets: cache first
+  // ⭐ NEVER cache login pages
+  if (
+    url.includes("/barber/login") ||
+    url.includes("/nail/login")
+  ) {
+    return;
+  }
+
+  // ⭐ Only cache STATIC assets
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request).then((response) => {
-          return caches.open(CACHE_NAME).then((cache) => {
+      if (cached) return cached;
+
+      return fetch(event.request).then((response) => {
+        // Only cache GET requests for static files
+        if (event.request.method === "GET") {
+          caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, response.clone());
-            return response;
           });
-        })
-      );
+        }
+        return response;
+      });
     })
   );
 });

@@ -71,6 +71,31 @@ export default function RescheduleInner() {
   useEffect(() => {
     loadAppointment();
   }, []);
+useEffect(() => {
+  if (!appointment) return;
+
+  const channel = supabase
+    .channel(`appointment-${appointment.id}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "appointments",
+        filter: `id=eq.${appointment.id}`,
+      },
+      (payload) => {
+        console.log("Realtime update (reschedule page):", payload);
+        loadAppointment();   // ⭐ reload instantly
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [appointment]);
+
 
   async function loadAppointment() {
     const { data: appt } = await supabase

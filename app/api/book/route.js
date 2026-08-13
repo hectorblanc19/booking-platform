@@ -86,7 +86,8 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to create appointment" });
   }
 
-  // ⭐ SEND CUSTOMER CONFIRMATION EMAIL + PUSH
+  // ⭐ SEND CUSTOMER CONFIRMATION EMAIL + PUSH (UPGRADED)
+try {
   await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-confirmation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -100,11 +101,17 @@ export async function POST(req) {
       time,
       secret_link,
       lang,
-      customer_id   // secret_link
+      customer_id
     })
   });
+  console.log("📲 Customer confirmation sent");
+} catch (err) {
+  console.error("❌ Error sending customer confirmation:", err);
+}
 
-  // ⭐ SEND BARBER EMAIL + PUSH
+
+// ⭐ SEND BARBER EMAIL + PUSH (UPGRADED)
+try {
   await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-barber-notification`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -123,6 +130,10 @@ export async function POST(req) {
       lang
     })
   });
+  console.log("📲 Barber notification sent");
+} catch (err) {
+  console.error("❌ Error sending barber notification:", err);
+}
 
   return NextResponse.json({
     success: true,

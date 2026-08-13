@@ -126,25 +126,29 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to send barber email" });
   }
 
-  // ⭐ SEND PUSH NOTIFICATION TO BARBER (FIXED)
-  try {
-    const { data: tokens } = await supabase
-      .from("push_tokens")
-      .select("subscription")
-      .eq("user_id", barber_id)     // ✔ correct
-      .eq("role", "barber");        // ⭐ FIXED (was "business")
+ // ⭐ SEND PUSH NOTIFICATION TO BARBER (UPGRADED)
+try {
+  const { data: tokens } = await supabase
+    .from("push_tokens")
+    .select("subscription")
+    .eq("user_id", barber_id)
+    .eq("role", "barber");
 
-    if (tokens && tokens.length > 0) {
-      for (const t of tokens) {
-        await sendPushToSubscription(t.subscription, {
-          title: "New Appointment",
-          message: `${customer_name} booked for ${date} at ${time}.`,
-        });
-      }
-    }
-  } catch (err) {
-    console.error("Barber push error:", err);
+  if (!tokens || tokens.length === 0) {
+    console.log("ℹ️ No push tokens for barber:", barber_id);
   }
+
+  for (const t of tokens || []) {
+    await sendPushToSubscription(t.subscription, {
+      title: "New Appointment",
+      message: `${customer_name} booked for ${date} at ${time}.`,
+    });
+  }
+
+  console.log("📲 Barber push notifications sent:", tokens?.length || 0);
+} catch (err) {
+  console.error("❌ Barber push error:", err);
+}
 
   return NextResponse.json({ success: true });
 }

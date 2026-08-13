@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 export async function POST(req) {
   const supabase = createClient(
@@ -10,7 +11,7 @@ export async function POST(req) {
   const body = await req.json();
   const { subscription, role, secret_link, barber_id } = body;
 
-  // ⭐ Validate required fields
+  // Validate required fields
   if (!subscription || !role) {
     return NextResponse.json(
       { error: "Missing fields: subscription and role are required" },
@@ -20,7 +21,7 @@ export async function POST(req) {
 
   let userId;
 
-  // ⭐ CUSTOMER (anonymous booking)
+  // CUSTOMER
   if (role === "customer") {
     if (!secret_link) {
       return NextResponse.json(
@@ -28,10 +29,10 @@ export async function POST(req) {
         { status: 400 }
       );
     }
-    userId = secret_link; // ⭐ MUST MATCH appointments.customer_id
+    userId = secret_link;
   }
 
-  // ⭐ BARBER (logged-in business user)
+  // BARBER
   if (role === "business") {
     if (!barber_id) {
       return NextResponse.json(
@@ -39,18 +40,30 @@ export async function POST(req) {
         { status: 400 }
       );
     }
-    userId = barber_id; // ⭐ MUST MATCH barbers.id
+    userId = barber_id;
   }
 
-  // ⭐ Save or update the push token
+  // ⭐ Generate a hash to prevent duplicate tokens
+  const subscription_hash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(subscription))
+    .digest("hex");
+
+  // ⭐ Upsert (insert or update) the token
   const { error } = await supabase
     .from("push_tokens")
-    .upsert({
-      user_id: userId,
-      role,
-      subscription,
-      updated_at: new Date().toISOString(),
-    });
+    .upsert(
+      {
+        user_id: userId,
+        role,
+        subscription,
+        subscription_hash,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "user_id, subscription_hash",
+      }
+    );
 
   if (error) {
     console.error("Push subscribe error:", error);

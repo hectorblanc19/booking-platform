@@ -83,23 +83,30 @@ export async function GET() {
 
       console.log("📧 Email reminder sent to:", appt.customer_email);
 
-      // ⭐ PUSH REMINDER (FIXED)
-      const { data: tokens } = await supabase
-        .from("push_tokens")
-        .select("subscription")
-        .eq("user_id", appt.secret_link)   // ⭐ FIXED: use secret_link
-        .eq("role", "customer");
+      // ⭐ PUSH REMINDER (UPGRADED)
+try {
+  const { data: tokens } = await supabase
+    .from("push_tokens")
+    .select("subscription")
+    .eq("user_id", appt.secret_link)
+    .eq("role", "customer");
 
-      if (tokens && tokens.length > 0) {
-        for (const t of tokens) {
-          await sendPushToSubscription(t.subscription, {
-            title: isSpanish ? "Recordatorio de Cita" : "Appointment Reminder",
-            message: finalMessage,
-          });
-        }
-      }
+  if (!tokens || tokens.length === 0) {
+    console.log("ℹ️ No push tokens for customer:", appt.secret_link);
+  }
 
-      console.log("📲 Push reminder sent to:", appt.customer_email);
+  for (const t of tokens || []) {
+    await sendPushToSubscription(t.subscription, {
+      title: isSpanish ? "Recordatorio de Cita" : "Appointment Reminder",
+      message: finalMessage,
+    });
+  }
+
+  console.log("📲 Push reminder sent:", tokens?.length || 0);
+} catch (err) {
+  console.error("❌ Push reminder error:", err);
+}
+
 
       // MARK REMINDER AS SENT
       await supabase

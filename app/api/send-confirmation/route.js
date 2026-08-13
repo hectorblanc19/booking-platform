@@ -163,25 +163,29 @@ export async function POST(req) {
     return NextResponse.json({ error: "Failed to send email" });
   }
 
-  // ⭐ SEND PUSH NOTIFICATION TO CUSTOMER
-  try {
-    const { data: tokens } = await supabase
-      .from("push_tokens")
-      .select("subscription")
-      .eq("user_id", secret_link)
-      .eq("role", "customer");
+  // ⭐ SEND PUSH NOTIFICATION TO CUSTOMER (UPGRADED)
+try {
+  const { data: tokens } = await supabase
+    .from("push_tokens")
+    .select("subscription")
+    .eq("user_id", secret_link)
+    .eq("role", "customer");
 
-    if (tokens && tokens.length > 0) {
-      for (const t of tokens) {
-        await sendPushToSubscription(t.subscription, {
-          title: "FlowPayDR",
-          message: `Your appointment is confirmed for ${date} at ${time}.`,
-        });
-      }
-    }
-  } catch (err) {
-    console.error("Push error:", err);
+  if (!tokens || tokens.length === 0) {
+    console.log("ℹ️ No push tokens for customer:", secret_link);
   }
+
+  for (const t of tokens || []) {
+    await sendPushToSubscription(t.subscription, {
+      title: "FlowPayDR",
+      message: `Your appointment is confirmed for ${date} at ${time}.`,
+    });
+  }
+
+  console.log("📲 Customer push notifications sent:", tokens?.length || 0);
+} catch (err) {
+  console.error("❌ Customer push error:", err);
+}
 
   return NextResponse.json({ success: true });
 }

@@ -392,6 +392,41 @@ return (
           })}
         </div>
       </div>
+{/* ⭐ Service Prices */}
+<div className="mt-6">
+  <h2 className="text-lg font-semibold text-slate-900">
+    {lang === "es" ? "Precios" : "Prices"}
+  </h2>
+
+  <div className="mt-3 space-y-2 text-sm text-slate-800">
+
+    {/* Haircut */}
+    {barber.haircut_price && (
+      <div className="flex justify-between border-b pb-1">
+        <span>{lang === "es" ? "Corte" : "Haircut"}</span>
+        <span className="font-medium">${barber.haircut_price}</span>
+      </div>
+    )}
+
+    {/* Beard */}
+    {barber.beard_price && (
+      <div className="flex justify-between border-b pb-1">
+        <span>{lang === "es" ? "Barba" : "Beard"}</span>
+        <span className="font-medium">${barber.beard_price}</span>
+      </div>
+    )}
+
+    {/* Haircut + Beard */}
+    {barber.combo_price && (
+      <div className="flex justify-between border-b pb-1">
+        <span>{lang === "es" ? "Corte + Barba" : "Haircut + Beard"}</span>
+        <span className="font-medium">${barber.combo_price}</span>
+      </div>
+    )}
+
+  </div>
+</div>
+
 
      {/* Gallery */}
 <div className="mt-10">

@@ -159,6 +159,11 @@ export default function BarberDashboard() {
   // ⭐ Gallery state
   const [gallery, setGallery] = useState([]);
 
+  // ⭐ PRICE FIELDS (NEW — REQUIRED)
+  const [haircutPrice, setHaircutPrice] = useState("");
+  const [beardPrice, setBeardPrice] = useState("");
+  const [comboPrice, setComboPrice] = useState("");
+
   const tr = t[lang];
 
   // ⭐ Load barber + gallery on page load
@@ -202,17 +207,22 @@ useEffect(() => {
   }, [view]);
 
   // ⭐ Load barber profile
-  async function loadBarber() {
-    const { data, error } = await supabase
-      .from("barbers")
-      .select(`*, businesses(*)`)
-      .eq("id", barberId)
-      .single();
+async function loadBarber() {
+  const { data, error } = await supabase
+    .from("barbers")
+    .select(`*, businesses(*)`)
+    .eq("id", barberId)
+    .single();
 
-    if (error) console.error("Error loading barber:", error);
+  if (error) console.error("Error loading barber:", error);
 
-    setBarberData(data);
-  }
+  setBarberData(data);
+
+  // ⭐ Load prices (NEW)
+  setHaircutPrice(data.haircut_price || "");
+  setBeardPrice(data.beard_price || "");
+  setComboPrice(data.combo_price || "");
+}
 
   // ⭐ Load gallery photos
 async function loadGallery() {
@@ -516,6 +526,26 @@ async function handleDeleteAccount() {
   window.location.href = "/barber/login";
 }
 
+// ⭐ SAVE PRICES FUNCTION (INSERTED HERE)
+async function savePrices() {
+  const { error } = await supabase
+    .from("barbers")
+    .update({
+      haircut_price: haircutPrice,
+      beard_price: beardPrice,
+      combo_price: comboPrice,
+    })
+    .eq("id", barberId);
+
+  if (error) {
+    alert(lang === "es" ? "Error guardando precios" : "Error saving prices");
+    return;
+  }
+
+  alert(lang === "es" ? "Precios actualizados" : "Prices updated");
+  loadBarber();
+}
+
 // ⭐ EARLY RETURN — stop dashboard completely
 if (barberData?.payment_status === "unpaid") {
   return (
@@ -719,6 +749,66 @@ return (
       🗑 {lang === "es" ? "Eliminar Cuenta" : "Delete Account"}
     </button>
 
+</div>
+</div>
+
+{/* ⭐ Services & Prices */}
+<div className="bg-white rounded-2xl shadow-md p-4 mb-6">
+  <h3 className="text-lg font-semibold mb-3">
+    {lang === "es" ? "Servicios y Precios" : "Services & Prices"}
+  </h3>
+
+  <div className="space-y-4">
+
+    {/* Haircut Price */}
+    <div>
+      <label className="block text-sm font-medium mb-1">
+        {lang === "es" ? "Precio de Corte" : "Haircut Price"}
+      </label>
+      <input
+        type="number"
+        value={haircutPrice}
+        onChange={(e) => setHaircutPrice(e.target.value)}
+        className="w-full border rounded-lg px-3 py-2"
+        placeholder={lang === "es" ? "Ej: 20" : "Ex: 20"}
+      />
+    </div>
+
+    {/* Beard Price */}
+    <div>
+      <label className="block text-sm font-medium mb-1">
+        {lang === "es" ? "Precio de Barba" : "Beard Price"}
+      </label>
+      <input
+        type="number"
+        value={beardPrice}
+        onChange={(e) => setBeardPrice(e.target.value)}
+        className="w-full border rounded-lg px-3 py-2"
+        placeholder={lang === "es" ? "Ej: 15" : "Ex: 15"}
+      />
+    </div>
+
+    {/* Haircut + Beard Price */}
+    <div>
+      <label className="block text-sm font-medium mb-1">
+        {lang === "es" ? "Corte + Barba" : "Haircut + Beard"}
+      </label>
+      <input
+        type="number"
+        value={comboPrice}
+        onChange={(e) => setComboPrice(e.target.value)}
+        className="w-full border rounded-lg px-3 py-2"
+        placeholder={lang === "es" ? "Ej: 30" : "Ex: 30"}
+      />
+    </div>
+
+    {/* Save Button */}
+    <button
+      onClick={savePrices}
+      className="w-full bg-green-600 text-white py-2 rounded-lg text-sm mt-2"
+    >
+      {lang === "es" ? "Guardar Precios" : "Save Prices"}
+    </button>
   </div>
 </div>
 

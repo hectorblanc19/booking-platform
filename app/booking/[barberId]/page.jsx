@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -95,28 +94,29 @@ const [lang, setLang] = useState(
 
 const tr = t[lang];
 
-  const [barber, setBarber] = useState(null);
-  const [service, setService] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [availableTimes, setAvailableTimes] = useState([]);
+const [barber, setBarber] = useState(null);
+const [service, setService] = useState("");
+const [date, setDate] = useState("");
+const [time, setTime] = useState("");
+const [availableTimes, setAvailableTimes] = useState([]);
 
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [notes, setNotes] = useState("");
-  const [loading, setLoading] = useState(true);
+const [customerName, setCustomerName] = useState("");
+const [customerPhone, setCustomerPhone] = useState("");
+const [customerEmail, setCustomerEmail] = useState("");
+const [notes, setNotes] = useState("");
+const [loading, setLoading] = useState(true);
 
-  const [loadingTimes, setLoadingTimes] = useState(false);
+const [loadingTimes, setLoadingTimes] = useState(false);
 
   // ⭐ Reviews state
 const [reviews, setReviews] = useState([]);
 const [showReviews, setShowReviews] = useState(false);   // ⭐ ADD THIS LINE
 
-// ⭐ Load barber first
 useEffect(() => {
-  loadBarber();
-}, []);
+  if (barberId) {
+    loadBarber();
+  }
+}, [barberId]);
 
 // ⭐ Load reviews AFTER barberId is available
 useEffect(() => {
@@ -125,7 +125,7 @@ useEffect(() => {
   }
 }, [barberId]);
 
-  async function loadBarber() {
+ async function loadBarber() {
   const { data, error } = await supabase
     .from("barbers")
     .select(`
@@ -139,17 +139,28 @@ useEffect(() => {
       photo_url,
       payment_status,
       working_days,
+      haircut_price,
+      beard_price,
+      combo_price,
       businesses(*)
     `)
     .eq("id", barberId)
     .single();
 
-  if (!error) setBarber(data);
-  setLoading(false);
+  if (!error) {
+  setBarber({
+    ...data,
+    haircut_price: Number(data.haircut_price),
+    beard_price: Number(data.beard_price),
+    combo_price: Number(data.combo_price)
+  });
+}
 
-  if (data?.payment_status === "unpaid") {
-    setBarber({ ...data, blocked: true });
-  }
+setLoading(false);
+
+if (data?.payment_status === "unpaid") {
+  setBarber(prev => ({ ...prev, blocked: true }));
+}
 }
 
   // ⭐ Load reviews
@@ -252,10 +263,20 @@ useEffect(() => {
   }
 
   async function createAppointment() {
-    if (!service || !date || !time || !customerName || !customerPhone || !customerEmail) {
-      alert(tr.fillAll);
-      return;
-    }
+  if (!service || !date || !time || !customerName || !customerPhone || !customerEmail) {
+    alert(tr.fillAll);
+    return;
+  }
+
+  // ⭐ PRICE MUST BE CALCULATED HERE (AFTER barber is loaded)
+  const selectedPrice =
+    service === "Haircut"
+      ? barber.haircut_price
+      : service === "Beard"
+      ? barber.beard_price
+      : service === "Haircut + Beard"
+      ? barber.combo_price
+      : 0;
 
     const formattedTime = time + ":00";
 
@@ -290,37 +311,39 @@ useEffect(() => {
 
     const secret = crypto.randomUUID();
 
-    await supabase.from("appointments").insert({
-      business_id: barber.business_id,
-      barber_id: barberId,
-      service,
-      date,
-      time: formattedTime,
-      duration: SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      customer_email: customerEmail,
-      notes,
-      status: "confirmed",
-      lang,
-      secret_link: secret,
-    });
+   await supabase.from("appointments").insert({
+  business_id: barber.business_id,
+  barber_id: barberId,
+  service,
+  date,
+  time: formattedTime,
+  duration: SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60,
+  customer_name: customerName,
+  customer_phone: customerPhone,
+  customer_email: customerEmail,
+  notes,
+  status: "confirmed",
+  lang,
+  secret_link: secret,
+  price: selectedPrice   // ⭐ ADDED
+});
 
-    await fetch("/api/send-confirmation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customer_email: customerEmail,
-        customer_name: customerName,
-        service,
-        barber_id: barberId,
-        business_id: barber.business_id,
-        date,
-        time: formattedTime,
-        secret_link: `https://flowpaydr.com/customer/${secret}`,
-        lang,
-      }),
-    });
+   await fetch("/api/send-confirmation", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    customer_email: customerEmail,
+    customer_name: customerName,
+    service,
+    barber_id: barberId,
+    business_id: barber.business_id,
+    date,
+    time: formattedTime,
+    secret_link: `https://flowpaydr.com/customer/${secret}`,
+    lang,
+    price: selectedPrice   // ⭐ ADDED
+  }),
+});
 
     await fetch("/api/send-barber-notification", {
       method: "POST",
@@ -340,9 +363,10 @@ useEffect(() => {
       }),
     });
 
-    window.location.href = `/customer/${secret}`;
-  }
-
+   setTimeout(() => {
+  window.location.href = `/customer/${secret}`;
+}, 300);
+}
   if (loading) return <p className="p-6">Loading...</p>;
   if (!barber) return <p className="p-6">Barber not found.</p>;
 

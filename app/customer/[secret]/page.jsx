@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -255,11 +256,14 @@ useEffect(() => {
         <p className="text-sm"><strong>{tr.business}:</strong> {business?.name}</p>
 
         <p className="text-sm mt-2"><strong>{tr.date}:</strong> {appointment.date}</p>
-        <p className="text-sm"><strong>{tr.time}:</strong> {appointment.time}</p>
+<p className="text-sm"><strong>{tr.time}:</strong> {appointment.time}</p>
 
-        <p className="text-sm mt-2"><strong>{tr.name}:</strong> {appointment.customer_name}</p>
-        <p className="text-sm"><strong>{tr.phone}:</strong> {appointment.customer_phone}</p>
-        <p className="text-sm"><strong>{tr.email}:</strong> {appointment.customer_email}</p>
+<p className="text-sm"><strong>{lang === "es" ? "Precio" : "Price"}:</strong> ${appointment.price}</p>
+
+<p className="text-sm mt-2"><strong>{tr.name}:</strong> {appointment.customer_name}</p>
+<p className="text-sm"><strong>{tr.phone}:</strong> {appointment.customer_phone}</p>
+<p className="text-sm"><strong>{tr.email}:</strong> {appointment.customer_email}</p>
+
 
         {/* STATUS */}
         <div className="flex items-center gap-2 mt-3">

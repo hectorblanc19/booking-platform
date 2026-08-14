@@ -10,17 +10,18 @@ export async function POST(req) {
   const body = await req.json();
 
   const {
-    business,
-    barber,
-    service,
-    date,
-    time,
-    customer_name,
-    customer_email,
-    customer_phone,
-    notes,
-    lang
-  } = body;
+  business,
+  barber,
+  service,
+  date,
+  time,
+  customer_name,
+  customer_email,
+  customer_phone,
+  notes,
+  lang,
+  price   // ⭐ ADD THIS
+} = body;
 
   // ⭐ Anonymous customers → use secret_link as customer_id
   const secret_link = crypto.randomUUID();
@@ -60,26 +61,27 @@ export async function POST(req) {
   const barberName = barberInfo?.name || "Your Barber";
 
   // ⭐ INSERT APPOINTMENT
-  const { data, error } = await supabase
-    .from("appointments")
-    .insert({
-      business_id: business,
-      barber_id: barber,
-      service,
-      date,
-      time,
-      duration: 60,
-      customer_name,
-      customer_email,
-      customer_phone,
-      notes,
-      customer_id,   // secret_link
-      status: "confirmed",
-      secret_link,
-      lang
-    })
-    .select()
-    .single();
+const { data, error } = await supabase
+  .from("appointments")
+  .insert({
+    business_id: business,
+    barber_id: barber,
+    service,
+    date,
+    time,
+    duration: 60,
+    customer_name,
+    customer_email,
+    customer_phone,
+    notes,
+    customer_id,   // secret_link
+    status: "confirmed",
+    secret_link,
+    lang,
+    price   // ⭐ REQUIRED — THIS SAVES THE PRICE
+  })
+  .select()
+  .single();
 
   if (error) {
     console.log("Supabase error:", error);

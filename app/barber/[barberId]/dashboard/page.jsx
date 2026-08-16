@@ -148,11 +148,16 @@ function WeeklyAvailability({ barberId, lang }) {
 export default function BarberDashboard() {
   const { barberId } = useParams();
 
+  const [lang, setLang] = useState("es");   // MUST COME FIRST
+
+  /* ⭐ QR CODE LOGIC — NOW SAFE */
+  const qrLink = `https://www.flowpaydr.com/barbers/${barberId}?lang=${lang}`;
+  const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrLink}`;
+
   const [barberData, setBarberData] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [view, setView] = useState("today");
   const [loading, setLoading] = useState(true);
-  const [lang, setLang] = useState("es");
   const [pushActive, setPushActive] = useState(true);
   const [availabilityToday, setAvailabilityToday] = useState(null);
 
@@ -610,84 +615,120 @@ return (
       <ServiceWorkerClient role="business" barber_id={barberId} />
 
       {/* Header card */}
-      <div className="bg-white rounded-2xl shadow-md p-5 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <img
-            src={barberData?.photo_url || "/default-barber.png"}
-            alt="Barber Photo"
-            className="w-20 h-20 rounded-full object-cover border shadow"
-          />
-          <div>
-            <h1 className="text-2xl font-bold">
-              {barberData?.name || tr.barber}
-            </h1>
-            <p className="text-gray-500 text-sm">
-              {barberData?.businesses?.name || ""}
-            </p>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
-                ● {tr.statusOnline}
-              </span>
-              {availabilityToday && (
-                <span className="text-xs text-gray-500">
-                  {tr.availabilityToday}:{" "}
-                  {formatTime(availabilityToday.start)} –{" "}
-                  {formatTime(availabilityToday.end)}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-3 w-full md:w-auto">
-          {/* Upload Profile Photo */}
-          <label className="bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm w-full text-center">
-            {tr.uploadPhoto}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handlePhotoUpload}
-            />
-          </label>
-
-          {/* Upload Gallery Photo */}
-          <label className="bg-purple-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm w-full text-center">
-            {lang === "es" ? "Subir Foto a Galería" : "Upload Gallery Photo"}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleGalleryUpload}
-            />
-          </label>
-
-          {/* Edit Profile */}
-          <button
-            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm w-full"
-            onClick={() =>
-              (window.location.href = `/barber/${barberId}/edit`)
-            }
-          >
-            ✏️ {tr.editProfile}
-          </button>
-
-          {/* Public profile + booking links */}
-          <a
-            href={`/barbers/${barberId}?lang=${lang}`}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm text-center w-full"
-          >
-            {lang === "es" ? "Ver Perfil Público" : "View Public Profile"}
-          </a>
-
-          <a
-            href={`/booking/${barberId}?lang=${lang}`}
-            className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm text-center w-full"
-          >
-            {lang === "es" ? "Ver Página de Reservas" : "View Booking Page"}
-          </a>
-        </div>
+<div className="bg-white rounded-2xl shadow-md p-5 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+  <div className="flex items-center gap-4">
+    <img
+      src={barberData?.photo_url || "/default-barber.png"}
+      alt="Barber Photo"
+      className="w-20 h-20 rounded-full object-cover border shadow"
+    />
+    <div>
+      <h1 className="text-2xl font-bold">
+        {barberData?.name || tr.barber}
+      </h1>
+      <p className="text-gray-500 text-sm">
+        {barberData?.businesses?.name || ""}
+      </p>
+      <div className="mt-2 flex items-center gap-2">
+        <span className="inline-flex items-center px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
+          ● {tr.statusOnline}
+        </span>
+        {availabilityToday && (
+          <span className="text-xs text-gray-500">
+            {tr.availabilityToday}:{" "}
+            {formatTime(availabilityToday.start)} –{" "}
+            {formatTime(availabilityToday.end)}
+          </span>
+        )}
       </div>
+    </div>
+  </div>
+
+  <div className="flex flex-col items-center gap-3 w-full md:w-auto">
+    {/* Upload Profile Photo */}
+    <label className="bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm w-full text-center">
+      {tr.uploadPhoto}
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handlePhotoUpload}
+      />
+    </label>
+
+    {/* Upload Gallery Photo */}
+    <label className="bg-purple-600 text-white px-4 py-2 rounded-lg cursor-pointer text-sm w-full text-center">
+      {lang === "es" ? "Subir Foto a Galería" : "Upload Gallery Photo"}
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleGalleryUpload}
+      />
+    </label>
+
+    {/* Edit Profile */}
+    <button
+      className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm w-full"
+      onClick={() =>
+        (window.location.href = `/barber/${barberId}/edit`)
+      }
+    >
+      ✏️ {tr.editProfile}
+    </button>
+
+    {/* Public profile + booking links */}
+    <a
+      href={`/barbers/${barberId}?lang=${lang}`}
+      className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm text-center w-full"
+    >
+      {lang === "es" ? "Ver Perfil Público" : "View Public Profile"}
+    </a>
+
+    <a
+      href={`/booking/${barberId}?lang=${lang}`}
+      className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm text-center w-full"
+    >
+      {lang === "es" ? "Ver Página de Reservas" : "View Booking Page"}
+    </a>
+  </div>
+</div>
+
+{/* ⭐ QR CODE SECTION */}
+<div className="bg-white rounded-2xl shadow-md p-5 mb-6 text-center">
+
+  <img
+    src={qrImage}
+    alt="QR Code"
+    className="w-40 h-40 mx-auto mb-3"
+  />
+
+  <p className="text-gray-600 mb-2">
+    {lang === "es"
+      ? "Comparte este QR para que los clientes vean tu perfil público."
+      : "Share this QR so clients can access your public profile."}
+  </p>
+
+  <p className="text-gray-400 text-xs mb-3">
+    {lang === "es"
+      ? "Mantén presionada la imagen 3 segundos para copiar, guardar o compartir."
+      : "Hold the image for 3 seconds to copy, save, or share."}
+  </p>
+
+  <button
+    onClick={() => {
+      const link = document.createElement("a");
+      link.href = qrImage;
+      link.download = `barber-${barberId}-qr.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }}
+    className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
+  >
+    {lang === "es" ? "Descargar QR" : "Download QR"}
+  </button>
+</div>
 
      {/* Quick actions */}
 <div className="bg-white rounded-2xl shadow-md p-4 mb-6">

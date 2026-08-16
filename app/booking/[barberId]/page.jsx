@@ -220,46 +220,75 @@ if (data?.payment_status === "unpaid") {
   current = slotEnd;
 }
 
-    const { data: appointments } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("barber_id", barberId)
-      .eq("date", selectedDate)
-      .eq("status", "confirmed");
+    // ⭐ Load existing appointments
+const { data: appointments } = await supabase
+  .from("appointments")
+  .select("*")
+  .eq("barber_id", barberId)
+  .eq("date", selectedDate)
+  .eq("status", "confirmed");
 
-    const booked = appointments?.map(a => a.time.slice(0, 5)) || [];
-    slots = slots.filter(t => !booked.includes(t));
+// ⭐ FIX: Remove slots that partially overlap with existing appointments
+if (appointments && appointments.length > 0) {
+  slots = slots.filter(slot => {
+    const [slotHour, slotMin] = slot.split(":");
+    const slotStart = new Date(`${selectedDate}T${slotHour}:${slotMin}:00`);
 
-    const { data: blocks } = await supabase
-      .from("barber_blocks")
-      .select("*")
-      .eq("barber_id", barberId)
-      .eq("date", selectedDate);
+    const slotEnd = new Date(
+      slotStart.getTime() +
+        (SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60) *
+          60 *
+          1000
+    );
 
-    if (blocks && blocks.length > 0) {
-      blocks.forEach(block => {
-        const blockStart = block.start_time.slice(0, 5);
-        const blockEnd = block.end_time.slice(0, 5);
+    for (const appt of appointments) {
+      const existingStart = new Date(`${appt.date}T${appt.time}`);
+      const existingEnd = new Date(
+        existingStart.getTime() + (appt.duration || 60) * 60 * 1000
+      );
 
-        slots = slots.filter(t => !(t >= blockStart && t < blockEnd));
-      });
+      // ⭐ TRUE overlap logic
+      if (existingStart < slotEnd && existingEnd > slotStart) {
+        return false; // remove this slot
+      }
     }
 
-    const today = new Date().toLocaleDateString("en-CA");
+    return true; // keep slot
+  });
+}
 
-    if (selectedDate === today) {
-      const now = new Date();
-      const currentTime = now.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
+// ⭐ Blocked hours
+const { data: blocks } = await supabase
+  .from("barber_blocks")
+  .select("*")
+  .eq("barber_id", barberId)
+  .eq("date", selectedDate);
 
-      slots = slots.filter(slot => slot >= currentTime);
-    }
+if (blocks && blocks.length > 0) {
+  blocks.forEach(block => {
+    const blockStart = block.start_time.slice(0, 5);
+    const blockEnd = block.end_time.slice(0, 5);
 
-    setAvailableTimes(slots);
-    setLoadingTimes(false);
+    slots = slots.filter(t => !(t >= blockStart && t < blockEnd));
+  });
+}
+
+// ⭐ Remove past times if booking today
+const today = new Date().toLocaleDateString("en-CA");
+
+if (selectedDate === today) {
+  const now = new Date();
+  const currentTime = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  slots = slots.filter(slot => slot >= currentTime);
+}
+
+setAvailableTimes(slots);
+setLoadingTimes(false);
   }
 
   async function createAppointment() {

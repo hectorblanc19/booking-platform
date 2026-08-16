@@ -692,6 +692,7 @@ if (loading) return <p className="p-6">Loading admin panel...</p>;
     <div className="bg-white p-6 rounded-xl w-96 space-y-3 shadow-lg">
       <h3 className="text-lg font-semibold">Edit Barber</h3>
 
+      {/* Name */}
       <input
         className="border p-2 rounded w-full"
         value={editingBarber.name || ""}
@@ -700,6 +701,7 @@ if (loading) return <p className="p-6">Loading admin panel...</p>;
         }
       />
 
+      {/* Phone */}
       <input
         className="border p-2 rounded w-full"
         value={editingBarber.phone || ""}
@@ -708,6 +710,7 @@ if (loading) return <p className="p-6">Loading admin panel...</p>;
         }
       />
 
+      {/* Address */}
       <input
         className="border p-2 rounded w-full"
         value={editingBarber.address || ""}
@@ -716,6 +719,7 @@ if (loading) return <p className="p-6">Loading admin panel...</p>;
         }
       />
 
+      {/* Google Maps URL */}
       <input
         className="border p-2 rounded w-full"
         placeholder="Google Maps URL (Pin)"
@@ -725,13 +729,138 @@ if (loading) return <p className="p-6">Loading admin panel...</p>;
         }
       />
 
+      {/* ⭐ Latitude */}
+      <input
+        className="border p-2 rounded w-full"
+        placeholder="Latitude"
+        value={editingBarber.lat || ""}
+        onChange={(e) =>
+          setEditingBarber({ ...editingBarber, lat: e.target.value })
+        }
+      />
+
+      {/* ⭐ Longitude */}
+      <input
+        className="border p-2 rounded w-full"
+        placeholder="Longitude"
+        value={editingBarber.lng || ""}
+        onChange={(e) =>
+          setEditingBarber({ ...editingBarber, lng: e.target.value })
+        }
+      />
+
+     {/* ⭐ GET COORDINATES BUTTON (IMPROVED FOR USA + DOMINICAN REPUBLIC + GOOGLE MAP URL) */}
+<button
+  className="bg-blue-600 text-white px-4 py-2 rounded w-full"
+  type="button"
+  onClick={async () => {
+    try {
+      let addr = editingBarber.address.trim();
+
+      // ⭐ AUTO‑FIX COMMON U.S. ISSUES
+      addr = addr.replace(/booklyn/i, "Brooklyn");
+
+      // ⭐ AUTO‑ADD COUNTRY IF MISSING
+      const lower = addr.toLowerCase();
+
+      const isDR =
+        lower.includes("santo domingo") ||
+        lower.includes("santiago") ||
+        lower.includes("la vega") ||
+        lower.includes("san cristobal") ||
+        lower.includes("bonao") ||
+        lower.includes("moca") ||
+        lower.includes("puerto plata") ||
+        lower.includes("san pedro") ||
+        lower.includes("higuey") ||
+        lower.includes("romana") ||
+        lower.includes("barahona");
+
+      const hasCountry =
+        lower.includes("dominican") ||
+        lower.includes("usa") ||
+        lower.includes("united states");
+
+      if (!hasCountry) {
+        addr += isDR ? ", Dominican Republic" : ", USA";
+      }
+
+      // ⭐ FETCH COORDINATES (WITH REQUIRED USER‑AGENT)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          addr
+        )}`,
+        {
+          headers: {
+            "User-Agent": "FlowPayDR/1.0 (contact: info@flowpaydr.com)"
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.length > 0) {
+        const { lat, lon } = data[0];
+
+        // ⭐ AUTO‑GENERATE GOOGLE MAPS URL
+        const autoMapUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+
+        // ⭐ UPDATE LOCAL STATE
+        setEditingBarber({
+          ...editingBarber,
+          lat,
+          lng: lon,
+          map_url: autoMapUrl,
+        });
+
+        // ⭐ AUTO‑SAVE DIRECTLY TO SUPABASE
+        const { error } = await supabase
+          .from("barbers")
+          .update({ lat, lng: lon, map_url: autoMapUrl })
+          .eq("id", editingBarber.id);
+
+        if (error) {
+          alert("Coordinates found but could not save to Supabase.");
+          return;
+        }
+
+        alert("Coordinates + Google Maps URL saved!");
+      } else {
+        alert("Address not found. Please adjust it.");
+      }
+    } catch (err) {
+      alert("Error fetching coordinates.");
+    }
+  }}
+>
+  Get Coordinates Automatically
+</button>
+
+      {/* Save */}
       <button
         className="bg-green-600 text-white px-4 py-2 rounded w-full"
-        onClick={saveBarberEdit}
+        onClick={async () => {
+          const { id, name, phone, address, map_url, lat, lng } = editingBarber;
+
+          const { error } = await supabase
+            .from("barbers")
+            .update({ name, phone, address, map_url, lat, lng })
+            .eq("id", id);
+
+          if (error) {
+            alert("Error updating barber");
+            return;
+          }
+
+          alert("Barber updated");
+          setEditingBarber(null);
+          loadAll();
+        }}
       >
         Save Changes
       </button>
 
+      {/* Cancel */}
       <button
         className="text-red-600 text-sm w-full mt-2"
         onClick={() => setEditingBarber(null)}

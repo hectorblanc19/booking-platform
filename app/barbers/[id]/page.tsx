@@ -377,14 +377,20 @@ return (
 
   <div className="mt-3 flex flex-wrap gap-2">
     {Array.isArray(barber.services) && barber.services.length > 0 ? (
-      barber.services.map((service) => (
-        <span
-          key={service}
-          className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-sm font-medium capitalize text-slate-800"
-        >
-          {service}
-        </span>
-      ))
+      barber.services.map((service) => {
+        const key = service.toLowerCase();
+        const translated =
+          serviceTranslations[key]?.[lang] || service;
+
+        return (
+          <span
+            key={service}
+            className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-sm font-medium capitalize text-slate-800"
+          >
+            {translated}
+          </span>
+        );
+      })
     ) : (
       <p className="text-sm text-slate-600">
         {lang === "es" ? "No hay servicios añadidos." : "No services added."}

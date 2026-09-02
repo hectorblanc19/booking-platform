@@ -11,6 +11,20 @@ function getDayNameFromDate(dateString) {
   return date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
 }
 
+function formatTime(timeStr) {
+  if (!timeStr) return "";
+
+  const [hoursString, minutes] = timeStr.split(":");
+  let hours = Number(hoursString);
+
+  if (Number.isNaN(hours)) return timeStr;
+
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  return `${hours}:${minutes} ${ampm}`;
+}
+
 // ⭐ Visual Time Slot Component
 function TimeSlot({ time, selected, onSelect }) {
   return (
@@ -20,11 +34,10 @@ function TimeSlot({ time, selected, onSelect }) {
         ${selected === time ? "bg-black text-white" : "bg-white text-black"}
       `}
     >
-      {time}
+      {formatTime(time)}
     </button>
   );
 }
-
 // Bilingual dictionary
 const t = {
   en: {

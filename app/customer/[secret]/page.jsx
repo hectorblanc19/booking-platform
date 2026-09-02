@@ -210,41 +210,69 @@ useEffect(() => {
 
       <h1 className="text-2xl font-bold mb-4">{tr.title}</h1>
 
-      {/* STATUS MESSAGE */}
-      <div className="text-center mb-6">
-        {appointment.status === "confirmed" ? (
-          <>
-            <div className="text-green-600 text-5xl mb-2">✔</div>
-            <h2 className="text-2xl font-bold">
-              {lang === "es" ? "¡Cita Confirmada!" : "Appointment Confirmed!"}
-            </h2>
-          </>
-        ) : (
-          <>
-            <div className="text-red-600 text-5xl mb-2">✖</div>
-            <h2 className="text-2xl font-bold">
-              {lang === "es" ? "Cita Cancelada" : "Appointment Cancelled"}
-            </h2>
-          </>
-        )}
+     {/* STATUS MESSAGE */}
+<div className="text-center mb-6">
+  {appointment.status === "confirmed" ? (
+    <>
+      <div className="text-green-600 text-5xl mb-2">✔</div>
+      <h2 className="text-2xl font-bold">
+        {lang === "es"
+          ? "¡Cita Confirmada!"
+          : "Appointment Confirmed!"}
+      </h2>
+    </>
+  ) : appointment.status === "completed" ? (
+    <>
+      <div className="text-blue-600 text-5xl mb-2">✔</div>
+      <h2 className="text-2xl font-bold">
+        {lang === "es"
+          ? "¡Cita Completada!"
+          : "Appointment Completed!"}
+      </h2>
+      <p className="text-gray-600 mt-2">
+        {lang === "es"
+          ? "Gracias por visitarnos."
+          : "Thank you for visiting us."}
+      </p>
+    </>
+  ) : appointment.status === "no_show" ? (
+    <>
+      <div className="text-orange-500 text-5xl mb-2">⚠</div>
+      <h2 className="text-2xl font-bold">
+        {lang === "es"
+          ? "Cita marcada como no asistida"
+          : "Appointment marked as no-show"}
+      </h2>
+    </>
+  ) : (
+    <>
+      <div className="text-red-600 text-5xl mb-2">✖</div>
+      <h2 className="text-2xl font-bold">
+        {lang === "es"
+          ? "Cita Cancelada"
+          : "Appointment Cancelled"}
+      </h2>
+    </>
+  )}
 
-        <button
-          className="mt-4 bg-black text-white px-5 py-3 rounded-xl w-full"
-          onClick={() => (window.location.href = "/")}
-        >
-          {lang === "es" ? "Volver al Inicio" : "Back Home"}
-        </button>
+  <button
+    className="mt-4 bg-black text-white px-5 py-3 rounded-xl w-full"
+    onClick={() => (window.location.href = "/")}
+  >
+    {lang === "es" ? "Volver al Inicio" : "Back Home"}
+  </button>
 
-        {appointment.status === "confirmed" && (
-          <button
-            className="mt-3 bg-green-600 text-white px-5 py-3 rounded-xl w-full"
-            onClick={shareWhatsApp}
-          >
-            {lang === "es" ? "Compartir por WhatsApp" : "Share via WhatsApp"}
-          </button>
-        )}
-      </div>
-
+  {appointment.status === "confirmed" && (
+    <button
+      className="mt-3 bg-green-600 text-white px-5 py-3 rounded-xl w-full"
+      onClick={shareWhatsApp}
+    >
+      {lang === "es"
+        ? "Compartir por WhatsApp"
+        : "Share via WhatsApp"}
+    </button>
+  )}
+</div>
       {/* CARD */}
       <div className="p-5 border rounded-xl bg-white shadow-md">
 
@@ -266,24 +294,37 @@ useEffect(() => {
 
 
         {/* STATUS */}
-        <div className="flex items-center gap-2 mt-3">
-          {appointment.status === "confirmed" ? (
-            <>
-              <span className="text-green-600 text-lg">✔</span>
-              <span className="font-semibold text-green-700 text-sm">
-                {lang === "es" ? "Confirmado" : "Confirmed"}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="text-red-600 text-lg">✖</span>
-              <span className="font-semibold text-red-700 text-sm">
-                {lang === "es" ? "Cancelado" : "Cancelled"}
-              </span>
-            </>
-          )}
-        </div>
-
+<div className="flex items-center gap-2 mt-3">
+  {appointment.status === "confirmed" ? (
+    <>
+      <span className="text-green-600 text-lg">✔</span>
+      <span className="font-semibold text-green-700 text-sm">
+        {lang === "es" ? "Confirmado" : "Confirmed"}
+      </span>
+    </>
+  ) : appointment.status === "completed" ? (
+    <>
+      <span className="text-blue-600 text-lg">✔</span>
+      <span className="font-semibold text-blue-700 text-sm">
+        {lang === "es" ? "Completada" : "Completed"}
+      </span>
+    </>
+  ) : appointment.status === "no_show" ? (
+    <>
+      <span className="text-orange-500 text-lg">⚠</span>
+      <span className="font-semibold text-orange-600 text-sm">
+        {lang === "es" ? "No asistió" : "No-show"}
+      </span>
+    </>
+  ) : (
+    <>
+      <span className="text-red-600 text-lg">✖</span>
+      <span className="font-semibold text-red-700 text-sm">
+        {lang === "es" ? "Cancelado" : "Cancelled"}
+      </span>
+    </>
+  )}
+</div>
         <p className="text-sm mt-3">
           <strong>{tr.notes}:</strong> {appointment.notes || tr.none}
         </p>

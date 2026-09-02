@@ -9,6 +9,21 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// ⭐ FORMAT TIME FOR DISPLAY
+function formatTime(timeStr) {
+  if (!timeStr) return "";
+
+  const [hoursString, minutes] = timeStr.split(":");
+  let hours = Number(hoursString);
+
+  if (Number.isNaN(hours)) return timeStr;
+
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  return `${hours}:${minutes} ${ampm}`;
+}
+
 // ⭐ SERVICE TRANSLATIONS
 const SERVICE_TRANSLATIONS = {
   "Haircut": { en: "Haircut", es: "Corte" },
@@ -105,7 +120,7 @@ export async function POST(req) {
           <h3>${tr.apptDetails}</h3>
           <p><strong>${tr.service}:</strong> ${translatedService}</p>
           <p><strong>${tr.date}:</strong> ${date}</p>
-          <p><strong>${tr.time}:</strong> ${time}</p>
+          <p><strong>${tr.time}:</strong> ${formatTime(time)}</p>
           <p><strong>${tr.notes}:</strong> ${notes || tr.none}</p>
 
           <div style="text-align:center; margin-top: 25px;">
@@ -141,7 +156,7 @@ try {
   for (const t of tokens || []) {
     await sendPushToSubscription(t.subscription, {
       title: "New Appointment",
-      message: `${customer_name} booked for ${date} at ${time}.`,
+      message: `${customer_name} booked for ${date} at ${formatTime(time)}.`,
     });
   }
 

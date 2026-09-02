@@ -9,6 +9,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+function formatTime(timeStr) {
+  if (!timeStr) return "";
+
+  const [hoursString, minutes] = timeStr.split(":");
+  let hours = Number(hoursString);
+
+  if (Number.isNaN(hours)) return timeStr;
+
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  return `${hours}:${minutes} ${ampm}`;
+}
+
 // ⭐ SERVICE TRANSLATIONS
 const SERVICE_TRANSLATIONS = {
   "Haircut": { en: "Haircut", es: "Corte" },
@@ -132,7 +146,7 @@ export async function POST(req) {
           <p><strong>${tr.address}:</strong> ${finalAddress}</p>
           <p><strong>${tr.phone}:</strong> ${finalPhone}</p>
           <p><strong>${tr.date}:</strong> ${date}</p>
-          <p><strong>${tr.time}:</strong> ${time}</p>
+          <p><strong>${tr.time}:</strong> ${formatTime(time)}</p>
 
           ${
             mapsLink
@@ -178,7 +192,7 @@ try {
   for (const t of tokens || []) {
     await sendPushToSubscription(t.subscription, {
       title: "FlowPayDR",
-      message: `Your appointment is confirmed for ${date} at ${time}.`,
+     message: `Your appointment is confirmed for ${date} at ${formatTime(time)}.`,
     });
   }
 
@@ -189,3 +203,8 @@ try {
 
   return NextResponse.json({ success: true });
 }
+
+
+
+
+

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,275 +9,506 @@ export default function WelcomePage() {
   const [lang, setLang] = useState("es");
   const [businesses, setBusinesses] = useState([]);
   const [independentBarbers, setIndependentBarbers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const t = {
     es: {
-      title: "Reserva Fácil. Rápido. Profesional.",
-      subtitle: "Barberías, salones, uñas, spas, car wash y más.",
-      chooseBusiness: "Selecciona un negocio",
-      viewAll: "Ver todos los negocios",
-      login: "Entrar al Panel",
-      footer: "FlowPayDR — Plataforma de Reservas",
+      brand: "FLOWPAYDR BOOKING",
+      title: "Selecciona dónde quieres reservar",
+      subtitle:
+        "Elige una barbería, barbero independiente o profesional para comenzar tu reserva.",
+      businesses: "Barberías y Negocios",
       independent: "Barberos Independientes",
-      noIndependent: "No hay barberos independientes.",
+      noBusinesses: "No hay negocios disponibles.",
+      noIndependent: "No hay barberos independientes disponibles.",
       phone: "Teléfono",
       days: "Días",
-      mapLink: "Ver ubicación exacta en Google Maps",
+      mapLink: "Ver ubicación en Google Maps",
       noRatings: "Sin calificaciones",
+      back: "← Volver",
+      login: "Entrar al Panel",
+      select: "Seleccionar →",
+      book: "Reservar →",
+      loading: "Cargando...",
+      noAddress: "Sin dirección",
     },
+
     en: {
-      title: "Easy Booking. Fast. Professional.",
-      subtitle: "Barbershops, salons, nails, spas, car wash and more.",
-      chooseBusiness: "Select a business",
-      viewAll: "View all businesses",
-      login: "Login to Dashboard",
-      footer: "FlowPayDR — Booking Platform",
+      brand: "FLOWPAYDR BOOKING",
+      title: "Select where you want to book",
+      subtitle:
+        "Choose a barbershop, independent barber or professional to start your booking.",
+      businesses: "Barbershops & Businesses",
       independent: "Independent Barbers",
+      noBusinesses: "No businesses available.",
       noIndependent: "No independent barbers available.",
       phone: "Phone",
       days: "Days",
-      mapLink: "View exact location on Google Maps",
+      mapLink: "View location on Google Maps",
       noRatings: "No ratings yet",
+      back: "← Back",
+      login: "Login to Dashboard",
+      select: "Select →",
+      book: "Book →",
+      loading: "Loading...",
+      noAddress: "No address",
     },
   };
 
   const tr = t[lang];
 
   useEffect(() => {
-    loadBusinesses();
-    loadIndependentBarbers();
+    async function loadData() {
+      setLoading(true);
+
+      try {
+        /*
+         * STAGE 1 PERFORMANCE OPTIMIZATION
+         *
+         * Instead of querying ratings separately for every
+         * business and every barber, we make only 3 queries:
+         *
+         * 1. Businesses
+         * 2. Independent barbers
+         * 3. All ratings
+         */
+
+        const [businessResult, barberResult, ratingResult] =
+          await Promise.all([
+            supabase
+              .from("businesses")
+              .select("id, name, address, map_url")
+              .limit(4),
+
+            supabase
+              .from("barbers")
+              .select("id, name, phone, working_days")
+              .is("business_id", null)
+              .eq("active", true),
+
+            supabase
+              .from("ratings")
+              .select("barber_id, business_id, rating"),
+          ]);
+
+        /*
+         * Check for query errors.
+         */
+        if (businessResult.error) {
+          console.error(
+            "Error loading businesses:",
+            businessResult.error
+          );
+        }
+
+        if (barberResult.error) {
+          console.error(
+            "Error loading independent barbers:",
+            barberResult.error
+          );
+        }
+
+        if (ratingResult.error) {
+          console.error(
+            "Error loading ratings:",
+            ratingResult.error
+          );
+        }
+
+        const businessData = businessResult.data || [];
+        const barberData = barberResult.data || [];
+        const ratingData = ratingResult.data || [];
+
+        /*
+         * ---------------------------------------------------
+         * CALCULATE BUSINESS RATINGS
+         * ---------------------------------------------------
+         */
+
+        const businessRatings = {};
+
+        ratingData.forEach(function (rating) {
+          if (!rating.business_id || rating.rating == null) {
+            return;
+          }
+
+          if (!businessRatings[rating.business_id]) {
+            businessRatings[rating.business_id] = {
+              total: 0,
+              count: 0,
+            };
+          }
+
+          businessRatings[rating.business_id].total += Number(
+            rating.rating
+          );
+
+          businessRatings[rating.business_id].count += 1;
+        });
+
+        const businessesWithRatings = businessData.map(
+          function (business) {
+            const stats = businessRatings[business.id];
+
+            return {
+              ...business,
+              avgRating:
+                stats && stats.count > 0
+                  ? (stats.total / stats.count).toFixed(1)
+                  : null,
+            };
+          }
+        );
+
+        /*
+         * ---------------------------------------------------
+         * CALCULATE INDEPENDENT BARBER RATINGS
+         * ---------------------------------------------------
+         */
+
+        const barberRatings = {};
+
+        ratingData.forEach(function (rating) {
+          if (!rating.barber_id || rating.rating == null) {
+            return;
+          }
+
+          if (!barberRatings[rating.barber_id]) {
+            barberRatings[rating.barber_id] = {
+              total: 0,
+              count: 0,
+            };
+          }
+
+          barberRatings[rating.barber_id].total += Number(
+            rating.rating
+          );
+
+          barberRatings[rating.barber_id].count += 1;
+        });
+
+        const barbersWithRatings = barberData.map(function (barber) {
+          const stats = barberRatings[barber.id];
+
+          return {
+            ...barber,
+            avgRating:
+              stats && stats.count > 0
+                ? (stats.total / stats.count).toFixed(1)
+                : null,
+          };
+        });
+
+        setBusinesses(businessesWithRatings);
+        setIndependentBarbers(barbersWithRatings);
+      } catch (error) {
+        console.error("Error loading booking directory:", error);
+
+        setBusinesses([]);
+        setIndependentBarbers([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
   }, []);
 
-  async function loadBusinesses() {
-    const { data: businesses } = await supabase
-      .from("businesses")
-      .select("*")
-      .limit(4);
+  const dayMapES = {
+    mon: "Lunes",
+    tue: "Martes",
+    wed: "Miércoles",
+    thu: "Jueves",
+    fri: "Viernes",
+    sat: "Sábado",
+    sun: "Domingo",
+  };
 
-    if (!businesses) {
-      setBusinesses([]);
-      return;
-    }
+  const dayMapEN = {
+    mon: "Monday",
+    tue: "Tuesday",
+    wed: "Wednesday",
+    thu: "Thursday",
+    fri: "Friday",
+    sat: "Saturday",
+    sun: "Sunday",
+  };
 
-    for (const business of businesses) {
-      const { data: barbers } = await supabase
-        .from("barbers")
-        .select("id")
-        .eq("business_id", business.id);
+  const orderedDays = [
+    "mon",
+    "tue",
+    "wed",
+    "thu",
+    "fri",
+    "sat",
+    "sun",
+  ];
 
-      if (!barbers || barbers.length === 0) {
-        business.avgRating = null;
-        continue;
-      }
-
-      const barberIds = barbers.map((b) => b.id);
-
-      const { data: ratings } = await supabase
-        .from("ratings")
-        .select("rating")
-        .in("barber_id", barberIds);
-
-      if (ratings && ratings.length > 0) {
-        const avg =
-          ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
-        business.avgRating = avg.toFixed(1);
-      } else {
-        business.avgRating = null;
-      }
-    }
-
-    setBusinesses(businesses);
-  }
-
-  async function loadIndependentBarbers() {
-    const { data: barbers } = await supabase
-      .from("barbers")
-      .select("*")
-      .is("business_id", null);
-
-    if (!barbers) {
-      setIndependentBarbers([]);
-      return;
-    }
-
-    for (const barber of barbers) {
-      const { data: ratings } = await supabase
-        .from("ratings")
-        .select("rating")
-        .eq("barber_id", barber.id);
-
-      if (ratings && ratings.length > 0) {
-        const avg =
-          ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
-        barber.avgRating = avg.toFixed(1);
-      } else {
-        barber.avgRating = null;
-      }
-    }
-
-    setIndependentBarbers(barbers);
-  }
+  const dayMap = lang === "es" ? dayMapES : dayMapEN;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <main className="min-h-screen bg-gray-50 text-gray-900">
 
-      {/* Language Toggle */}
-      <div className="flex justify-end p-4 gap-2">
-        <button
-          className={`px-3 py-1 rounded ${
-            lang === "es" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setLang("es")}
-        >
-          ES
-        </button>
-        <button
-          className={`px-3 py-1 rounded ${
-            lang === "en" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setLang("en")}
-        >
-          EN
-        </button>
-      </div>
+      {/* HEADER */}
+      <header className="bg-white border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+
+          <Link
+            href="/"
+            className="font-black tracking-tight text-lg"
+          >
+            FLOWPAYDR
+            <span className="text-gray-500 font-semibold">
+              {" "}BOOKING
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-3">
+
+            <Link
+              href="/barber/login"
+              className="hidden sm:block text-sm font-semibold text-gray-600 hover:text-black"
+            >
+              {tr.login}
+            </Link>
+
+            <div className="flex items-center gap-1 border border-gray-200 rounded-full p-1 bg-gray-50">
+
+              <button
+                type="button"
+                onClick={() => setLang("es")}
+                className={
+                  "px-3 py-1.5 rounded-full text-sm font-semibold " +
+                  (lang === "es"
+                    ? "bg-black text-white"
+                    : "text-gray-500 hover:text-black")
+                }
+              >
+                ES
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLang("en")}
+                className={
+                  "px-3 py-1.5 rounded-full text-sm font-semibold " +
+                  (lang === "en"
+                    ? "bg-black text-white"
+                    : "text-gray-500 hover:text-black")
+                }
+              >
+                EN
+              </button>
+
+            </div>
+          </div>
+        </div>
+      </header>
 
       {/* HERO */}
-      <div className="flex flex-col items-center text-center px-6 mt-10">
-        <h1 className="text-4xl font-bold mb-3">{tr.title}</h1>
-        <p className="text-lg text-gray-600 max-w-xl">{tr.subtitle}</p>
+      <section className="px-6 pt-12 pb-10">
+        <div className="max-w-4xl mx-auto text-center">
 
-        <div className="flex gap-4 mt-8">
-          <Link href="/select-business">
-            <button className="bg-blue-600 text-white px-6 py-3 rounded-xl text-lg shadow">
-              {tr.viewAll}
-            </button>
+          <p className="text-sm font-bold tracking-[0.25em] text-gray-400 mb-4">
+            {tr.brand}
+          </p>
+
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black">
+            {tr.title}
+          </h1>
+
+          <p className="mt-4 text-gray-500 text-lg max-w-2xl mx-auto">
+            {tr.subtitle}
+          </p>
+
+          <Link
+            href="/"
+            className="inline-block mt-6 text-sm text-gray-500 hover:text-black"
+          >
+            {tr.back}
           </Link>
 
-          <Link href="/barber/login">
-            <button className="bg-gray-200 px-6 py-3 rounded-xl text-lg shadow">
-              {tr.login}
-            </button>
-          </Link>
         </div>
-      </div>
+      </section>
 
-      {/* FEATURED BUSINESSES */}
-      <div className="mt-16 px-6 max-w-4xl mx-auto w-full">
-        <h2 className="text-2xl font-bold mb-6">{tr.chooseBusiness}</h2>
+      {/* MAIN CONTENT */}
+      <section className="px-6 pb-16">
+        <div className="max-w-5xl mx-auto">
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {businesses.map((b) => (
-            <Link key={b.id} href={`/select-barber/${b.id}`}>
-              <div className="p-5 bg-white rounded-xl shadow hover:shadow-lg transition cursor-pointer">
-                <h3 className="text-xl font-semibold">{b.name}</h3>
+          {loading ? (
+            <div className="text-center py-16 text-gray-500">
+              {tr.loading}
+            </div>
+          ) : (
+            <>
 
-                {b.avgRating ? (
-                  <p className="text-yellow-500 font-bold">
-                    ⭐ {b.avgRating} / 5
+              {/* BUSINESSES */}
+              <div className="mb-14">
+
+                <h2 className="text-2xl font-black mb-6">
+                  {tr.businesses}
+                </h2>
+
+                {businesses.length === 0 ? (
+                  <p className="text-gray-500">
+                    {tr.noBusinesses}
                   </p>
                 ) : (
-                  <p className="text-gray-400 text-sm">{tr.noRatings}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+                    {businesses.map(function (business) {
+                      return (
+                        <Link
+                          key={business.id}
+                          href={"/select-barber/" + business.id}
+                          className="block"
+                        >
+                          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition">
+
+                            <h3 className="text-xl font-bold">
+                              {business.name}
+                            </h3>
+
+                            <div className="mt-2">
+                              {business.avgRating ? (
+                                <p className="text-yellow-500 font-bold">
+                                  ⭐ {business.avgRating} / 5
+                                </p>
+                              ) : (
+                                <p className="text-gray-400 text-sm">
+                                  {tr.noRatings}
+                                </p>
+                              )}
+                            </div>
+
+                            <p className="text-gray-500 mt-3">
+                              {business.address || tr.noAddress}
+                            </p>
+
+                            {business.map_url && (
+                              <button
+                                type="button"
+                                className="text-blue-600 underline text-sm inline-block mt-3"
+                                onClick={function (event) {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+
+                                  window.open(
+                                    business.map_url,
+                                    "_blank",
+                                    "noopener,noreferrer"
+                                  );
+                                }}
+                              >
+                                {tr.mapLink}
+                              </button>
+                            )}
+
+                            <div className="mt-5 text-sm font-bold text-black">
+                              {tr.select}
+                            </div>
+
+                          </div>
+                        </Link>
+                      );
+                    })}
+
+                  </div>
                 )}
 
-                <p className="text-gray-600">{b.address || "Sin dirección"}</p>
-
-                {b.map_url && (
-                  <a
-                    href={b.map_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline text-sm block mt-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {tr.mapLink}
-                  </a>
-                )}
               </div>
-            </Link>
-          ))}
+
+              {/* INDEPENDENT BARBERS */}
+              <div>
+
+                <h2 className="text-2xl font-black mb-6">
+                  {tr.independent}
+                </h2>
+
+                {independentBarbers.length === 0 ? (
+                  <p className="text-gray-500 text-sm">
+                    {tr.noIndependent}
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+                    {independentBarbers.map(function (barber) {
+
+                      const displayDays = orderedDays
+                        .filter(function (day) {
+                          return (
+                            barber.working_days &&
+                            barber.working_days.includes(day)
+                          );
+                        })
+                        .map(function (day) {
+                          return dayMap[day];
+                        })
+                        .join(", ");
+
+                      return (
+                        <Link
+                          key={barber.id}
+                          href={"/booking/" + barber.id}
+                          className="block"
+                        >
+                          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition">
+
+                            <h3 className="text-xl font-bold">
+                              {barber.name}
+                            </h3>
+
+                            <div className="mt-2">
+                              {barber.avgRating ? (
+                                <p className="text-yellow-500 font-bold">
+                                  ⭐ {barber.avgRating} / 5
+                                </p>
+                              ) : (
+                                <p className="text-gray-400 text-sm">
+                                  {tr.noRatings}
+                                </p>
+                              )}
+                            </div>
+
+                            {barber.phone && (
+                              <p className="text-gray-500 mt-3">
+                                {tr.phone}: {barber.phone}
+                              </p>
+                            )}
+
+                            {barber.working_days && (
+                              <p className="text-gray-500 mt-1">
+                                {tr.days}: {displayDays}
+                              </p>
+                            )}
+
+                            <div className="mt-5 text-sm font-bold text-black">
+                              {tr.book}
+                            </div>
+
+                          </div>
+                        </Link>
+                      );
+                    })}
+
+                  </div>
+                )}
+
+              </div>
+
+            </>
+          )}
+
         </div>
-
-        <div className="text-center mt-6">
-          <Link href="/select-business" className="text-blue-600 underline">
-            {tr.viewAll}
-          </Link>
-        </div>
-      </div>
-
-      {/* INDEPENDENT BARBERS */}
-      <div className="mt-16 px-6 max-w-4xl mx-auto w-full">
-        <h2 className="text-2xl font-bold mb-6">{tr.independent}</h2>
-
-        {independentBarbers.length === 0 && (
-          <p className="text-gray-500 text-sm">{tr.noIndependent}</p>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {independentBarbers.map((barber) => {
-            const dayMapES = {
-              mon: "Lunes",
-              tue: "Martes",
-              wed: "Miércoles",
-              thu: "Jueves",
-              fri: "Viernes",
-              sat: "Sábado",
-              sun: "Domingo",
-            };
-
-            const dayMapEN = {
-              mon: "Monday",
-              tue: "Tuesday",
-              wed: "Wednesday",
-              thu: "Thursday",
-              fri: "Friday",
-              sat: "Saturday",
-              sun: "Sunday",
-            };
-
-            const dayMap = lang === "es" ? dayMapES : dayMapEN;
-
-            const orderedDays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-
-            const displayDays = orderedDays
-              .filter((d) => barber.working_days?.includes(d))
-              .map((d) => dayMap[d])
-              .join(", ");
-
-            return (
-              <Link key={barber.id} href={`/booking/${barber.id}`}>
-                <div className="p-5 bg-white rounded-xl shadow hover:shadow-lg transition cursor-pointer">
-                  <h3 className="text-xl font-semibold">{barber.name}</h3>
-
-                  {barber.avgRating ? (
-                    <p className="text-yellow-500 font-bold">
-                      ⭐ {barber.avgRating} / 5
-                    </p>
-                  ) : (
-                    <p className="text-gray-400 text-sm">{tr.noRatings}</p>
-                  )}
-
-                  {barber.phone && (
-                    <p className="text-gray-600">
-                      {tr.phone}: {barber.phone}
-                    </p>
-                  )}
-
-                  {barber.working_days && (
-                    <p className="text-gray-600">
-                      {tr.days}: {displayDays}
-                    </p>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+      </section>
 
       {/* FOOTER */}
-      <div className="mt-auto text-center py-6 text-gray-500">
-        {tr.footer}
-      </div>
-    </div>
+      <footer className="border-t border-gray-200 bg-white px-6 py-8 text-center">
+        <p className="text-sm text-gray-400">
+          FlowPayDR — Booking Platform
+        </p>
+      </footer>
+
+    </main>
   );
 }

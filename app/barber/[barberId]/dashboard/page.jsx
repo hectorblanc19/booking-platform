@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import BlockingPanel from "@/components/BlockingPanel";
 import ServiceWorkerClient from "@/app/ServiceWorkerClient";
+import CustomerHistory from "@/components/CustomerHistory";
 
 // Service translation dictionary
 const serviceNames = {
@@ -156,6 +157,7 @@ export default function BarberDashboard() {
 
   const [barberData, setBarberData] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [customerHistoryRefresh, setCustomerHistoryRefresh] = useState(0);
   const [view, setView] = useState("today");
   const [loading, setLoading] = useState(true);
   const [pushActive, setPushActive] = useState(true);
@@ -482,16 +484,99 @@ async function deleteGalleryPhoto(photoId) {
   });
 }
 
-  async function cancelAppointment(id) {
-    if (!confirm(lang === "es" ? "¿Cancelar esta cita?" : "Cancel this appointment?")) return;
+async function cancelAppointment(id) {
+  if (!confirm(lang === "es" ? "¿Cancelar esta cita?" : "Cancel this appointment?")) return;
 
-    await supabase
-      .from("appointments")
-      .update({ status: "cancelled" })
-      .eq("id", id);
+  await supabase
+    .from("appointments")
+    .update({ status: "cancelled" })
+    .eq("id", id);
 
-    loadAppointments();
+  loadAppointments();
+}
+
+async function markAppointmentCompleted(id) {
+  if (
+    !confirm(
+      lang === "es"
+        ? "¿Marcar esta cita como completada?"
+        : "Mark this appointment as completed?"
+    )
+  ) {
+    return;
   }
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({
+      status: "completed",
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Complete appointment error:", error);
+
+    alert(
+      lang === "es"
+        ? "No se pudo marcar la cita como completada."
+        : "Could not mark appointment as completed."
+    );
+
+    return;
+  }
+
+  loadAppointments();
+  setCustomerHistoryRefresh((value) => value + 1);
+}
+
+async function markAppointmentNoShow(id) {
+  if (
+    !confirm(
+      lang === "es"
+        ? "¿Marcar esta cita como 'No asistió'?"
+        : "Mark this appointment as 'No-show'?"
+    )
+  ) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("appointments")
+    .update({
+      status: "no_show",
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("No-show appointment error:", error);
+
+    alert(
+      lang === "es"
+        ? "No se pudo marcar la cita como no asistió."
+        : "Could not mark appointment as no-show."
+    );
+
+    return;
+  }
+
+  loadAppointments();
+  setCustomerHistoryRefresh((value) => value + 1);
+}
+function formatTime(timeStr) {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":");
+  const date = new Date();
+  date.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+
+  return date.toLocaleTimeString(
+    lang === "es" ? "es-ES" : "en-US",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }
+  );
+}  
 
   function formatTime(timeStr) {
   if (!timeStr) return "";
@@ -852,6 +937,7 @@ return (
     </button>
   </div>
 </div>
+<CustomerHistory barberId={barberId} lang={lang} />
 
 {/* Filters */}
 <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
@@ -903,17 +989,24 @@ return (
                       {tr.date}: {appt.date}
                     </span>
                     <span className="inline-flex items-center px-2 py-1 text-xs rounded-full mt-1 w-fit">
-                      {isConfirmed ? (
-                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                          {lang === "es" ? "Confirmado" : "Confirmed"}
-                        </span>
-                      ) : (
-                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full">
-                          {lang === "es" ? "Cancelado" : "Cancelled"}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-xs text-gray-500 mt-1">
+  {appt.status === "confirmed" ? (
+    <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">
+      {lang === "es" ? "Confirmado" : "Confirmed"}
+    </span>
+  ) : appt.status === "completed" ? (
+    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+      {lang === "es" ? "Completada" : "Completed"}
+    </span>
+  ) : appt.status === "no_show" ? (
+    <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+      {lang === "es" ? "No asistió" : "No-show"}
+    </span>
+  ) : (
+    <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full">
+      {lang === "es" ? "Cancelado" : "Cancelled"}
+    </span>
+  )}
+</span>                    <span className="text-xs text-gray-500 mt-1">
                       {duration} min
                     </span>
                   </div>
@@ -956,24 +1049,44 @@ return (
                   {/* Right: actions */}
                   <div className="flex flex-col gap-2 md:w-40">
                     {isConfirmed && (
-                      <>
-                        <button
-                          className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
-                          onClick={() =>
-                            (window.location.href = `/barber/${barberId}/reschedule/${appt.id}`)
-                          }
-                        >
-                          🔄 {tr.reschedule}
-                        </button>
-                        <button
-                          className="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
-                          onClick={() => cancelAppointment(appt.id)}
-                        >
-                          ❌ {tr.cancel}
-                        </button>
-                      </>
-                    )}
-                  </div>
+  <>
+    {new Date(`${appt.date}T${appt.time}`) > new Date() ? (
+      <>
+        <button
+          className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
+          onClick={() =>
+            (window.location.href = `/barber/${barberId}/reschedule/${appt.id}`)
+          }
+        >
+          🔄 {tr.reschedule}
+        </button>
+
+        <button
+          className="w-full bg-red-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
+          onClick={() => cancelAppointment(appt.id)}
+        >
+          ❌ {tr.cancel}
+        </button>
+      </>
+    ) : (
+      <>
+        <button
+          className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
+          onClick={() => markAppointmentCompleted(appt.id)}
+        >
+          ✅ {lang === "es" ? "Completada" : "Completed"}
+        </button>
+
+        <button
+          className="w-full bg-orange-500 text-white py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
+          onClick={() => markAppointmentNoShow(appt.id)}
+        >
+          🚫 {lang === "es" ? "No asistió" : "No-show"}
+        </button>
+      </>
+    )}
+  </>
+)}                  </div>
                 </div>
               );
             })}
@@ -988,11 +1101,11 @@ return (
   </h3>
 
   {/* ⭐ Limit message */}
-  {gallery.length >= 3 && (
+  {gallery.length >= 4 && (
     <p className="text-xs text-red-600 mb-2">
       {lang === "es"
-        ? "Límite alcanzado: máximo 3 fotos."
-        : "Limit reached: maximum 3 photos."}
+        ? "Límite alcanzado: máximo 4 fotos."
+        : "Limit reached: maximum 4 photos."}
     </p>
   )}
 
@@ -1033,4 +1146,3 @@ return (
     </div>
   );
 }
-

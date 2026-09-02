@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -310,6 +311,10 @@ setLoadingTimes(false);
     return;
   }
 
+  // ⭐ CLEAN CUSTOMER PHONE NUMBER
+  // Removes spaces, dashes, parentheses, backticks, +, etc.
+  const cleanCustomerPhone = String(customerPhone).replace(/\D/g, "");
+
   // ⭐ PRICE MUST BE CALCULATED HERE (AFTER barber is loaded)
   const selectedPrice =
     service === "Haircut"
@@ -320,37 +325,36 @@ setLoadingTimes(false);
       ? barber.combo_price
       : 0;
 
-    const formattedTime = time + ":00";
+  const formattedTime = time + ":00";
 
-    const newStart = new Date(`${date}T${formattedTime}`);
+  const newStart = new Date(`${date}T${formattedTime}`);
 
-    const selectedDuration =
-      SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60;
+  const selectedDuration =
+    SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60;
 
-    const newEnd = new Date(newStart.getTime() + selectedDuration * 60 * 1000);
+  const newEnd = new Date(newStart.getTime() + selectedDuration * 60 * 1000);
 
-    const { data: existing } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("barber_id", barberId)
-      .eq("date", date)
-      .eq("status", "confirmed");
+  const { data: existing } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("barber_id", barberId)
+    .eq("date", date)
+    .eq("status", "confirmed");
 
-    if (existing && existing.length > 0) {
-      for (const appt of existing) {
-        const existingStart = new Date(`${appt.date}T${appt.time}`);
+  if (existing && existing.length > 0) {
+    for (const appt of existing) {
+      const existingStart = new Date(`${appt.date}T${appt.time}`);
 
-        const existingEnd = new Date(
-          existingStart.getTime() + (appt.duration || 60) * 60 * 1000
-        );
+      const existingEnd = new Date(
+        existingStart.getTime() + (appt.duration || 60) * 60 * 1000
+      );
 
-        if (existingStart < newEnd && existingEnd > newStart) {
-          alert(tr.slotTaken);
-          return;
-        }
+      if (existingStart < newEnd && existingEnd > newStart) {
+        alert(tr.slotTaken);
+        return;
       }
     }
-
+  }
     const secret = crypto.randomUUID();
 
    await supabase.from("appointments").insert({
@@ -361,15 +365,14 @@ setLoadingTimes(false);
   time: formattedTime,
   duration: SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60,
   customer_name: customerName,
-  customer_phone: customerPhone,
+  customer_phone: cleanCustomerPhone,
   customer_email: customerEmail,
   notes,
   status: "confirmed",
   lang,
   secret_link: secret,
-  price: selectedPrice   // ⭐ ADDED
+  price: selectedPrice // ⭐ ADDED
 });
-
    await fetch("/api/send-confirmation", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -388,23 +391,22 @@ setLoadingTimes(false);
 });
 
     await fetch("/api/send-barber-notification", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        barber_email: barber.email,
-        barber_name: barber.name,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        customer_email: customerEmail,
-        service,
-        date,
-        time: formattedTime,
-        notes,
-        dashboard_link: `https://flowpaydr.com/barber/${barberId}`,
-        lang,
-      }),
-    });
-
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    barber_email: barber.email,
+    barber_name: barber.name,
+    customer_name: customerName,
+    customer_phone: cleanCustomerPhone,
+    customer_email: customerEmail,
+    service,
+    date,
+    time: formattedTime,
+    notes,
+    dashboard_link: `https://flowpaydr.com/barber/${barberId}`,
+    lang,
+  }),
+});
    setTimeout(() => {
   window.location.href = `/customer/${secret}`;
 }, 300);

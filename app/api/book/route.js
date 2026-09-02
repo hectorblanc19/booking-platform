@@ -10,18 +10,23 @@ export async function POST(req) {
   const body = await req.json();
 
   const {
-  business,
-  barber,
-  service,
-  date,
-  time,
-  customer_name,
-  customer_email,
-  customer_phone,
-  notes,
-  lang,
-  price   // ⭐ ADD THIS
-} = body;
+    business,
+    barber,
+    service,
+    date,
+    time,
+    customer_name,
+    customer_email,
+    customer_phone,
+    notes,
+    lang,
+    price // ⭐ ADD THIS
+  } = body;
+
+  // ⭐ CLEAN CUSTOMER PHONE NUMBER
+  // Removes backticks, spaces, dashes, parentheses, +, etc.
+  // Example: "5612554439`" → "5612554439"
+  const cleanCustomerPhone = String(customer_phone || "").replace(/\D/g, "");
 
   // ⭐ Anonymous customers → use secret_link as customer_id
   const secret_link = crypto.randomUUID();
@@ -61,27 +66,27 @@ export async function POST(req) {
   const barberName = barberInfo?.name || "Your Barber";
 
   // ⭐ INSERT APPOINTMENT
-const { data, error } = await supabase
-  .from("appointments")
-  .insert({
-    business_id: business,
-    barber_id: barber,
-    service,
-    date,
-    time,
-    duration: 60,
-    customer_name,
-    customer_email,
-    customer_phone,
-    notes,
-    customer_id,   // secret_link
-    status: "confirmed",
-    secret_link,
-    lang,
-    price   // ⭐ REQUIRED — THIS SAVES THE PRICE
-  })
-  .select()
-  .single();
+  const { data, error } = await supabase
+    .from("appointments")
+    .insert({
+      business_id: business,
+      barber_id: barber,
+      service,
+      date,
+      time,
+      duration: 60,
+      customer_name,
+      customer_email,
+      customer_phone: cleanCustomerPhone,
+      notes,
+      customer_id, // secret_link
+      status: "confirmed",
+      secret_link,
+      lang,
+      price // ⭐ REQUIRED — THIS SAVES THE PRICE
+    })
+    .select()
+    .single();
 
   if (error) {
     console.log("Supabase error:", error);
@@ -89,53 +94,57 @@ const { data, error } = await supabase
   }
 
   // ⭐ SEND CUSTOMER CONFIRMATION EMAIL + PUSH (UPGRADED)
-try {
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-confirmation`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      customer_email,
-      customer_name,
-      service,
-      barber_id: barber,
-      business_id: business,
-      date,
-      time,
-      secret_link,
-      lang,
-      customer_id
-    })
-  });
-  console.log("📲 Customer confirmation sent");
-} catch (err) {
-  console.error("❌ Error sending customer confirmation:", err);
-}
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-confirmation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_email,
+        customer_name,
+        service,
+        barber_id: barber,
+        business_id: business,
+        date,
+        time,
+        secret_link,
+        lang,
+        customer_id
+      })
+    });
 
+    console.log("📲 Customer confirmation sent");
+  } catch (err) {
+    console.error("❌ Error sending customer confirmation:", err);
+  }
 
-// ⭐ SEND BARBER EMAIL + PUSH (UPGRADED)
-try {
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-barber-notification`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      barber_email: barberInfo.email,
-      barber_name: barberInfo.name,
-      barber_id: barber,
-      customer_name,
-      customer_phone,
-      customer_email,
-      service,
-      date,
-      time,
-      notes,
-      dashboard_link: `${process.env.NEXT_PUBLIC_BASE_URL}/barber/${barber}/dashboard`,
-      lang
-    })
-  });
-  console.log("📲 Barber notification sent");
-} catch (err) {
-  console.error("❌ Error sending barber notification:", err);
-}
+  // ⭐ SEND BARBER EMAIL + PUSH (UPGRADED)
+  try {
+    await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/send-barber-notification`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          barber_email: barberInfo.email,
+          barber_name: barberInfo.name,
+          barber_id: barber,
+          customer_name,
+          customer_phone: cleanCustomerPhone,
+          customer_email,
+          service,
+          date,
+          time,
+          notes,
+          dashboard_link: `${process.env.NEXT_PUBLIC_BASE_URL}/barber/${barber}/dashboard`,
+          lang
+        })
+      }
+    );
+
+    console.log("📲 Barber notification sent");
+  } catch (err) {
+    console.error("❌ Error sending barber notification:", err);
+  }
 
   return NextResponse.json({
     success: true,

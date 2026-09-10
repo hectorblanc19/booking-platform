@@ -144,31 +144,32 @@ export async function GET(req) {
     /*
      * Get completed appointments from the target date.
      */
-    const { data: targetAppointments, error } =
-      await supabase
-        .from("appointments")
-        .select(`
-          id,
-          barber_id,
-          customer_name,
-          customer_email,
-          customer_phone,
-          service,
-          date,
-          time,
-          status,
-          secret_link,
-          lang
-        `)
-        .eq("status", "completed")
-        .eq("date", targetDateString);
+   const { data: targetAppointments, error } =
+  await supabase
+    .from("appointments")
+    .select(`
+      id,
+      barber_id,
+      provider_id,
+      business_id,
+      customer_name,
+      customer_email,
+      customer_phone,
+      service,
+      date,
+      time,
+      status,
+      secret_link,
+      lang
+    `)
+    .eq("status", "completed")
+    .eq("date", targetDateString);
 
-    if (error) {
-      console.error(
-        "❌ Comeback reminder query error:",
-        error
-      );
-
+if (error) {
+  console.error(
+    "❌ Comeback reminder query error:",
+    error
+  );
       return NextResponse.json(
         {
           success: false,
@@ -208,30 +209,31 @@ export async function GET(req) {
     ];
 
     const { data: allCompleted, error: allError } =
-      await supabase
-        .from("appointments")
-        .select(`
-          id,
-          barber_id,
-          customer_name,
-          customer_email,
-          customer_phone,
-          service,
-          date,
-          time,
-          status,
-          secret_link,
-          lang
-        `)
-        .eq("status", "completed")
-        .lte("date", new Date().toISOString().split("T")[0]);
+  await supabase
+    .from("appointments")
+    .select(`
+      id,
+      barber_id,
+      provider_id,
+      business_id,
+      customer_name,
+      customer_email,
+      customer_phone,
+      service,
+      date,
+      time,
+      status,
+      secret_link,
+      lang
+    `)
+    .eq("status", "completed")
+    .lte("date", new Date().toISOString().split("T")[0]);
 
-    if (allError) {
-      console.error(
-        "❌ Error loading completed history:",
-        allError
-      );
-
+if (allError) {
+  console.error(
+    "❌ Error loading completed history:",
+    allError
+  );
       return NextResponse.json(
         {
           success: false,
@@ -361,22 +363,43 @@ export async function GET(req) {
           continue;
         }
 
-        /*
-         * Barber information
-         */
-        const { data: barber } =
-          await supabase
-            .from("barbers")
-            .select("name")
-            .eq(
-              "id",
-              appointment.barber_id
-            )
-            .single();
+   /*
+ * Barber / Provider information
+ */
+let professionalName = "";
+let isProviderAppointment = false;
 
-        const barberName =
-          barber?.name || "your barber";
+if (appointment.provider_id) {
+  isProviderAppointment = true;
 
+  const { data: provider } =
+    await supabase
+      .from("providers")
+      .select("name")
+      .eq(
+        "id",
+        appointment.provider_id
+      )
+      .maybeSingle();
+
+  professionalName =
+    provider?.name || "your professional";
+} else if (appointment.barber_id) {
+  const { data: barber } =
+    await supabase
+      .from("barbers")
+      .select("name")
+      .eq(
+        "id",
+        appointment.barber_id
+      )
+      .maybeSingle();
+
+  professionalName =
+    barber?.name || "your barber";
+} else {
+  professionalName = "your professional";
+}
         /*
          * Language
          */
@@ -394,12 +417,13 @@ export async function GET(req) {
          * Booking link
          */
         const baseUrl =
-          process.env.BASE_URL ||
-          "https://www.flowpaydr.com";
+  process.env.BASE_URL ||
+  "https://www.flowpaydr.com";
 
-        const bookingLink =
-          `${baseUrl}/booking/${appointment.barber_id}?lang=${lang}`;
-
+const bookingLink =
+  isProviderAppointment
+    ? `${baseUrl}/business/${appointment.business_id}/booking?provider=${appointment.provider_id}&start=true`
+    : `${baseUrl}/booking/${appointment.barber_id}?lang=${lang}`;
         const customerName =
           appointment.customer_name ||
           (lang === "es"
@@ -407,41 +431,60 @@ export async function GET(req) {
             : "Customer");
 
         /*
-         * Email translations
-         */
-        const subject =
-          lang === "es"
-            ? "¿Listo para tu próximo corte? 💈"
-            : "Ready for your next appointment? 💈";
+ * Email translations
+ */
+const subject =
+  isProviderAppointment
+    ? lang === "es"
+      ? "¿Listo para tu próxima cita?"
+      : "Ready for your next appointment?"
+    : lang === "es"
+    ? "¿Listo para tu próximo corte? 💈"
+    : "Ready for your next appointment? 💈";
 
-        const title =
-          lang === "es"
-            ? "💈 ¡Es hora de tu próximo corte!"
-            : "💈 Time for your next appointment!";
+const title =
+  isProviderAppointment
+    ? lang === "es"
+      ? "¡Es hora de tu próxima cita!"
+      : "Time for your next appointment!"
+    : lang === "es"
+    ? "💈 ¡Es hora de tu próximo corte!"
+    : "💈 Time for your next appointment!";
 
-        const greeting =
-          lang === "es"
-            ? `Hola ${customerName} 👋`
-            : `Hi ${customerName} 👋`;
+const greeting =
+  lang === "es"
+    ? `Hola ${customerName} 👋`
+    : `Hi ${customerName} 👋`;
 
-        const bodyText =
-          lang === "es"
-            ? `Ya han pasado ${COMEBACK_DAYS} días desde tu última visita con ${barberName}.
+const bodyText =
+  isProviderAppointment
+    ? lang === "es"
+      ? `Ya han pasado ${COMEBACK_DAYS} días desde tu última visita con ${professionalName}.
 
 Tu último servicio fue: ${translatedService}.
 
 ¿Listo para tu próxima cita?`
-            : `It has been ${COMEBACK_DAYS} days since your last visit with ${barberName}.
+      : `It has been ${COMEBACK_DAYS} days since your last visit with ${professionalName}.
+
+Your last service was: ${translatedService}.
+
+Ready for your next appointment?`
+    : lang === "es"
+    ? `Ya han pasado ${COMEBACK_DAYS} días desde tu última visita con ${professionalName}.
+
+Tu último servicio fue: ${translatedService}.
+
+¿Listo para tu próxima cita?`
+    : `It has been ${COMEBACK_DAYS} days since your last visit with ${professionalName}.
 
 Your last service was: ${translatedService}.
 
 Ready for your next appointment?`;
 
-        const buttonText =
-          lang === "es"
-            ? "Reservar mi próxima cita"
-            : "Book my next appointment";
-
+const buttonText =
+  lang === "es"
+    ? "Reservar mi próxima cita"
+    : "Book my next appointment";
         /*
          * Send email
          */
@@ -477,16 +520,20 @@ Ready for your next appointment?`;
                 </p>
 
                 <p style="margin:0;">
-                  <strong>
-                    ${
-                      lang === "es"
-                        ? "Barbero"
-                        : "Barber"
-                    }:
-                  </strong>
-                  ${barberName}
-                </p>
-              </div>
+  <strong>
+    ${
+      isProviderAppointment
+        ? lang === "es"
+          ? "Profesional"
+          : "Professional"
+        : lang === "es"
+        ? "Barbero"
+        : "Barber"
+    }:
+  </strong>
+  ${professionalName}
+</p>             
+ </div>
 
               <div style="text-align:center; margin-top:25px;">
                 <a

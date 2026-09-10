@@ -3,6 +3,16 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import ProviderList from "@/components/business/ProviderList";
+import ProviderAvailability from "@/components/business/ProviderAvailability";
+import BusinessServices from "@/components/business/BusinessServices";
+import ManualAppointment from "@/components/business/ManualAppointment";
+import BusinessQRCode from "@/components/business/BusinessQRCode";
+import TodaysSchedule from "@/components/business/TodaysSchedule";
+import CustomerList from "@/components/business/CustomerList";
+import CalendarView from "@/components/business/CalendarView";
+import AllAppointments from "@/components/business/AllAppointments";
+import BarberManagement from "@/components/business/BarberManagement";
 
 /* ⭐ ADD THIS BLOCK RIGHT HERE */
 const serviceLabels = {
@@ -19,12 +29,27 @@ const dayLabels = {
 export default function BusinessDashboard() {
   const { businessId } = useParams();
 
-  const [lang, setLang] = useState("en");
-  const [business, setBusiness] = useState(null);
-  const [barbers, setBarbers] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
+ const [lang, setLang] = useState("en");
+const [business, setBusiness] = useState(null);
+const [barbers, setBarbers] = useState([]);
+const [providers, setProviders] = useState([]);
+const [services, setServices] = useState([]);
+const [appointments, setAppointments] = useState([]);
+const [customers, setCustomers] = useState([]);
+const [loading, setLoading] = useState(true);
+
+// BUSINESS PHOTO
+const [uploadingBusinessPhoto, setUploadingBusinessPhoto] = useState(false);
+const [businessPhotoPreview, setBusinessPhotoPreview] = useState(null);
+
+// Detect whether this business is a barber business
+const normalizedCategory = business?.category?.trim().toLowerCase() || "";
+
+const isBarberBusiness =
+  normalizedCategory.includes("barber") ||
+  normalizedCategory.includes("barbero") ||
+  normalizedCategory.includes("barbería") ||
+  normalizedCategory.includes("barberia");
 
   const [newBarberName, setNewBarberName] = useState("");
   const [newBarberEmail, setNewBarberEmail] = useState("");
@@ -36,46 +61,102 @@ export default function BusinessDashboard() {
   const [newBarberServices, setNewBarberServices] = useState([]);
   const [newBarberDays, setNewBarberDays] = useState([]);
 
-  // TOAST
+  // MANUAL APPOINTMENT
+  const [newAppointmentName, setNewAppointmentName] = useState("");
+  const [newAppointmentPhone, setNewAppointmentPhone] = useState("");
+  const [newAppointmentEmail, setNewAppointmentEmail] = useState("");
+  const [newAppointmentService, setNewAppointmentService] = useState("");
+  const [newAppointmentDate, setNewAppointmentDate] = useState("");
+  const [newAppointmentTime, setNewAppointmentTime] = useState("");
+  const [newAppointmentBarberId, setNewAppointmentBarberId] = useState("");
+  const [newAppointmentProviderId, setNewAppointmentProviderId] = useState("");
+  const [savingAppointment, setSavingAppointment] = useState(false);
+
+// PROVIDER
+const [newProviderName, setNewProviderName] = useState("");
+const [newProviderEmail, setNewProviderEmail] = useState("");
+const [newProviderPhone, setNewProviderPhone] = useState("");
+const [newProviderSpecialty, setNewProviderSpecialty] = useState("");
+
+// EDIT PROVIDER
+const [editingProviderId, setEditingProviderId] = useState(null);
+const [editProviderName, setEditProviderName] = useState("");
+const [editProviderEmail, setEditProviderEmail] = useState("");
+const [editProviderPhone, setEditProviderPhone] = useState("");
+const [editProviderSpecialty, setEditProviderSpecialty] = useState("");
+const [savingEditProvider, setSavingEditProvider] = useState(false);
+
+// PROVIDER AVAILABILITY
+const [providerAvailability, setProviderAvailability] = useState([]);
+const [selectedAvailabilityProviderId, setSelectedAvailabilityProviderId] =
+  useState("");
+const [savingProviderAvailability, setSavingProviderAvailability] =
+  useState(false);
+
+// BUSINESS SERVICES
+const [newServiceName, setNewServiceName] = useState("");
+const [newServiceDescription, setNewServiceDescription] = useState("");
+const [newServicePrice, setNewServicePrice] = useState("");
+const [newServiceDuration, setNewServiceDuration] = useState("30");
+const [newServiceProviderId, setNewServiceProviderId] = useState("");
+const [savingService, setSavingService] = useState(false);
+
+// EDIT SERVICE
+const [editingServiceId, setEditingServiceId] = useState(null);
+const [editServiceName, setEditServiceName] = useState("");
+const [editServiceDescription, setEditServiceDescription] = useState("");
+const [editServicePrice, setEditServicePrice] = useState("");
+const [editServiceDuration, setEditServiceDuration] = useState("");
+const [editServiceProviderId, setEditServiceProviderId] = useState("");
+const [savingEditService, setSavingEditService] = useState(false);
+ 
+ // TOAST
   const [toast, setToast] = useState(null);
   function showToast(message) {
     setToast(message);
     setTimeout(() => setToast(null), 2000);
   }
 
-  // SECRET KEY ACCESS CONTROL
-  const [accessGranted, setAccessGranted] = useState(false);
-  const [checkingKey, setCheckingKey] = useState(true);
+  // BUSINESS OWNER AUTHENTICATION
+const [accessGranted, setAccessGranted] = useState(false);
+const [checkingAuth, setCheckingAuth] = useState(true);
 
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const key = url.searchParams.get("key");
-    validateKey(key);
-  }, []);
+useEffect(() => {
+  checkBusinessOwner();
+}, []);
 
-  async function validateKey(key) {
-    if (!key) {
-      setAccessGranted(false);
-      setCheckingKey(false);
-      return;
-    }
+async function checkBusinessOwner() {
+  setCheckingAuth(true);
 
-    const { data: biz } = await supabase
-      .from("businesses")
-      .select("secret_key")
-      .eq("id", businessId)
-      .single();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-    if (biz?.secret_key === key) {
-      setAccessGranted(true);
-      loadDashboard();
-    } else {
-      setAccessGranted(false);
-    }
-
-    setCheckingKey(false);
+  if (userError || !user) {
+    setAccessGranted(false);
+    setCheckingAuth(false);
+    return;
   }
 
+  const { data: biz, error: businessError } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("id", businessId)
+    .eq("owner_id", user.id)
+    .single();
+
+  if (businessError || !biz) {
+    setAccessGranted(false);
+    setCheckingAuth(false);
+    return;
+  }
+
+  setAccessGranted(true);
+  setCheckingAuth(false);
+
+  await loadDashboard();
+}
   /* ⭐ NEW STATE FOR FILTERS + GROUPING + PAGINATION ⭐ */
   const [filterBarberId, setFilterBarberId] = useState("all");
   const [filterDate, setFilterDate] = useState("");
@@ -109,8 +190,27 @@ export default function BusinessDashboard() {
       copyLink: "Copy Link",
       qrCode: "QR Code",
       copied: "Link copied!",
-    },
-    es: {
+
+      // MANUAL APPOINTMENT
+addAppointment: "Add Appointment",
+customerName: "Customer name",
+customerPhone: "WhatsApp / Phone",
+customerEmail: "Customer email",
+service: "Service",
+date: "Date",
+time: "Time",
+selectBarber: "Select barber",
+selectProvider: "Select provider",
+noBarber: "No barber / Provider",
+saveAppointment: "Save Appointment",
+appointmentAdded: "Appointment added successfully",
+missingAppointmentFields: "Complete the required fields",
+appointmentExists: "That time is already booked",
+checkingAvailability: "Checking availability...",
+   
+ },
+  
+es: {
       dashboard: "Panel del Negocio",
       barbers: "Barberos",
       addBarber: "Agregar Barbero",
@@ -131,8 +231,99 @@ export default function BusinessDashboard() {
       copyLink: "Copiar Enlace",
       qrCode: "Código QR",
       copied: "¡Enlace copiado!",
-    },
+
+      // CITA MANUAL
+addAppointment: "Agregar Cita",
+customerName: "Nombre del cliente",
+customerPhone: "WhatsApp / Teléfono",
+customerEmail: "Correo del cliente",
+service: "Servicio",
+date: "Fecha",
+time: "Hora",
+selectBarber: "Seleccionar barbero",
+selectProvider: "Seleccionar profesional",
+noBarber: "Sin barbero / Profesional",
+saveAppointment: "Guardar Cita",
+appointmentAdded: "Cita agregada correctamente",
+missingAppointmentFields: "Completa los campos requeridos",
+appointmentExists: "Ese horario ya está ocupado",
+checkingAvailability: "Verificando disponibilidad...",   
+ },
   };
+
+// BUSINESS PHOTO UPLOAD
+async function uploadBusinessPhoto(file) {
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    showToast(
+      lang === "es"
+        ? "Selecciona una imagen válida."
+        : "Select a valid image."
+    );
+    return;
+  }
+
+  setUploadingBusinessPhoto(true);
+
+  try {
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const safeId = Math.random().toString(36).substring(2);
+
+    const fileName =
+      `businesses/${businessId}/${safeId}-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("barber-photos")
+      .upload(fileName, file);
+
+    if (uploadError) {
+      console.error("Business photo upload error:", uploadError);
+
+      showToast(
+        lang === "es"
+          ? "No se pudo subir la foto."
+          : "Could not upload photo."
+      );
+
+      return;
+    }
+
+    const photoUrl =
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/barber-photos/${fileName}`;
+
+    const { error: updateError } = await supabase
+      .from("businesses")
+      .update({
+        photo_url: photoUrl,
+      })
+      .eq("id", businessId);
+
+    if (updateError) {
+      console.error("Business photo database error:", updateError);
+
+      showToast(
+        lang === "es"
+          ? "La foto subió, pero no se pudo guardar."
+          : "Photo uploaded, but could not be saved."
+      );
+
+      return;
+    }
+
+    setBusinessPhotoPreview(photoUrl);
+
+    await loadDashboard();
+
+    showToast(
+      lang === "es"
+        ? "Foto actualizada correctamente."
+        : "Photo updated successfully."
+    );
+  } finally {
+    setUploadingBusinessPhoto(false);
+  }
+}
 
   async function loadDashboard() {
     setLoading(true);
@@ -144,11 +335,35 @@ export default function BusinessDashboard() {
       .single();
     setBusiness(biz || null);
 
-    const { data: bar } = await supabase
-      .from("barbers")
-      .select("*")
-      .eq("business_id", businessId);
-    setBarbers(bar || []);
+   const { data: bar } = await supabase
+  .from("barbers")
+  .select("*")
+  .eq("business_id", businessId);
+
+setBarbers(bar || []);
+
+const { data: prov, error: providerError } = await supabase
+  .from("providers")
+  .select("*")
+  .eq("business_id", businessId);
+
+if (providerError) {
+  console.error("Provider loading error:", providerError);
+}
+
+setProviders(prov || []);
+
+const { data: serviceData, error: serviceError } = await supabase
+  .from("business_services")
+  .select("*")
+  .eq("business_id", businessId)
+  .order("name", { ascending: true });
+
+if (serviceError) {
+  console.error("Service loading error:", serviceError);
+}
+
+setServices(serviceData || []);
 
     const { data: appt } = await supabase
       .from("appointments")
@@ -179,41 +394,760 @@ export default function BusinessDashboard() {
     setLoading(false);
   }
 
-  async function addBarber() {
-  if (!newBarberName || !newBarberEmail || !newBarberPin) {
-    showToast("Missing fields");
+// LOAD PROVIDER AVAILABILITY
+async function loadProviderAvailability(providerId) {
+  if (!providerId) {
+    setProviderAvailability([]);
     return;
   }
 
-  if (newBarberPin.length !== 4) {
-    showToast("PIN must be 4 digits");
-    return;
-  }
-
-  const { error } = await supabase.from("barbers").insert({
-  name: newBarberName,
-  email: newBarberEmail,
-  pin: newBarberPin,
-  business_id: businessId,
-  services: newBarberServices,     // ← FIX
-  working_days: newBarberDays,     // ← FIX (your column is working_days, not work_days)
-});
+  const { data, error } = await supabase
+    .from("provider_availability")
+    .select("*")
+    .eq("provider_id", providerId)
+    .order("day_of_week", { ascending: true });
 
   if (error) {
-    showToast("Error adding barber");
+    console.error("Provider availability loading error:", error);
+
+    showToast(
+      lang === "es"
+        ? "No se pudo cargar el horario."
+        : "Could not load provider availability."
+    );
+
     return;
   }
 
-  setNewBarberName("");
-  setNewBarberEmail("");
-  setNewBarberPin("");
+  if (!data || data.length === 0) {
+    const defaultSchedule = Array.from({ length: 7 }, (_, dayIndex) => ({
+      id: `new-${dayIndex}`,
+      provider_id: providerId,
+      day_of_week: dayIndex,
+      is_available: dayIndex >= 1 && dayIndex <= 5,
+      start_time: "09:00",
+      end_time: "18:00",
+    }));
 
-  loadDashboard();
-  showToast("Barber added");
+    setProviderAvailability(defaultSchedule);
+    return;
+  }
+
+  setProviderAvailability(data);
 }
 
-  async function deleteBarber(id) {
-    if (!confirm("Delete this barber?")) return;
+// SAVE PROVIDER AVAILABILITY
+async function saveProviderAvailability() {
+  if (!selectedAvailabilityProviderId) {
+    showToast(
+      lang === "es"
+        ? "Selecciona un profesional."
+        : "Select a provider."
+    );
+    return;
+  }
+
+  setSavingProviderAvailability(true);
+
+  try {
+    for (const day of providerAvailability) {
+      if (day.is_available && (!day.start_time || !day.end_time)) {
+        showToast(
+          lang === "es"
+            ? "Completa las horas de los días disponibles."
+            : "Complete the hours for available days."
+        );
+        return;
+      }
+
+      if (day.is_available && day.end_time <= day.start_time) {
+        showToast(
+          lang === "es"
+            ? "La hora de cierre debe ser después de la hora de inicio."
+            : "End time must be after start time."
+        );
+        return;
+      }
+
+      // NEW ROW
+      if (String(day.id).startsWith("new-")) {
+        const { error } = await supabase
+          .from("provider_availability")
+          .insert({
+            provider_id: selectedAvailabilityProviderId,
+            day_of_week: day.day_of_week,
+            start_time: day.start_time,
+            end_time: day.end_time,
+            is_available: day.is_available,
+          });
+
+        if (error) {
+          console.error("Provider availability insert error:", error);
+
+          showToast(
+            lang === "es"
+              ? "No se pudo guardar el horario."
+              : "Could not save the schedule."
+          );
+          return;
+        }
+
+        continue;
+      }
+
+      // EXISTING ROW
+      const { error } = await supabase
+        .from("provider_availability")
+        .update({
+          start_time: day.start_time,
+          end_time: day.end_time,
+          is_available: day.is_available,
+        })
+        .eq("id", day.id)
+        .eq("provider_id", selectedAvailabilityProviderId);
+
+      if (error) {
+        console.error("Provider availability save error:", error);
+
+        showToast(
+          lang === "es"
+            ? "No se pudo guardar el horario."
+            : "Could not save the schedule."
+        );
+        return;
+      }
+    }
+
+    await loadProviderAvailability(selectedAvailabilityProviderId);
+
+    showToast(
+      lang === "es"
+        ? "Horario guardado correctamente."
+        : "Schedule saved successfully."
+    );
+  } finally {
+    setSavingProviderAvailability(false);
+  }
+}
+async function addBarber() {    
+if (!newBarberName || !newBarberEmail || !newBarberPin) {
+      showToast("Missing fields");
+      return;
+    }
+
+    if (newBarberPin.length !== 4) {
+      showToast("PIN must be 4 digits");
+      return;
+    }
+
+    const { error } = await supabase.from("barbers").insert({
+      name: newBarberName,
+      email: newBarberEmail,
+      pin: newBarberPin,
+      business_id: businessId,
+      services: newBarberServices,
+      working_days: newBarberDays,
+    });
+
+    if (error) {
+      showToast("Error adding barber");
+      return;
+    }
+
+    setNewBarberName("");
+    setNewBarberEmail("");
+    setNewBarberPin("");
+
+    loadDashboard();
+    showToast("Barber added");
+  }
+
+// PROVIDER
+async function addProvider() {
+  if (!newProviderName) {
+    showToast(
+      lang === "es"
+        ? "El nombre es requerido"
+        : "Provider name is required"
+    );
+    return;
+  }
+
+  const { error } = await supabase.from("providers").insert({
+    business_id: businessId,
+    name: newProviderName,
+    email: newProviderEmail || null,
+    phone: newProviderPhone || null,
+    specialty: newProviderSpecialty || null,
+  });
+
+  if (error) {
+    console.error("Error adding provider:", error);
+
+    showToast(
+      lang === "es"
+        ? "Error agregando profesional"
+        : "Error adding provider"
+    );
+
+    return;
+  }
+
+  setNewProviderName("");
+  setNewProviderEmail("");
+  setNewProviderPhone("");
+  setNewProviderSpecialty("");
+
+  await loadDashboard();
+
+    showToast(
+    lang === "es"
+      ? "Profesional agregado"
+      : "Provider added"
+  );
+}
+
+// EDIT PROVIDER
+function startEditProvider(provider) {
+  setEditingProviderId(provider.id);
+  setEditProviderName(provider.name || "");
+  setEditProviderEmail(provider.email || "");
+  setEditProviderPhone(provider.phone || "");
+  setEditProviderSpecialty(provider.specialty || "");
+}
+
+function cancelEditProvider() {
+  setEditingProviderId(null);
+  setEditProviderName("");
+  setEditProviderEmail("");
+  setEditProviderPhone("");
+  setEditProviderSpecialty("");
+}
+
+async function updateProvider() {
+  if (!editingProviderId) return;
+
+  if (!editProviderName.trim()) {
+    showToast(
+      lang === "es"
+        ? "El nombre es requerido."
+        : "Provider name is required."
+    );
+    return;
+  }
+
+  setSavingEditProvider(true);
+
+  try {
+    const { error } = await supabase
+      .from("providers")
+      .update({
+        name: editProviderName.trim(),
+        email: editProviderEmail.trim() || null,
+        phone: editProviderPhone.trim() || null,
+        specialty: editProviderSpecialty.trim() || null,
+      })
+      .eq("id", editingProviderId)
+      .eq("business_id", businessId);
+
+    if (error) {
+      console.error("Update provider error:", error);
+
+      showToast(
+        lang === "es"
+          ? "No se pudo actualizar el profesional."
+          : "Could not update provider."
+      );
+      return;
+    }
+
+    await loadDashboard();
+    cancelEditProvider();
+
+    showToast(
+      lang === "es"
+        ? "Profesional actualizado correctamente."
+        : "Provider updated successfully."
+    );
+  } finally {
+    setSavingEditProvider(false);
+  }
+}
+
+// DELETE PROVIDER
+async function deleteProvider(provider) {
+  if (!provider?.id) return;
+
+  const { data: providerAppointments, error: appointmentCheckError } =
+    await supabase
+      .from("appointments")
+      .select("id")
+      .eq("business_id", businessId)
+      .eq("provider_id", provider.id)
+      .limit(1);
+
+  if (appointmentCheckError) {
+    console.error(
+      "Provider appointment check error:",
+      appointmentCheckError
+    );
+
+    showToast(
+      lang === "es"
+        ? "No se pudo verificar el historial del profesional."
+        : "Could not check provider history."
+    );
+    return;
+  }
+
+  if (providerAppointments?.length > 0) {
+    showToast(
+      lang === "es"
+        ? "No puedes eliminar este profesional porque tiene historial de citas."
+        : "You cannot delete this provider because they have appointment history."
+    );
+    return;
+  }
+
+  const confirmed = window.confirm(
+    lang === "es"
+      ? `¿Seguro que deseas eliminar a ${provider.name}?`
+      : `Are you sure you want to delete ${provider.name}?`
+  );
+
+  if (!confirmed) return;
+
+  const { error } = await supabase
+    .from("providers")
+    .delete()
+    .eq("id", provider.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    console.error("Delete provider error:", error);
+
+    showToast(
+      lang === "es"
+        ? "No se pudo eliminar el profesional."
+        : "Could not delete provider."
+    );
+    return;
+  }
+
+  if (selectedAvailabilityProviderId === provider.id) {
+    setSelectedAvailabilityProviderId("");
+    setProviderAvailability([]);
+  }
+
+  await loadDashboard();
+
+  showToast(
+    lang === "es"
+      ? "Profesional eliminado correctamente."
+      : "Provider deleted successfully."
+  );
+}
+
+
+// BUSINESS SERVICES
+async function addService() {
+  if (!newServiceName.trim()) {
+    showToast(
+      lang === "es"
+        ? "Escribe el nombre del servicio."
+        : "Enter the service name.",
+      "error"
+    );
+    return;
+  }
+
+  if (!newServiceDuration || Number(newServiceDuration) <= 0) {
+    showToast(
+      lang === "es"
+        ? "La duración debe ser mayor de 0."
+        : "Duration must be greater than 0.",
+      "error"
+    );
+    return;
+  }
+
+  setSavingService(true);
+
+  const { data, error } = await supabase
+    .from("business_services")
+    .insert([
+      {
+        business_id: businessId,
+        provider_id: newServiceProviderId || null,
+        name: newServiceName.trim(),
+        description: newServiceDescription.trim() || null,
+        price: newServicePrice !== "" ? Number(newServicePrice) : null,
+        duration: Number(newServiceDuration),
+        is_active: true,
+      },
+    ])
+    .select()
+    .single();
+
+  setSavingService(false);
+
+  if (error) {
+    console.error("Add service error:", error);
+
+    showToast(
+      lang === "es"
+        ? "No se pudo agregar el servicio."
+        : "Could not add service.",
+      "error"
+    );
+    return;
+  }
+
+  setServices((prev) =>
+    [...prev, data].sort((a, b) => a.name.localeCompare(b.name))
+  );
+
+  setNewServiceName("");
+  setNewServiceDescription("");
+  setNewServicePrice("");
+  setNewServiceDuration("30");
+  setNewServiceProviderId("");
+
+  showToast(
+  lang === "es"
+    ? "Servicio agregado correctamente."
+    : "Service added successfully.",
+  "success"
+);
+}
+
+// START EDITING SERVICE
+function startEditService(service) {
+  setEditingServiceId(service.id);
+  setEditServiceName(service.name || "");
+  setEditServiceDescription(service.description || "");
+  setEditServicePrice(
+    service.price !== null && service.price !== undefined
+      ? String(service.price)
+      : ""
+  );
+  setEditServiceDuration(String(service.duration || ""));
+  setEditServiceProviderId(service.provider_id || "");
+}
+
+// CANCEL EDITING SERVICE
+function cancelEditService() {
+  setEditingServiceId(null);
+  setEditServiceName("");
+  setEditServiceDescription("");
+  setEditServicePrice("");
+  setEditServiceDuration("");
+  setEditServiceProviderId("");
+}
+
+// UPDATE SERVICE
+async function updateService() {
+  if (!editingServiceId) return;
+
+  if (!editServiceName.trim()) {
+    showToast(
+      lang === "es"
+        ? "Escribe el nombre del servicio."
+        : "Enter the service name."
+    );
+    return;
+  }
+
+  if (!editServiceDuration || Number(editServiceDuration) <= 0) {
+    showToast(
+      lang === "es"
+        ? "La duración debe ser mayor de 0."
+        : "Duration must be greater than 0."
+    );
+    return;
+  }
+
+  setSavingEditService(true);
+
+  const { error } = await supabase
+    .from("business_services")
+    .update({
+      name: editServiceName.trim(),
+      description: editServiceDescription.trim() || null,
+      price:
+        editServicePrice !== ""
+          ? Number(editServicePrice)
+          : null,
+      duration: Number(editServiceDuration),
+      provider_id: editServiceProviderId || null,
+    })
+    .eq("id", editingServiceId)
+    .eq("business_id", businessId);
+
+  setSavingEditService(false);
+
+  if (error) {
+    console.error("Update service error:", error);
+
+    showToast(
+      lang === "es"
+        ? "No se pudo actualizar el servicio."
+        : "Could not update service."
+    );
+    return;
+  }
+
+  await loadDashboard();
+  cancelEditService();
+
+  showToast(
+    lang === "es"
+      ? "Servicio actualizado correctamente."
+      : "Service updated successfully."
+  );
+}
+
+// TOGGLE SERVICE ACTIVE / INACTIVE
+async function toggleServiceActive(service) {
+  const newStatus = !service.is_active;
+
+  const { error } = await supabase
+    .from("business_services")
+    .update({
+      is_active: newStatus,
+    })
+    .eq("id", service.id)
+    .eq("business_id", businessId);
+
+  if (error) {
+    console.error("Toggle service status error:", error);
+
+    showToast(
+      lang === "es"
+        ? "No se pudo actualizar el estado del servicio."
+        : "Could not update service status."
+    );
+    return;
+  }
+
+  await loadDashboard();
+
+  showToast(
+    newStatus
+      ? lang === "es"
+        ? "Servicio activado."
+        : "Service activated."
+      : lang === "es"
+      ? "Servicio desactivado."
+      : "Service deactivated."
+  );
+}
+
+
+// MANUAL APPOINTMENT
+async function addAppointment() {
+  if (
+    !newAppointmentName ||
+    !newAppointmentPhone ||
+    !newAppointmentService ||
+    !newAppointmentDate ||
+    !newAppointmentTime
+  ) {
+    showToast(t[lang].missingAppointmentFields);
+    return;
+  }
+
+  setSavingAppointment(true);
+
+  try {
+    // --------------------------------------------------
+    // GENERIC BUSINESS SERVICE
+    // Barber businesses continue using free-text service
+    // --------------------------------------------------
+    let selectedService = null;
+    let serviceName = newAppointmentService;
+    let serviceDuration = null;
+    let servicePrice = null;
+    let effectiveProviderId = newAppointmentProviderId || null;
+
+    if (!isBarberBusiness) {
+      selectedService = services.find(
+        (service) => service.id === newAppointmentService
+      );
+
+      if (!selectedService) {
+        showToast(
+          lang === "es"
+            ? "Selecciona un servicio válido."
+            : "Select a valid service."
+        );
+        return;
+      }
+
+      serviceName = selectedService.name;
+      serviceDuration = selectedService.duration;
+      servicePrice = selectedService.price;
+
+      // If the service belongs to a specific provider,
+      // use that provider automatically.
+      if (selectedService.provider_id) {
+        effectiveProviderId = selectedService.provider_id;
+      }
+
+      if (!effectiveProviderId) {
+        showToast(
+          lang === "es"
+            ? "Selecciona un profesional."
+            : "Select a provider."
+        );
+        return;
+      }
+    }
+
+ // --------------------------------------------------
+// CHECK APPOINTMENT OVERLAP
+// --------------------------------------------------
+let query = supabase
+  .from("appointments")
+  .select("id, barber_id, provider_id, customer_name, time, duration")
+  .eq("business_id", businessId)
+  .eq("date", newAppointmentDate)
+  .eq("status", "confirmed");
+
+if (isBarberBusiness && newAppointmentBarberId) {
+  query = query.eq("barber_id", newAppointmentBarberId);
+}
+
+if (!isBarberBusiness && effectiveProviderId) {
+  query = query.eq("provider_id", effectiveProviderId);
+}
+
+const { data: existingAppointments, error: checkError } =
+  await query;
+
+if (checkError) {
+  console.error("Availability check error:", checkError);
+
+  showToast(
+    lang === "es"
+      ? "Error verificando disponibilidad"
+      : "Error checking availability"
+  );
+
+  return;
+}
+
+// Barber side keeps the old exact-start behavior.
+// Generic businesses use duration-based overlap checking.
+if (isBarberBusiness) {
+  const exactMatch = existingAppointments?.some(
+    (appointment) =>
+      appointment.time?.slice(0, 5) === newAppointmentTime
+  );
+
+  if (exactMatch) {
+    showToast(t[lang].appointmentExists);
+    return;
+  }
+} else {
+  const timeToMinutes = (timeValue) => {
+    const [hours, minutes] = timeValue.slice(0, 5).split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const newStart = timeToMinutes(newAppointmentTime);
+  const newEnd = newStart + Number(serviceDuration);
+
+  const hasOverlap = existingAppointments?.some((appointment) => {
+    const existingStart = timeToMinutes(appointment.time);
+
+    const existingDuration =
+      Number(appointment.duration) > 0
+        ? Number(appointment.duration)
+        : 30;
+
+    const existingEnd = existingStart + existingDuration;
+
+    return newStart < existingEnd && newEnd > existingStart;
+  });
+
+  if (hasOverlap) {
+    showToast(
+      lang === "es"
+        ? "Ese horario se cruza con otra cita."
+        : "That time overlaps with another appointment."
+    );
+    return;
+  }
+}
+    // --------------------------------------------------
+    // APPOINTMENT DATA
+    // --------------------------------------------------
+    const appointmentData = {
+      business_id: businessId,
+
+      barber_id: isBarberBusiness
+        ? newAppointmentBarberId || null
+        : null,
+
+      provider_id: !isBarberBusiness
+        ? effectiveProviderId
+        : null,
+
+      service: serviceName,
+      date: newAppointmentDate,
+      time: newAppointmentTime,
+      customer_name: newAppointmentName,
+      customer_phone: newAppointmentPhone,
+      customer_email: newAppointmentEmail || null,
+      status: "confirmed",
+      lang: lang,
+      whatsapp_reminder_sent: false,
+    };
+
+    // Only generic businesses use business_services here.
+    // This leaves the barber appointment behavior unchanged.
+    if (!isBarberBusiness) {
+      appointmentData.duration = serviceDuration;
+      appointmentData.price = servicePrice;
+    }
+
+    const { error } = await supabase
+      .from("appointments")
+      .insert(appointmentData);
+
+    if (error) {
+      console.error("Add appointment error:", error);
+
+      showToast(
+        lang === "es"
+          ? "Error creando la cita"
+          : "Error creating appointment"
+      );
+
+      return;
+    }
+
+    // Clear form
+    setNewAppointmentName("");
+    setNewAppointmentPhone("");
+    setNewAppointmentEmail("");
+    setNewAppointmentService("");
+    setNewAppointmentDate("");
+    setNewAppointmentTime("");
+    setNewAppointmentBarberId("");
+    setNewAppointmentProviderId("");
+
+    await loadDashboard();
+
+    showToast(t[lang].appointmentAdded);
+  } finally {
+    setSavingAppointment(false);
+  }
+}
+
+async function deleteBarber(id) {    
+if (!confirm("Delete this barber?")) return;
 
     await supabase.from("barbers").delete().eq("id", id);
     loadDashboard();
@@ -221,8 +1155,12 @@ export default function BusinessDashboard() {
   }
 
   const barberMap = Object.fromEntries(
-    barbers.map((b) => [b.id, b.name])
-  );
+  barbers.map((b) => [b.id, b.name])
+);
+
+const providerMap = Object.fromEntries(
+  providers.map((p) => [p.id, p.name])
+);
 
   const today = new Date().toISOString().split("T")[0];
   const todaysAppointments = appointments.filter((a) => a.date === today);
@@ -230,7 +1168,6 @@ export default function BusinessDashboard() {
   function getDaysInMonth(date) {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   }
-
   async function loadAppointmentsForDate(dateStr) {
     const { data } = await supabase
       .from("appointments")
@@ -249,15 +1186,19 @@ export default function BusinessDashboard() {
     setSelectedDate(null);
     setSelectedAppointments([]);
   }
-/* ⭐ FILTER + GROUP + PAGINATION LOGIC ⭐ */
 
-const APPOINTMENTS_PER_PAGE = 20;
+  /* ⭐ FILTER + GROUP + PAGINATION LOGIC ⭐ */
+
+  const APPOINTMENTS_PER_PAGE = 20;
 
 // FILTER APPOINTMENTS
 const filteredAppointments = appointments.filter((a) => {
-  // filter by barber
-  if (filterBarberId !== "all" && a.barber_id !== filterBarberId) return false;
-
+  
+// filter by barber / provider
+if (filterBarberId !== "all") {
+  if (isBarberBusiness && a.barber_id !== filterBarberId) return false;
+  if (!isBarberBusiness && a.provider_id !== filterBarberId) return false;
+}
   // filter by exact date
   if (filterDate && a.date !== filterDate) return false;
 
@@ -270,20 +1211,26 @@ const filteredAppointments = appointments.filter((a) => {
   return true;
 });
 
-// GROUP BY BARBER
+// GROUP BY BARBER / PROVIDER
 const groupedByBarber = {};
+
 filteredAppointments.forEach((a) => {
-  if (!groupedByBarber[a.barber_id]) {
-    groupedByBarber[a.barber_id] = [];
+  const personId = isBarberBusiness
+    ? a.barber_id
+    : a.provider_id;
+
+  if (!groupedByBarber[personId]) {
+    groupedByBarber[personId] = [];
   }
-  groupedByBarber[a.barber_id].push(a);
+
+  groupedByBarber[personId].push(a);
 });
 
 // COLLAPSE TOGGLE
 const toggleBarberOpen = (barberId) => {
   setOpenBarbers((prev) => ({
     ...prev,
-    [barberId]: !prev[barberId],
+    [barberId]: !(prev[barberId] ?? true),
   }));
 };
 
@@ -296,20 +1243,23 @@ const changeBarberPage = (barberId, newPage) => {
 };
 
 
-  if (checkingKey) {
-    return <p className="p-6 text-center">Checking access…</p>;
-  }
+ if (checkingAuth) {
+  return <p className="p-6 text-center">Checking access…</p>;
+}
 
-  if (!accessGranted) {
-    return (
-      <div className="max-w-md mx-auto p-6 text-center">
-        <h1 className="text-2xl font-bold mb-4 text-red-600">Access Denied</h1>
-        <p className="text-gray-600">
-          Invalid or missing access key.
-        </p>
-      </div>
-    );
-  }
+if (!accessGranted) {
+  return (
+    <div className="max-w-md mx-auto p-6 text-center">
+      <h1 className="text-2xl font-bold mb-4 text-red-600">
+        Access Denied
+      </h1>
+
+      <p className="text-gray-600">
+        You do not have permission to access this business.
+      </p>
+    </div>
+  );
+}
 
   if (loading) return <p className="p-6">Loading...</p>;
   return (
@@ -347,480 +1297,304 @@ const changeBarberPage = (barberId, newPage) => {
 <section className="mb-12">
   <h2 className="text-2xl font-semibold mb-3">{t[lang].businessInfo}</h2>
 
-  <div className="bg-white p-4 rounded-xl shadow space-y-3 border">
-    <p><strong>Name:</strong> {business?.name}</p>
-    <p><strong>Phone:</strong> {business?.phone}</p>
-    <p><strong>Address:</strong> {business?.address}</p>
-  </div>
-</section>
+<div className="bg-white p-4 rounded-xl shadow space-y-4 border">
+  <p><strong>Name:</strong> {business?.name}</p>
+  <p><strong>Phone:</strong> {business?.phone}</p>
+  <p><strong>Address:</strong> {business?.address}</p>
 
-{/* ⭐ BUSINESS QR CODE — PASTE HERE */}
-<section className="mb-12">
-  <h2 className="text-2xl font-semibold mb-3">{t[lang].qrCode}</h2>
-
-  <div className="bg-white p-4 rounded-xl shadow inline-block">
-    <img
-      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-        `https://www.flowpaydr.com/select-barber/${businessId}`
-      )}`}
-      alt="Business QR Code"
-      className="w-40 h-40 mx-auto mb-3"
-    />
-
-    <p className="text-gray-600 mb-2 text-center">
-      {lang === "es"
-        ? "Comparte este QR para que los clientes elijan un barbero."
-        : "Share this QR so clients can select a barber."}
-    </p>
-
-    <p className="text-gray-400 text-xs mb-3 text-center">
-      {lang === "es"
-        ? "Mantén presionada la imagen 3 segundos para copiar, guardar o compartir."
-        : "Hold the image for 3 seconds to copy, save, or share."}
-    </p>
-
-    <button
-      onClick={() => {
-        const link = document.createElement("a");
-        link.href = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-          `https://www.flowpaydr.com/select-barber/${businessId}`
-        )}`;
-        link.download = `business-${businessId}-qr.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }}
-      className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm mx-auto block"
-    >
-      {lang === "es" ? "Descargar QR" : "Download QR"}
-    </button>
-  </div>
-</section>
-
-{/* BARBERS */}
-<section className="mb-12">
-  <h2 className="text-2xl font-semibold mb-3">{t[lang].barbers}</h2>
-
-  {/* ADD BARBER */}
-  <div className="space-y-4 bg-white p-4 rounded-xl shadow">
-
-    {/* BASIC INFO */}
-    <div className="grid grid-cols-3 gap-2">
-      <input
-        className="border p-2 rounded"
-        placeholder={t[lang].barberName}
-        value={newBarberName}
-        onChange={(e) => setNewBarberName(e.target.value)}
-      />
-
-      <input
-        className="border p-2 rounded"
-        placeholder={t[lang].barberEmail}
-        value={newBarberEmail}
-        onChange={(e) => setNewBarberEmail(e.target.value)}
-      />
-
-      <input
-        className="border p-2 rounded"
-        placeholder="PIN (4 digits)"
-        value={newBarberPin}
-        onChange={(e) => setNewBarberPin(e.target.value)}
-        maxLength={4}
-      />
-    </div>
-
-    {/* SERVICES */}
-<div>
-  <label className="block font-semibold mb-2">
-    {lang === "es" ? "Servicios" : "Services"}
-  </label>
-
-  <div className="grid grid-cols-2 gap-2 text-sm">
-    {serviceLabels[lang].map((service) => (
-      <label key={service} className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={newBarberServices.includes(service)}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setNewBarberServices([...newBarberServices, service]);
-            } else {
-              setNewBarberServices(
-                newBarberServices.filter((s) => s !== service)
-              );
-            }
-          }}
-        />
-        {service}
-      </label>
-    ))}
-  </div>
-</div>
-
-{/* WORK DAYS */}
-<div>
-  <label className="block font-semibold mb-2">
-    {lang === "es" ? "Días Laborales" : "Work Days"}
-  </label>
-
-  <div className="grid grid-cols-4 gap-2 text-sm">
-    {dayLabels[lang].map((day) => (
-      <label key={day} className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={newBarberDays.includes(day)}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setNewBarberDays([...newBarberDays, day]);
-            } else {
-              setNewBarberDays(
-                newBarberDays.filter((d) => d !== day)
-              );
-            }
-          }}
-        />
-        {day}
-      </label>
-    ))}
-  </div>
-</div>
-
-    {/* ADD BUTTON */}
-    <button
-      className="bg-green-600 text-white px-4 py-2 rounded mb-2"
-      onClick={addBarber}
-    >
-      {t[lang].addBarber}
-    </button>
-  </div>
-</section>
-
-       {/* BARBER LIST */}
-<section className="mb-12">
-  <div className="border rounded-xl p-4 bg-white shadow space-y-6">
-    {barbers.map((b) => {
-      const barberLink = `https://www.flowpaydr.com/booking/${b.id}`;
-
-      return (
-        <div key={b.id} className="border-b pb-4 last:border-none">
-          <div className="flex justify-between items-center">
-            <span className="font-semibold">{b.name} — {b.email}</span>
-
-            <button
-              className="text-red-600"
-              onClick={() => deleteBarber(b.id)}
-            >
-              {t[lang].delete}
-            </button>
-          </div>
-
-          {/* BOOKING LINK */}
-          <div className="mt-3">
-            <p className="text-sm font-medium">{t[lang].bookingLink}:</p>
-            <p className="text-blue-600 text-sm break-all">{barberLink}</p>
-
-            <button
-              className="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 active:scale-95 transition"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(barberLink);
-                  showToast(t[lang].copied);
-                } catch (err) {
-                  showToast("Copy failed");
-                }
-              }}
-            >
-              {t[lang].copyLink}
-            </button>
-          </div>
-
-          {/* QR CODE */}
-          <div className="mt-3">
-            <p className="text-sm font-medium">{t[lang].qrCode}:</p>
-            <div className="inline-block bg-white p-3 rounded-xl shadow">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                  barberLink
-                )}`}
-                alt="QR Code"
-                className="w-32 h-32"
-              />
-            </div>
-          </div>
-        </div>
-      );
-    })}
-  </div>
-</section>
-
-      {/* TODAY'S SCHEDULE */}
-      <section className="mb-12">
-        <h2 className="text-2xl font-semibold mb-3">{t[lang].todaysSchedule}</h2>
-
-        {todaysAppointments.length === 0 && (
-          <p>{t[lang].noAppointmentsToday}</p>
-        )}
-
-        <div className="border rounded-xl p-4 bg-white shadow">
-          {todaysAppointments.map((a) => (
-            <div key={a.id} className="border-b py-3 last:border-none">
-              <p>
-                <strong>{a.time}</strong> — {a.customer_name} ({a.service})
-              </p>
-              <p>Barber: {barberMap[a.barber_id] || "Unknown"}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CALENDAR */}
-      <section className="mb-12">
-        <h2 className="text-2xl font-semibold mb-3">{t[lang].calendarView}</h2>
-
-        <div className="flex justify-between mb-4">
-          <button
-            className="px-3 py-1 bg-gray-200 rounded"
-            onClick={() => changeMonth(-1)}
-          >
-            ← {t[lang].prev}
-          </button>
-
-          <h3 className="text-xl font-bold">
-            {selectedMonth.toLocaleString(
-              lang === "en" ? "en-US" : "es-DO",
-              { month: "long", year: "numeric" }
-            )}
-          </h3>
-
-          <button
-            className="px-3 py-1 bg-gray-200 rounded"
-            onClick={() => changeMonth(1)}
-          >
-            {t[lang].next} →
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-2 text-center">
-          {Array.from({ length: getDaysInMonth(selectedMonth) }, (_, i) => {
-            const day = i + 1;
-            const month = selectedMonth.getMonth() + 1;
-            const year = selectedMonth.getFullYear();
-
-            const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(
-              day
-            ).padStart(2, "0")}`;
-
-            const count = appointments.filter(
-              (a) => a.date === dateStr
-            ).length;
-
-            return (
-              <div
-                key={day}
-                className={`
-                  p-3 border rounded-xl shadow cursor-pointer transition
-                  ${selectedDate === dateStr ? "bg-blue-200 border-blue-600" : ""}
-                  ${count > 0 ? "bg-green-100 border-green-500" : "bg-white"}
-                `}
-                onClick={() => {
-                  setSelectedDate(dateStr);
-                  loadAppointmentsForDate(dateStr);
-                }}
-              >
-                <strong>{day}</strong>
-                {count > 0 && (
-                  <p className="text-xs text-green-700 font-semibold">
-                    {count} {t[lang].appointments}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {selectedDate && (
-          <div className="mt-6 border rounded-xl p-4 bg-white shadow">
-            <h3 className="text-xl font-semibold mb-3">
-              Appointments for {selectedDate}
-            </h3>
-
-            {selectedAppointments.length === 0 && (
-              <p>No appointments for this day.</p>
-            )}
-
-            {selectedAppointments.map((a) => (
-              <div key={a.id} className="border-b py-3 last:border-none">
-                <p>
-                  <strong>{a.time}</strong> — {a.customer_name} ({a.service})
-                </p>
-                <p>Barber: {barberMap[a.barber_id] || "Unknown"}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* CUSTOMERS */}
-      <section className="mb-12">
-        <h2 className="text-2xl font-semibold mb-3">{t[lang].customerList}</h2>
-
-        <div className="border rounded-xl p-4 bg-white shadow">
-          {customers.map((c, i) => (
-            <div key={i} className="border-b py-3 last:border-none">
-              <p><strong>{c.name}</strong></p>
-              <p>{c.email} — {c.phone}</p>
-              <p>
-                {c.count} {t[lang].appointments} — {t[lang].last}: {c.last}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-     {/* ALL APPOINTMENTS */}
-<section className="mb-12">
-  <h2 className="text-2xl font-semibold mb-3">{t[lang].allAppointments}</h2>
-
-  {/* FILTER BAR */}
-  <div className="mb-4 flex flex-wrap gap-3 items-center">
-
-    {/* Barber Filter */}
-    <div>
-      <label className="block text-sm font-medium mb-1">
-        {lang === "es" ? "Barbero" : "Barber"}
-      </label>
-      <select
-        className="border rounded px-2 py-1 text-sm"
-        value={filterBarberId}
-        onChange={(e) => setFilterBarberId(e.target.value)}
-      >
-        <option value="all">{lang === "es" ? "Todos" : "All"}</option>
-        {Object.entries(barberMap).map(([id, name]) => (
-          <option key={id} value={id}>{name}</option>
-        ))}
-      </select>
-    </div>
-
-    {/* Date Filter */}
-    <div>
-      <label className="block text-sm font-medium mb-1">
-        {lang === "es" ? "Fecha" : "Date"}
-      </label>
-      <input
-        type="date"
-        className="border rounded px-2 py-1 text-sm"
-        value={filterDate}
-        onChange={(e) => setFilterDate(e.target.value)}
-      />
-    </div>
-
-    {/* Month Filter */}
-    <div>
-      <label className="block text-sm font-medium mb-1">
-        {lang === "es" ? "Mes" : "Month"}
-      </label>
-      <select
-        className="border rounded px-2 py-1 text-sm"
-        value={filterMonth}
-        onChange={(e) => setFilterMonth(e.target.value)}
-      >
-        <option value="all">{lang === "es" ? "Todos" : "All"}</option>
-        {Array.from(new Set(appointments.map(a => a.date.slice(0, 7))))
-          .sort()
-          .map(monthStr => (
-            <option key={monthStr} value={monthStr}>{monthStr}</option>
-          ))}
-      </select>
-    </div>
-  </div>
-
-  {/* GROUPED + PAGINATED BY BARBER */}
-  <div className="border rounded-xl p-4 bg-white shadow space-y-4">
-    {Object.entries(groupedByBarber).length === 0 && (
-      <p className="text-sm text-gray-500">
-        {lang === "es" ? "No hay citas con estos filtros." : "No appointments with these filters."}
+  {!isBarberBusiness && (
+    <div className="pt-3 border-t">
+      <p className="font-semibold mb-3">
+        {lang === "es" ? "Foto del negocio" : "Business Photo"}
       </p>
-    )}
 
-    {Object.entries(groupedByBarber).map(([barberId, list]) => {
-      const barberName = barberMap[barberId] || "Unknown";
-      const total = list.length;
-      const currentPage = pageByBarber[barberId] || 0;
-      const totalPages = Math.max(1, Math.ceil(total / APPOINTMENTS_PER_PAGE));
+      {(businessPhotoPreview || business?.photo_url) && (
+        <img
+          src={businessPhotoPreview || business.photo_url}
+          alt={business?.name || "Business"}
+          className="w-40 h-40 object-cover rounded-lg border mb-3"
+        />
+      )}
 
-      const start = currentPage * APPOINTMENTS_PER_PAGE;
-      const end = start + APPOINTMENTS_PER_PAGE;
-      const pageItems = list.slice(start, end);
+      <label
+        className={`inline-flex items-center gap-2 px-4 py-2 rounded cursor-pointer ${
+          uploadingBusinessPhoto
+            ? "bg-gray-300 text-gray-600"
+            : "bg-blue-600 text-white"
+        }`}
+      >
+        📸{" "}
+        {uploadingBusinessPhoto
+          ? lang === "es"
+            ? "Subiendo..."
+            : "Uploading..."
+          : business?.photo_url
+          ? lang === "es"
+            ? "Cambiar Foto"
+            : "Change Photo"
+          : lang === "es"
+          ? "Subir Foto"
+          : "Upload Photo"}
 
-      const isOpen = openBarbers[barberId] ?? true;
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={uploadingBusinessPhoto}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
 
-      return (
-        <div key={barberId} className="border rounded-lg p-3 bg-gray-50 space-y-2">
+            if (file) {
+              uploadBusinessPhoto(file);
+            }
 
-          {/* HEADER */}
-          <div
-            className="flex justify-between items-center cursor-pointer"
-            onClick={() => toggleBarberOpen(barberId)}
-          >
-            <div>
-              <p className="font-semibold">
-                {lang === "es" ? "Barbero: " : "Barber: "}
-                {barberName}
-              </p>
-              <p className="text-xs text-gray-500">
-                {total} {lang === "es" ? "citas" : "appointments"}
-              </p>
-            </div>
-
-            <span className="text-sm text-blue-600">
-              {isOpen ? (lang === "es" ? "Cerrar" : "Collapse") : (lang === "es" ? "Abrir" : "Expand")}
-            </span>
-          </div>
-
-          {/* BODY */}
-          {isOpen && (
-            <div className="space-y-2 mt-2">
-
-              {/* APPOINTMENTS */}
-              {pageItems.map((a) => (
-                <div key={a.id} className="border-b py-2 last:border-none text-sm">
-                  <p><strong>{a.date}</strong> — <strong>{a.time}</strong></p>
-                  <p>{a.customer_name} — {a.service}</p>
-                </div>
-              ))}
-
-              {/* PAGINATION */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-end gap-2 mt-2 text-xs">
-                  <button
-                    className="px-2 py-1 border rounded disabled:opacity-40"
-                    disabled={currentPage === 0}
-                    onClick={() => changeBarberPage(barberId, currentPage - 1)}
-                  >
-                    {lang === "es" ? "Anterior" : "Prev"}
-                  </button>
-
-                  <span>
-                    {lang === "es" ? "Página" : "Page"} {currentPage + 1} / {totalPages}
-                  </span>
-
-                  <button
-                    className="px-2 py-1 border rounded disabled:opacity-40"
-                    disabled={currentPage >= totalPages - 1}
-                    onClick={() => changeBarberPage(barberId, currentPage + 1)}
-                  >
-                    {lang === "es" ? "Siguiente" : "Next"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    })}
-  </div>
+            e.target.value = "";
+          }}
+        />
+      </label>
+    </div>
+  )}
+</div>  
 </section>
 
+{/* ADD APPOINTMENT */}
+<ManualAppointment
+  t={t}
+  lang={lang}
+  isBarberBusiness={isBarberBusiness}
+
+  newAppointmentName={newAppointmentName}
+  setNewAppointmentName={setNewAppointmentName}
+  newAppointmentPhone={newAppointmentPhone}
+  setNewAppointmentPhone={setNewAppointmentPhone}
+  newAppointmentEmail={newAppointmentEmail}
+  setNewAppointmentEmail={setNewAppointmentEmail}
+  newAppointmentService={newAppointmentService}
+  setNewAppointmentService={setNewAppointmentService}
+  newAppointmentDate={newAppointmentDate}
+  setNewAppointmentDate={setNewAppointmentDate}
+  newAppointmentTime={newAppointmentTime}
+  setNewAppointmentTime={setNewAppointmentTime}
+
+  newAppointmentBarberId={newAppointmentBarberId}
+  setNewAppointmentBarberId={setNewAppointmentBarberId}
+  newAppointmentProviderId={newAppointmentProviderId}
+  setNewAppointmentProviderId={setNewAppointmentProviderId}
+
+  barbers={barbers}
+  providers={providers}
+  services={services}
+
+  addAppointment={addAppointment}
+  savingAppointment={savingAppointment}
+/>
+{/* BUSINESS QR CODE */}
+<BusinessQRCode
+  t={t}
+  lang={lang}
+  businessId={businessId}
+/>
+{/* BARBERS */}
+{isBarberBusiness && (
+  <BarberManagement
+    t={t}
+    lang={lang}
+    newBarberName={newBarberName}
+    setNewBarberName={setNewBarberName}
+    newBarberEmail={newBarberEmail}
+    setNewBarberEmail={setNewBarberEmail}
+    newBarberPin={newBarberPin}
+    setNewBarberPin={setNewBarberPin}
+    newBarberServices={newBarberServices}
+    setNewBarberServices={setNewBarberServices}
+    newBarberDays={newBarberDays}
+    setNewBarberDays={setNewBarberDays}
+    serviceLabels={serviceLabels}
+    dayLabels={dayLabels}
+    addBarber={addBarber}
+    barbers={barbers}
+    deleteBarber={deleteBarber}
+    showToast={showToast}
+  />
+)}
+{/* PROVIDERS */}
+{!isBarberBusiness && (
+  <section className="mb-12">
+    <h2 className="text-2xl font-semibold mb-3">
+      {lang === "es" ? "Profesionales" : "Providers"}
+    </h2>
+
+    {/* ADD PROVIDER */}
+    <div className="space-y-4 bg-white p-4 rounded-xl shadow">
+
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          className="border p-2 rounded"
+          placeholder={lang === "es" ? "Nombre del profesional" : "Provider name"}
+          value={newProviderName}
+          onChange={(e) => setNewProviderName(e.target.value)}
+        />
+
+        <input
+          className="border p-2 rounded"
+          placeholder={lang === "es" ? "Especialidad" : "Specialty"}
+          value={newProviderSpecialty}
+          onChange={(e) => setNewProviderSpecialty(e.target.value)}
+        />
+
+        <input
+          className="border p-2 rounded"
+          placeholder={lang === "es" ? "Correo electrónico" : "Email"}
+          value={newProviderEmail}
+          onChange={(e) => setNewProviderEmail(e.target.value)}
+        />
+
+        <input
+          className="border p-2 rounded"
+          placeholder={lang === "es" ? "Teléfono" : "Phone"}
+          value={newProviderPhone}
+          onChange={(e) => setNewProviderPhone(e.target.value)}
+        />
+      </div>
+
+      <button
+        className="bg-green-600 text-white px-4 py-2 rounded mb-2"
+        onClick={addProvider}
+      >
+        {lang === "es" ? "Agregar Profesional" : "Add Provider"}
+      </button>
+    </div>
+
+    <ProviderList
+  providers={providers}
+  lang={lang}
+
+  editingProviderId={editingProviderId}
+  editProviderName={editProviderName}
+  setEditProviderName={setEditProviderName}
+  editProviderEmail={editProviderEmail}
+  setEditProviderEmail={setEditProviderEmail}
+  editProviderPhone={editProviderPhone}
+  setEditProviderPhone={setEditProviderPhone}
+  editProviderSpecialty={editProviderSpecialty}
+  setEditProviderSpecialty={setEditProviderSpecialty}
+
+  savingEditProvider={savingEditProvider}
+
+  startEditProvider={startEditProvider}
+  cancelEditProvider={cancelEditProvider}
+  updateProvider={updateProvider}
+  deleteProvider={deleteProvider}
+/>
+    {/* PROVIDER AVAILABILITY */}
+<ProviderAvailability
+  lang={lang}
+  providers={providers}
+
+  selectedAvailabilityProviderId={selectedAvailabilityProviderId}
+  setSelectedAvailabilityProviderId={setSelectedAvailabilityProviderId}
+
+  providerAvailability={providerAvailability}
+  setProviderAvailability={setProviderAvailability}
+
+  loadProviderAvailability={loadProviderAvailability}
+  saveProviderAvailability={saveProviderAvailability}
+  savingProviderAvailability={savingProviderAvailability}
+/>
+  </section>
+)}
+
+{/* BUSINESS SERVICES */}
+{!isBarberBusiness && (
+  <BusinessServices
+    lang={lang}
+    services={services}
+    providers={providers}
+
+    newServiceName={newServiceName}
+    setNewServiceName={setNewServiceName}
+    newServiceDescription={newServiceDescription}
+    setNewServiceDescription={setNewServiceDescription}
+    newServicePrice={newServicePrice}
+    setNewServicePrice={setNewServicePrice}
+    newServiceDuration={newServiceDuration}
+    setNewServiceDuration={setNewServiceDuration}
+    newServiceProviderId={newServiceProviderId}
+    setNewServiceProviderId={setNewServiceProviderId}
+    savingService={savingService}
+    addService={addService}
+
+    editingServiceId={editingServiceId}
+    editServiceName={editServiceName}
+    setEditServiceName={setEditServiceName}
+    editServiceDescription={editServiceDescription}
+    setEditServiceDescription={setEditServiceDescription}
+    editServicePrice={editServicePrice}
+    setEditServicePrice={setEditServicePrice}
+    editServiceDuration={editServiceDuration}
+    setEditServiceDuration={setEditServiceDuration}
+    editServiceProviderId={editServiceProviderId}
+    setEditServiceProviderId={setEditServiceProviderId}
+    savingEditService={savingEditService}
+
+    startEditService={startEditService}
+    cancelEditService={cancelEditService}
+    updateService={updateService}
+    toggleServiceActive={toggleServiceActive}
+  />
+)}
+{/* TODAY'S SCHEDULE */}
+<TodaysSchedule
+  t={t}
+  lang={lang}
+  todaysAppointments={todaysAppointments}
+  isBarberBusiness={isBarberBusiness}
+  barberMap={barberMap}
+  providerMap={providerMap}
+/>
+      {/* CALENDAR */}
+<CalendarView
+  t={t}
+  lang={lang}
+  selectedMonth={selectedMonth}
+  selectedDate={selectedDate}
+  selectedAppointments={selectedAppointments}
+  appointments={appointments}
+  isBarberBusiness={isBarberBusiness}
+  barberMap={barberMap}
+  providerMap={providerMap}
+  getDaysInMonth={getDaysInMonth}
+  changeMonth={changeMonth}
+  setSelectedDate={setSelectedDate}
+  loadAppointmentsForDate={loadAppointmentsForDate}
+/>
+      {/* CUSTOMERS */}
+<CustomerList
+  t={t}
+  lang={lang}
+  customers={customers}
+/>
+     {/* ALL APPOINTMENTS */}
+<AllAppointments
+  t={t}
+  lang={lang}
+  isBarberBusiness={isBarberBusiness}
+  filterBarberId={filterBarberId}
+  setFilterBarberId={setFilterBarberId}
+  filterDate={filterDate}
+  setFilterDate={setFilterDate}
+  filterMonth={filterMonth}
+  setFilterMonth={setFilterMonth}
+  appointments={appointments}
+  barberMap={barberMap}
+  providerMap={providerMap}
+  groupedByBarber={groupedByBarber}
+  pageByBarber={pageByBarber}
+  openBarbers={openBarbers}
+  APPOINTMENTS_PER_PAGE={APPOINTMENTS_PER_PAGE}
+  toggleBarberOpen={toggleBarberOpen}
+  changeBarberPage={changeBarberPage}
+/>
       {/* ANIMATION */}
       <style jsx>{`
         @keyframes fadeIn {
@@ -835,4 +1609,7 @@ const changeBarberPage = (barberId, newPage) => {
     </div>
   );
 }
+
+ 
+
 

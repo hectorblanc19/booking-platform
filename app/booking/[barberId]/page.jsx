@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -98,14 +97,30 @@ export default function BookingPage() {
   const { barberId } = useParams();
 console.log("barberId:", barberId);
 
-  // ⭐ Auto-detect language from browser
-const [lang, setLang] = useState(
-  typeof navigator !== "undefined" &&
-  navigator.language.toLowerCase().startsWith("es")
-    ? "es"
-    : "en"
-);
+ // ⭐ Language from URL first, browser fallback
+const [lang, setLang] = useState("es");
 
+useEffect(() => {
+  const params = new URLSearchParams(
+    window.location.search
+  );
+
+  const urlLang = params.get("lang");
+
+  if (urlLang === "es" || urlLang === "en") {
+    setLang(urlLang);
+    return;
+  }
+
+  const browserLang =
+    navigator.language
+      ?.toLowerCase()
+      .startsWith("es")
+      ? "es"
+      : "en";
+
+  setLang(browserLang);
+}, []);
 const tr = t[lang];
 
 const [barber, setBarber] = useState(null);
@@ -408,7 +423,7 @@ setLoadingTimes(false);
   }),
 });
    setTimeout(() => {
-  window.location.href = `/customer/${secret}`;
+  window.location.href = `/customer/${secret}?lang=${lang}`;
 }, 300);
 }
   if (loading) return <p className="p-6">Loading...</p>;

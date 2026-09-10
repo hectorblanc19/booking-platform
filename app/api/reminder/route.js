@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
@@ -223,38 +224,61 @@ export async function GET(req) {
       try {
         const apptTime = appt.time;
 
-        // --------------------------------------------------
-        // BARBER
-        // --------------------------------------------------
+ // --------------------------------------------------
+// BARBER / PROVIDER
+// --------------------------------------------------
 
-        const { data: barber } = await supabase
-          .from("barbers")
-          .select("name")
-          .eq("id", appt.barber_id)
-          .single();
+let professionalName = "";
+let isProviderAppointment = false;
 
-        const barberName =
-          barber?.name || "your barber";
+if (appt.provider_id) {
+  isProviderAppointment = true;
 
-        // --------------------------------------------------
-        // LANGUAGE
-        // --------------------------------------------------
+  const { data: provider } = await supabase
+    .from("providers")
+    .select("name")
+    .eq("id", appt.provider_id)
+    .maybeSingle();
 
-        const isSpanish =
-          appt.lang?.toUpperCase() === "ES";
+  professionalName =
+    provider?.name || "your professional";
+} else if (appt.barber_id) {
+  const { data: barber } = await supabase
+    .from("barbers")
+    .select("name")
+    .eq("id", appt.barber_id)
+    .maybeSingle();
 
-        const msgEN =
-          `You have an appointment today at ${apptTime} with barber ${barberName}.`;
+  professionalName =
+    barber?.name || "your barber";
+} else {
+  professionalName = "your professional";
+}
 
-        const msgES =
-          `Tienes una cita hoy a las ${apptTime} con el barbero ${barberName}.`;
+// --------------------------------------------------
+// LANGUAGE
+// --------------------------------------------------
 
-        const finalMessage =
-          isSpanish ? msgES : msgEN;
+const isSpanish =
+  appt.lang?.toUpperCase() === "ES";
 
-        const subject = isSpanish
-          ? `Recordatorio de Cita (${apptTime})`
-          : `Appointment Reminder (${apptTime})`;
+const formattedTime =
+  formatWhatsAppTime(apptTime);
+
+const msgEN = isProviderAppointment
+  ? `You have an appointment today at ${formattedTime} with ${professionalName}.`
+  : `You have an appointment today at ${formattedTime} with barber ${professionalName}.`;
+
+const msgES = isProviderAppointment
+  ? `Tienes una cita hoy a las ${formattedTime} con ${professionalName}.`
+  : `Tienes una cita hoy a las ${formattedTime} con el barbero ${professionalName}.`;
+
+const finalMessage =
+  isSpanish ? msgES : msgEN;
+
+const subject = isSpanish
+  ? `Recordatorio de Cita (${formattedTime})`
+  : `Appointment Reminder (${formattedTime})`;
 
         // --------------------------------------------------
         // EMAIL
@@ -511,54 +535,70 @@ export async function GET(req) {
         continue;
       }
 
-      // --------------------------------------------------
-      // BARBER
-      // --------------------------------------------------
+ // --------------------------------------------------
+// BARBER / PROVIDER
+// --------------------------------------------------
 
-      const { data: barber } =
-        await supabase
-          .from("barbers")
-          .select("name")
-          .eq("id", appt.barber_id)
-          .single();
+let professionalName = "";
 
-      const barberName =
-        barber?.name || "your barber";
+if (appt.provider_id) {
+  const { data: provider } =
+    await supabase
+      .from("providers")
+      .select("name")
+      .eq("id", appt.provider_id)
+      .maybeSingle();
 
-      // --------------------------------------------------
-      // LANGUAGE
-      // --------------------------------------------------
+  professionalName =
+    provider?.name || "your professional";
+} else if (appt.barber_id) {
+  const { data: barber } =
+    await supabase
+      .from("barbers")
+      .select("name")
+      .eq("id", appt.barber_id)
+      .maybeSingle();
 
-      const isSpanish =
-        appt.lang?.toUpperCase() === "ES";
+  professionalName =
+    barber?.name || "your barber";
+} else {
+  professionalName =
+    "your professional";
+}
 
-      const contentSid = isSpanish
-        ? WHATSAPP_TEMPLATE_ES
-        : WHATSAPP_TEMPLATE_EN;
+// --------------------------------------------------
+// LANGUAGE
+// --------------------------------------------------
 
-      // --------------------------------------------------
-      // TEMPLATE VARIABLES
-      // --------------------------------------------------
+const isSpanish =
+  appt.lang?.toUpperCase() === "ES";
 
-      const variables = {
-        "1":
-          appt.customer_name ||
-          "Cliente",
+const contentSid = isSpanish
+  ? WHATSAPP_TEMPLATE_ES
+  : WHATSAPP_TEMPLATE_EN;
 
-        "2":
-          barberName,
+// --------------------------------------------------
+// TEMPLATE VARIABLES
+// --------------------------------------------------
 
-        "3":
-          formatWhatsAppDate(
-            tomorrowDate
-          ),
+const variables = {
+  "1":
+    appt.customer_name ||
+    "Cliente",
 
-        "4":
-          formatWhatsAppTime(
-            appt.time
-          ),
-      };
+  "2":
+    professionalName,
 
+  "3":
+    formatWhatsAppDate(
+      tomorrowDate
+    ),
+
+  "4":
+    formatWhatsAppTime(
+      appt.time
+    ),
+};
       // --------------------------------------------------
       // SEND APPROVED WHATSAPP TEMPLATE
       // --------------------------------------------------

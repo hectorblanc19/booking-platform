@@ -1,9 +1,9 @@
-const CACHE_VERSION = "flowpay-v26"; // increment on each deploy
+const CACHE_VERSION = "flowpay-v27"; // increment on each deploy
 const CACHE_NAME = CACHE_VERSION;
 
-// Files you actually want cached (NOT login or API)
+// Files you actually want cached
 const STATIC_ASSETS = [
-  "/", 
+  "/",
   "/icons/icon-192.png",
   "/icons/icon-512.png"
 ];
@@ -11,6 +11,7 @@ const STATIC_ASSETS = [
 // Install
 self.addEventListener("install", (event) => {
   self.skipWaiting(); // force update immediately
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
@@ -27,45 +28,54 @@ self.addEventListener("activate", (event) => {
       )
     )
   );
+
   self.clients.claim(); // take control immediately
 });
 
-// Fetch — NETWORK FIRST for login + API + SUPABASE
+// Fetch — cache ONLY true static assets.
+// Dynamic pages always use the network normally.
 self.addEventListener("fetch", (event) => {
-  const url = event.request.url;
+  const url = new URL(event.request.url);
 
-  // ⭐ NEVER cache Supabase REST or Realtime
-  if (url.includes("supabase.co")) {
-    return; // let browser handle normally
-  }
-
-  // ⭐ NEVER cache API routes
-  if (url.includes("/api/")) {
+  // Only handle GET requests
+  if (event.request.method !== "GET") {
     return;
   }
 
-  // ⭐ NEVER cache login pages
-  if (
-    url.includes("/barber/login") ||
-    url.includes("/nail/login")
-  ) {
+  // Never cache external requests such as Supabase
+  if (url.origin !== self.location.origin) {
     return;
   }
 
-  // ⭐ Only cache STATIC assets
+  // Only cache real static assets
+  const isStaticAsset =
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/_next/static/") ||
+    /\.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf)$/i.test(
+      url.pathname
+    );
+
+  // Booking pages, customer pages, dashboards, login pages,
+  // API routes, etc. are NOT handled by the service worker.
+  if (!isStaticAsset) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
+    caches.match(event.request).then(async (cached) => {
+      if (cached) {
+        return cached;
+      }
 
-      return fetch(event.request).then((response) => {
-        // Only cache GET requests for static files
-        if (event.request.method === "GET") {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, response.clone());
-          });
-        }
-        return response;
-      });
+      const response = await fetch(event.request);
+
+      if (response && response.ok) {
+        const responseToCache = response.clone();
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(event.request, responseToCache);
+      }
+
+      return response;
     })
   );
 });
@@ -73,6 +83,7 @@ self.addEventListener("fetch", (event) => {
 // Push notifications
 self.addEventListener("push", (event) => {
   const data = event.data ? event.data.json() : {};
+
   event.waitUntil(
     self.registration.showNotification(data.title || "FlowPayDR", {
       body: data.message || "",
@@ -87,6 +98,8 @@ self.addEventListener("push", (event) => {
 // Notification click
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
   const url = event.notification.data?.url || "/";
+
   event.waitUntil(clients.openWindow(url));
 });

@@ -8,7 +8,7 @@ export default async function MarketplacePage({ searchParams }) {
 
   const supabase = createClient();
 
-  // ⭐ Fetch barbers including lat/lng
+  // ⭐ Fetch active barbers
   const { data: barbers } = await supabase
     .from("barbers")
     .select(`
@@ -28,6 +28,34 @@ export default async function MarketplacePage({ searchParams }) {
     `)
     .eq("active", true);
 
-  // ⭐ Pass barbers + language to client component
-  return <MarketplaceClient barbers={barbers || []} lang={lang} />;
+ // ⭐ Fetch businesses
+const { data: businesses } = await supabase
+  .from("businesses")
+  .select(`
+    id,
+    name,
+    phone,
+    address,
+    map_url,
+    category,
+    featured,
+    photo_url
+  `);  
+
+  // ⭐ Add empty lat/lng values because businesses table
+  // does not currently have those columns
+  const marketplaceBusinesses = (businesses || []).map((business) => ({
+    ...business,
+    lat: null,
+    lng: null,
+  }));
+
+  // ⭐ Pass barbers + businesses + language to Marketplace
+  return (
+    <MarketplaceClient
+      barbers={barbers || []}
+      businesses={marketplaceBusinesses}
+      lang={lang}
+    />
+  );
 }

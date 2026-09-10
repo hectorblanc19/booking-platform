@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sendPushToSubscription } from "@/lib/push";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -26,11 +27,14 @@ function formatTime(timeStr) {
 
 // ⭐ SERVICE TRANSLATIONS
 const SERVICE_TRANSLATIONS = {
-  "Haircut": { en: "Haircut", es: "Corte" },
-  "Beard": { en: "Beard", es: "Barba" },
-  "Haircut + Beard": { en: "Haircut + Beard", es: "Corte + Barba" },
-  "Fade": { en: "Fade", es: "Degradado" },
-  "Other": { en: "Other", es: "Otro" }
+  Haircut: { en: "Haircut", es: "Corte" },
+  Beard: { en: "Beard", es: "Barba" },
+  "Haircut + Beard": {
+    en: "Haircut + Beard",
+    es: "Corte + Barba",
+  },
+  Fade: { en: "Fade", es: "Degradado" },
+  Other: { en: "Other", es: "Otro" },
 };
 
 export async function POST(req) {
@@ -40,6 +44,12 @@ export async function POST(req) {
     barber_email,
     barber_name,
     barber_id,
+
+    // ⭐ GENERIC PROVIDER SUPPORT
+    provider_email,
+    provider_name,
+    provider_id,
+
     customer_name,
     customer_phone,
     customer_email,
@@ -49,25 +59,73 @@ export async function POST(req) {
     notes,
     dashboard_link,
     lang = "en",
+
+    // ⭐ EMAIL TYPE
+    notification_type = "new",
   } = body;
 
-  if (!barber_email) {
-    return NextResponse.json({ error: "Missing barber email" });
+  // ⭐ DETERMINE IF THIS IS A PROVIDER OR BARBER
+  const isProvider = Boolean(provider_id);
+
+  // ⭐ NOTIFICATION TYPE
+  const isReschedule =
+    notification_type === "reschedule";
+
+  const isCancellation =
+    notification_type === "cancelled";
+
+  // ⭐ FINAL PROFESSIONAL INFORMATION
+  const professionalEmail = isProvider
+    ? provider_email
+    : barber_email;
+
+  const professionalName = isProvider
+    ? provider_name
+    : barber_name;
+
+  const professionalId = isProvider
+    ? provider_id
+    : barber_id;
+
+  if (!professionalEmail) {
+    return NextResponse.json({
+      error: isProvider
+        ? "Missing provider email"
+        : "Missing barber email",
+    });
   }
 
-  // ⭐ Determine language
+  // ⭐ DETERMINE LANGUAGE
   const langCode = lang === "es" ? "es" : "en";
 
-  // ⭐ Translate service
+  // ⭐ TRANSLATE SERVICE
   const translatedService =
-    SERVICE_TRANSLATIONS[service]?.[langCode] || service;
+    SERVICE_TRANSLATIONS[service]?.[langCode] ||
+    service;
 
-  // ⭐ TRANSLATIONS FOR THE REST OF THE EMAIL
+  // ⭐ EMAIL TRANSLATIONS
   const tr = {
     en: {
-      subject: "New Appointment Booked",
-      title: "💈 New Appointment",
-      intro: "You have a new appointment.",
+      subject: isCancellation
+        ? "Appointment Cancelled"
+        : isReschedule
+        ? "Appointment Rescheduled"
+        : "New Appointment Booked",
+
+      title: isCancellation
+        ? "❌ Appointment Cancelled"
+        : isReschedule
+        ? "🔄 Appointment Rescheduled"
+        : isProvider
+        ? "📅 New Appointment"
+        : "💈 New Appointment",
+
+      intro: isCancellation
+        ? "A customer has cancelled their appointment."
+        : isReschedule
+        ? "A customer has rescheduled their appointment."
+        : "You have a new appointment.",
+
       customerDetails: "Customer Details",
       name: "Name",
       phone: "Phone",
@@ -78,13 +136,33 @@ export async function POST(req) {
       time: "Time",
       notes: "Notes",
       none: "None",
-      manage: "Manage Appointments",
+      professional: isProvider
+        ? "Professional"
+        : "Barber",
       button: "Open Dashboard",
     },
+
     es: {
-      subject: "Nueva Cita Reservada",
-      title: "💈 Nueva Cita",
-      intro: "Tienes una nueva cita.",
+      subject: isCancellation
+        ? "Cita Cancelada"
+        : isReschedule
+        ? "Cita Reprogramada"
+        : "Nueva Cita Reservada",
+
+      title: isCancellation
+        ? "❌ Cita Cancelada"
+        : isReschedule
+        ? "🔄 Cita Reprogramada"
+        : isProvider
+        ? "📅 Nueva Cita"
+        : "💈 Nueva Cita",
+
+      intro: isCancellation
+        ? "Un cliente ha cancelado su cita."
+        : isReschedule
+        ? "Un cliente ha reprogramado su cita."
+        : "Tienes una nueva cita.",
+
       customerDetails: "Detalles del Cliente",
       name: "Nombre",
       phone: "Teléfono",
@@ -95,75 +173,180 @@ export async function POST(req) {
       time: "Hora",
       notes: "Notas",
       none: "Ninguna",
-      manage: "Gestionar Citas",
+      professional: isProvider
+        ? "Profesional"
+        : "Barbero",
       button: "Abrir Panel",
     },
   }[langCode];
 
-  // ⭐ SEND EMAIL TO BARBER
+  // ⭐ SEND EMAIL TO BARBER OR PROVIDER
   try {
     await resend.emails.send({
       from: "info@flowpaydr.com",
-      to: barber_email,
+      to: professionalEmail,
       subject: tr.subject,
+
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
           
-          <h2 style="text-align:center;">${tr.title}</h2>
-          <p style="text-align:center;">${tr.intro}</p>
+          <h2 style="text-align:center;">
+            ${tr.title}
+          </h2>
+
+          <p style="text-align:center;">
+            ${tr.intro}
+          </p>
+
+          <p style="text-align:center;">
+            <strong>${tr.professional}:</strong>
+            ${professionalName || "N/A"}
+          </p>
 
           <h3>${tr.customerDetails}</h3>
-          <p><strong>${tr.name}:</strong> ${customer_name}</p>
-          <p><strong>${tr.phone}:</strong> ${customer_phone}</p>
-          <p><strong>${tr.email}:</strong> ${customer_email}</p>
+
+          <p>
+            <strong>${tr.name}:</strong>
+            ${customer_name || "N/A"}
+          </p>
+
+          <p>
+            <strong>${tr.phone}:</strong>
+            ${customer_phone || "N/A"}
+          </p>
+
+          <p>
+            <strong>${tr.email}:</strong>
+            ${customer_email || "N/A"}
+          </p>
 
           <h3>${tr.apptDetails}</h3>
-          <p><strong>${tr.service}:</strong> ${translatedService}</p>
-          <p><strong>${tr.date}:</strong> ${date}</p>
-          <p><strong>${tr.time}:</strong> ${formatTime(time)}</p>
-          <p><strong>${tr.notes}:</strong> ${notes || tr.none}</p>
 
-          <div style="text-align:center; margin-top: 25px;">
-            <a href="${dashboard_link}" 
-              style="background:#2563eb; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:16px;">
-              ${tr.button}
-            </a>
-          </div>
+          <p>
+            <strong>${tr.service}:</strong>
+            ${translatedService}
+          </p>
+
+          <p>
+            <strong>${tr.date}:</strong>
+            ${date}
+          </p>
+
+          <p>
+            <strong>${tr.time}:</strong>
+            ${formatTime(time)}
+          </p>
+
+          <p>
+            <strong>${tr.notes}:</strong>
+            ${notes || tr.none}
+          </p>
+
+          ${
+            dashboard_link
+              ? `
+                <div style="text-align:center; margin-top:25px;">
+                  <a
+                    href="${dashboard_link}"
+                    style="background:#2563eb; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:16px;"
+                  >
+                    ${tr.button}
+                  </a>
+                </div>
+              `
+              : ""
+          }
 
           <p style="margin-top:30px; font-size:12px; text-align:center; color:#666;">
             FlowPayDR • info@flowpaydr.com
           </p>
+
         </div>
       `,
     });
+
+    console.log(
+      `📧 ${
+        isProvider ? "Provider" : "Barber"
+      } ${
+        isCancellation
+          ? "cancellation"
+          : isReschedule
+          ? "reschedule"
+          : "appointment"
+      } email sent to:`,
+      professionalEmail
+    );
   } catch (err) {
-    console.error("Barber email error:", err);
-    return NextResponse.json({ error: "Failed to send barber email" });
-  }
+    console.error(
+      `${
+        isProvider ? "Provider" : "Barber"
+      } email error:`,
+      err
+    );
 
- // ⭐ SEND PUSH NOTIFICATION TO BARBER (UPGRADED)
-try {
-  const { data: tokens } = await supabase
-    .from("push_tokens")
-    .select("subscription")
-    .eq("user_id", barber_id)
-    .eq("role", "barber");
-
-  if (!tokens || tokens.length === 0) {
-    console.log("ℹ️ No push tokens for barber:", barber_id);
-  }
-
-  for (const t of tokens || []) {
-    await sendPushToSubscription(t.subscription, {
-      title: "New Appointment",
-      message: `${customer_name} booked for ${date} at ${formatTime(time)}.`,
+    return NextResponse.json({
+      error: `Failed to send ${
+        isProvider ? "provider" : "barber"
+      } email`,
     });
   }
 
-  console.log("📲 Barber push notifications sent:", tokens?.length || 0);
-} catch (err) {
-  console.error("❌ Barber push error:", err);
-}
+  // ⭐ KEEP EXISTING BARBER PUSH NOTIFICATION
+  // Generic providers do not use barber push-token logic.
+  if (!isProvider && professionalId) {
+    try {
+      const { data: tokens } = await supabase
+        .from("push_tokens")
+        .select("subscription")
+        .eq("user_id", professionalId)
+        .eq("role", "barber");
 
-  return NextResponse.json({ success: true });
+      if (!tokens || tokens.length === 0) {
+        console.log(
+          "ℹ️ No push tokens for barber:",
+          professionalId
+        );
+      }
+
+      for (const t of tokens || []) {
+        await sendPushToSubscription(
+          t.subscription,
+          {
+            title: isCancellation
+              ? "Appointment Cancelled"
+              : isReschedule
+              ? "Appointment Rescheduled"
+              : "New Appointment",
+
+            message: isCancellation
+              ? `${customer_name} cancelled their appointment for ${date} at ${formatTime(
+                  time
+                )}.`
+              : isReschedule
+              ? `${customer_name} moved their appointment to ${date} at ${formatTime(
+                  time
+                )}.`
+              : `${customer_name} booked for ${date} at ${formatTime(
+                  time
+                )}.`,
+          }
+        );
+      }
+
+      console.log(
+        "📲 Barber push notifications sent:",
+        tokens?.length || 0
+      );
+    } catch (err) {
+      console.error(
+        "❌ Barber push error:",
+        err
+      );
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+  });
 }

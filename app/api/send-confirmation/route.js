@@ -36,17 +36,18 @@ export async function POST(req) {
   const body = await req.json();
 
   const {
-    customer_email,
-    customer_name,
-    service,
-    barber_id,
-    business_id,
-    date,
-    time,
-    secret_link,
-    lang = "en",
-    customer_id,
-  } = body;
+  customer_email,
+  customer_name,
+  service,
+  barber_id,
+  provider_id,
+  business_id,
+  date,
+  time,
+  secret_link,
+  lang = "en",
+  customer_id,
+} = body;
 
   if (!customer_email) {
     return NextResponse.json({ error: "Missing email" });
@@ -108,19 +109,50 @@ export async function POST(req) {
     businessInfo = data;
   }
 
-  // ⭐ FETCH BARBER INFO (always needed)
-  const { data: barberInfo } = await supabase
+  // ⭐ FETCH BARBER OR PROVIDER INFO
+let professionalInfo = null;
+let professionalType = "barber";
+
+if (provider_id) {
+  const { data } = await supabase
+    .from("providers")
+    .select("name, phone, specialty")
+    .eq("id", provider_id)
+    .single();
+
+  professionalInfo = data;
+  professionalType = "provider";
+} else if (barber_id) {
+  const { data } = await supabase
     .from("barbers")
     .select("name, address, phone")
     .eq("id", barber_id)
     .single();
 
-  // ⭐ Determine final values for independent vs business barbers
-  const finalBusinessName = businessInfo?.name || barberInfo.name;
-  const finalBusinessLabel = businessInfo?.name || "Independent Barber";
-  const finalAddress = businessInfo?.address || barberInfo.address || "N/A";
-  const finalPhone = businessInfo?.phone || barberInfo.phone || "N/A";
+  professionalInfo = data;
+}
 
+// ⭐ FINAL BUSINESS / PROFESSIONAL VALUES
+const finalBusinessName =
+  businessInfo?.name ||
+  professionalInfo?.name ||
+  "FlowPayDR";
+
+const finalBusinessLabel =
+  businessInfo?.name ||
+  (professionalType === "barber"
+    ? "Independent Barber"
+    : professionalInfo?.name || "Professional");
+
+const finalAddress =
+  businessInfo?.address ||
+  professionalInfo?.address ||
+  "N/A";
+
+const finalPhone =
+  businessInfo?.phone ||
+  professionalInfo?.phone ||
+  "N/A";
   // ⭐ Auto-generate Google Maps link
   const mapsLink =
     finalAddress !== "N/A"
@@ -141,7 +173,16 @@ export async function POST(req) {
 
           <h3>${tr.details}</h3>
           <p><strong>${tr.service}:</strong> ${translatedService}</p>
-          <p><strong>${tr.barber}:</strong> ${barberInfo?.name}</p>
+         <p>
+  <strong>
+    ${professionalType === "barber"
+      ? tr.barber
+      : langCode === "es"
+      ? "Profesional"
+      : "Professional"}:
+  </strong>
+  ${professionalInfo?.name || "N/A"}
+</p>
           <p><strong>${tr.business}:</strong> ${finalBusinessLabel}</p>
           <p><strong>${tr.address}:</strong> ${finalAddress}</p>
           <p><strong>${tr.phone}:</strong> ${finalPhone}</p>

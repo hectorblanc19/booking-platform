@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -12,38 +11,38 @@ export default function WelcomePage() {
   const [loading, setLoading] = useState(true);
 
   const t = {
-    es: {
-      brand: "FLOWPAYDR BOOKING",
-      title: "Selecciona dónde quieres reservar",
-      subtitle:
-        "Elige una barbería, barbero independiente o profesional para comenzar tu reserva.",
-      businesses: "Barberías y Negocios",
-      independent: "Barberos Independientes",
-      noBusinesses: "No hay negocios disponibles.",
-      noIndependent: "No hay barberos independientes disponibles.",
-      phone: "Teléfono",
-      days: "Días",
-      mapLink: "Ver ubicación en Google Maps",
-      noRatings: "Sin calificaciones",
-      back: "← Volver",
-      login: "Entrar al Panel",
-      select: "Seleccionar →",
-      book: "Reservar →",
-      loading: "Cargando...",
-      noAddress: "Sin dirección",
-    },
+  es: {
+    brand: "FLOWPAYDR BOOKING",
+    title: "Selecciona dónde quieres reservar",
+    subtitle:
+      "Elige un negocio o profesional para comenzar tu reserva.",
+    businesses: "Negocios y Profesionales",
+    independent: "Barberos Independientes",
+    noBusinesses: "No hay negocios disponibles.",
+    noIndependent: "No hay barberos independientes disponibles.",
+    phone: "Teléfono",
+    days: "Días",
+    mapLink: "Ver ubicación en Google Maps",
+    noRatings: "Sin calificaciones",
+    back: "← Volver",
+    login: "Entrar al Panel",
+    select: "Seleccionar →",
+    book: "Reservar →",
+    loading: "Cargando...",
+    noAddress: "Sin dirección",
+  },
 
-    en: {
-      brand: "FLOWPAYDR BOOKING",
-      title: "Select where you want to book",
-      subtitle:
-        "Choose a barbershop, independent barber or professional to start your booking.",
-      businesses: "Barbershops & Businesses",
-      independent: "Independent Barbers",
-      noBusinesses: "No businesses available.",
-      noIndependent: "No independent barbers available.",
-      phone: "Phone",
-      days: "Days",
+  en: {
+    brand: "FLOWPAYDR BOOKING",
+    title: "Select where you want to book",
+    subtitle:
+      "Choose a business or professional to start your booking.",
+    businesses: "Businesses & Professionals",
+    independent: "Independent Barbers",
+    noBusinesses: "No businesses available.",
+    noIndependent: "No independent barbers available.",
+    phone: "Phone",    
+   days: "Days",
       mapLink: "View location on Google Maps",
       noRatings: "No ratings yet",
       back: "← Back",
@@ -77,8 +76,8 @@ export default function WelcomePage() {
           await Promise.all([
             supabase
               .from("businesses")
-              .select("id, name, address, map_url")
-              .limit(4),
+              .select("id, name, address, map_url, category")
+              .limit(20),
 
             supabase
               .from("barbers")
@@ -94,6 +93,7 @@ export default function WelcomePage() {
         /*
          * Check for query errors.
          */
+
         if (businessResult.error) {
           console.error(
             "Error loading businesses:",
@@ -248,11 +248,9 @@ export default function WelcomePage() {
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-
       {/* HEADER */}
       <header className="bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
-
           <Link
             href="/"
             className="font-black tracking-tight text-lg"
@@ -264,7 +262,6 @@ export default function WelcomePage() {
           </Link>
 
           <div className="flex items-center gap-3">
-
             <Link
               href="/barber/login"
               className="hidden sm:block text-sm font-semibold text-gray-600 hover:text-black"
@@ -273,7 +270,6 @@ export default function WelcomePage() {
             </Link>
 
             <div className="flex items-center gap-1 border border-gray-200 rounded-full p-1 bg-gray-50">
-
               <button
                 type="button"
                 onClick={() => setLang("es")}
@@ -299,7 +295,6 @@ export default function WelcomePage() {
               >
                 EN
               </button>
-
             </div>
           </div>
         </div>
@@ -308,7 +303,6 @@ export default function WelcomePage() {
       {/* HERO */}
       <section className="px-6 pt-12 pb-10">
         <div className="max-w-4xl mx-auto text-center">
-
           <p className="text-sm font-bold tracking-[0.25em] text-gray-400 mb-4">
             {tr.brand}
           </p>
@@ -327,24 +321,20 @@ export default function WelcomePage() {
           >
             {tr.back}
           </Link>
-
         </div>
       </section>
 
       {/* MAIN CONTENT */}
       <section className="px-6 pb-16">
         <div className="max-w-5xl mx-auto">
-
           {loading ? (
             <div className="text-center py-16 text-gray-500">
               {tr.loading}
             </div>
           ) : (
             <>
-
               {/* BUSINESSES */}
               <div className="mb-14">
-
                 <h2 className="text-2xl font-black mb-6">
                   {tr.businesses}
                 </h2>
@@ -355,16 +345,30 @@ export default function WelcomePage() {
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
                     {businesses.map(function (business) {
+                      const normalizedCategory = (
+                        business.category || ""
+                      )
+                        .toLowerCase()
+                        .trim();
+
+                      const isBarberBusiness =
+                        normalizedCategory.includes("barber") ||
+                        normalizedCategory.includes("barbero") ||
+                        normalizedCategory.includes("barbería") ||
+                        normalizedCategory.includes("barberia");
+
+                      const bookingHref = isBarberBusiness
+                        ? `/select-barber/${business.id}`
+                        : `/business/${business.id}/booking`;
+
                       return (
                         <Link
                           key={business.id}
-                          href={"/select-barber/" + business.id}
+                          href={bookingHref}
                           className="block"
                         >
                           <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition">
-
                             <h3 className="text-xl font-bold">
                               {business.name}
                             </h3>
@@ -407,20 +411,16 @@ export default function WelcomePage() {
                             <div className="mt-5 text-sm font-bold text-black">
                               {tr.select}
                             </div>
-
                           </div>
                         </Link>
                       );
                     })}
-
                   </div>
                 )}
-
               </div>
 
               {/* INDEPENDENT BARBERS */}
               <div>
-
                 <h2 className="text-2xl font-black mb-6">
                   {tr.independent}
                 </h2>
@@ -431,9 +431,7 @@ export default function WelcomePage() {
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
                     {independentBarbers.map(function (barber) {
-
                       const displayDays = orderedDays
                         .filter(function (day) {
                           return (
@@ -453,7 +451,6 @@ export default function WelcomePage() {
                           className="block"
                         >
                           <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition">
-
                             <h3 className="text-xl font-bold">
                               {barber.name}
                             </h3>
@@ -485,20 +482,15 @@ export default function WelcomePage() {
                             <div className="mt-5 text-sm font-bold text-black">
                               {tr.book}
                             </div>
-
                           </div>
                         </Link>
                       );
                     })}
-
                   </div>
                 )}
-
               </div>
-
             </>
           )}
-
         </div>
       </section>
 
@@ -508,7 +500,6 @@ export default function WelcomePage() {
           FlowPayDR — Booking Platform
         </p>
       </footer>
-
     </main>
   );
 }

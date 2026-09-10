@@ -51,16 +51,40 @@ const t = {
   },
 };
 
+function formatTime12(time) {
+  if (!time) return "";
+
+  const [hourString, minute] = time.split(":");
+  let hour = Number(hourString);
+
+  const period = hour >= 12 ? "PM" : "AM";
+
+  hour = hour % 12 || 12;
+
+  return `${hour}:${minute} ${period}`;
+}
+
 export default function CustomerSecretPage() {
   const { secret } = useParams();
   const router = useRouter();
 
   const [lang, setLang] = useState("es");
-  const tr = t[lang];
 
-  const [appointment, setAppointment] = useState(null);
-  const [barber, setBarber] = useState(null);
-  const [business, setBusiness] = useState(null);
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const urlLang = params.get("lang");
+
+  if (urlLang === "es" || urlLang === "en") {
+    setLang(urlLang);
+  }
+}, []);
+
+const tr = t[lang];
+
+const [appointment, setAppointment] = useState(null);
+const [barber, setBarber] = useState(null);
+const [provider, setProvider] = useState(null);
+const [business, setBusiness] = useState(null);
 
   useEffect(() => {
     loadAppointment();
@@ -91,27 +115,56 @@ useEffect(() => {
 }, [appointment]);
 
   async function loadAppointment() {
-    const { data: appt } = await supabase
+  // FIRST TRY THE APPOINTMENT ID
+  let { data: appt } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("id", secret)
+    .maybeSingle();
+
+  // FALLBACK FOR EXISTING BARBER / OLD SECRET LINKS
+  if (!appt) {
+    const { data: apptBySecret } = await supabase
       .from("appointments")
       .select("*")
       .eq("secret_link", secret)
-      .single();
+      .maybeSingle();
 
-    if (!appt) {
-      setAppointment("not-found");
-      return;
-    }
+    appt = apptBySecret;
+  }
 
-    setAppointment(appt);
+if (!appt) {
+  setAppointment("not-found");
+  return;
+}
 
-    const { data: barberData } = await supabase
-      .from("barbers")
-      .select("*")
-      .eq("id", appt.barber_id)
-      .single();
+// Keep the customer page in the language saved with the appointment
+if (appt.lang === "es" || appt.lang === "en") {
+  setLang(appt.lang);
+}
 
-    setBarber(barberData);
+setAppointment(appt);
 
+    // LOAD BARBER OR GENERIC PROVIDER
+if (appt.provider_id) {
+  const { data: providerData } = await supabase
+    .from("providers")
+    .select("*")
+    .eq("id", appt.provider_id)
+    .maybeSingle();
+
+  setProvider(providerData || null);
+  setBarber(null);
+} else if (appt.barber_id) {
+  const { data: barberData } = await supabase
+    .from("barbers")
+    .select("*")
+    .eq("id", appt.barber_id)
+    .maybeSingle();
+
+  setBarber(barberData || null);
+  setProvider(null);
+}
     const { data: businessData } = await supabase
       .from("businesses")
       .select("*")
@@ -121,9 +174,11 @@ useEffect(() => {
     setBusiness(businessData);
   }
 
-  async function cancelAppointment() {
+ async function cancelAppointment() {
   const now = new Date();
-  const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+  const apptDateTime = new Date(
+    `${appointment.date}T${appointment.time}`
+  );
 
   if (apptDateTime < now) {
     alert(
@@ -134,43 +189,150 @@ useEffect(() => {
     return;
   }
 
-  // Update appointment status
-  await supabase
+  // ⭐ UPDATE APPOINTMENT STATUS
+  const { error: cancelError } = await supabase
     .from("appointments")
     .update({ status: "cancelled" })
     .eq("id", appointment.id);
 
-  // ⭐ SEND PUSH NOTIFICATION TO BARBER (non-blocking)
+  if (cancelError) {
+    console.error(
+      "Appointment cancellation error:",
+      cancelError
+    );
+
+    alert(
+      lang === "es"
+        ? "Error cancelando la cita."
+        : "Error cancelling appointment."
+    );
+
+    return;
+  }
+
+  // ⭐ GENERIC PROVIDER CANCELLATION EMAIL
+  if (appointment.provider_id) {
+    try {
+      const { data: providerData } = await supabase
+        .from("providers")
+        .select("name, email")
+        .eq("id", appointment.provider_id)
+        .maybeSingle();
+
+      if (providerData?.email) {
+        const response = await fetch(
+          "/api/send-barber-notification",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              provider_email: providerData.email,
+              provider_name: providerData.name,
+              provider_id: appointment.provider_id,
+
+              customer_name: appointment.customer_name,
+              customer_phone: appointment.customer_phone,
+              customer_email:
+                appointment.customer_email || null,
+
+              service: appointment.service,
+              date: appointment.date,
+              time: appointment.time,
+              notes: appointment.notes || null,
+
+              // Provider must NOT receive owner dashboard access
+              dashboard_link: null,
+
+              lang: appointment.lang || lang,
+              notification_type: "cancelled",
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!data.success) {
+          console.error(
+            "Provider cancellation email error:",
+            data
+          );
+        }
+      }
+    } catch (error) {
+      console.error(
+        "Provider cancellation email request failed:",
+        error
+      );
+    }
+  }
+
+  // ⭐ KEEP EXISTING BARBER PUSH NOTIFICATION
+  // This preserves the old barber behavior.
+  if (appointment.barber_id) {
+  const notificationLang = appointment.lang || lang;
+
   fetch("/api/push/send", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       role: "business",
       barber_id: appointment.barber_id,
-      title: "Appointment Cancelled",
-      message: `Client cancelled their appointment for ${appointment.date} at ${appointment.time}.`,
+      title:
+        notificationLang === "es"
+          ? "Cita Cancelada"
+          : "Appointment Cancelled",
+      message:
+        notificationLang === "es"
+          ? `El cliente canceló su cita para el ${appointment.date} a las ${formatTime12(
+              appointment.time
+            )}.`
+          : `Client cancelled their appointment for ${appointment.date} at ${formatTime12(
+              appointment.time
+            )}.`,
     }),
   }).catch(() => {});
+}
+  alert(
+    lang === "es"
+      ? "Cita cancelada"
+      : "Appointment cancelled"
+  );
 
-  alert(lang === "es" ? "Cita cancelada" : "Appointment cancelled");
   loadAppointment();
 }
-
   function shareWhatsApp() {
-    const message =
-      `${lang === "es" ? "¡Mi cita está confirmada!" : "My appointment is confirmed!"}\n\n` +
-      `${tr.service}: ${serviceNames[appointment.service]?.[lang] || appointment.service}\n` +
-      `${tr.barber}: ${barber?.name}\n` +
-      `${tr.business}: ${business?.name}\n` +
-      `${tr.date}: ${appointment.date}\n` +
-      `${tr.time}: ${appointment.time}\n\n` +
-      `${lang === "es" ? "Ver detalles:" : "View details:"} ` +
-      `${window.location.href}`;
+  const professionalLabel = provider
+    ? lang === "es"
+      ? "Profesional"
+      : "Professional"
+    : tr.barber;
 
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
-  }
+  const professionalName =
+    provider?.name || barber?.name || "";
 
+  const serviceLabel =
+    lang === "es" ? "Servicio" : "Service";
+
+  const message =
+    `${lang === "es" ? "¡Mi cita está confirmada!" : "My appointment is confirmed!"}\n\n` +
+    `${serviceLabel}: ${
+      serviceNames[appointment.service]?.[lang] ||
+      appointment.service
+    }\n` +
+    `${professionalLabel}: ${professionalName}\n` +
+    `${tr.business}: ${business?.name}\n` +
+    `${tr.date}: ${appointment.date}\n` +
+    `${tr.time}: ${formatTime12(appointment.time)}\n\n` +
+    `${lang === "es" ? "Ver detalles:" : "View details:"} ` +
+    `${window.location.href}`;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank");
+}
   if (appointment === "not-found") {
     return (
       <p className="p-6 text-red-600 text-center text-lg">
@@ -257,7 +419,13 @@ useEffect(() => {
 
   <button
     className="mt-4 bg-black text-white px-5 py-3 rounded-xl w-full"
-    onClick={() => (window.location.href = "/")}
+    onClick={() => {
+      if (appointment.provider_id && appointment.business_id) {
+        window.location.href = `/business/${appointment.business_id}/booking`;
+      } else {
+        window.location.href = "/";
+      }
+    }}
   >
     {lang === "es" ? "Volver al Inicio" : "Back Home"}
   </button>
@@ -280,14 +448,33 @@ useEffect(() => {
           {serviceNames[appointment.service]?.[lang] || appointment.service}
         </p>
 
-        <p className="text-sm"><strong>{tr.barber}:</strong> {barber?.name}</p>
+        <p className="text-sm">
+  <strong>
+    {provider
+      ? lang === "es"
+        ? "Profesional"
+        : "Professional"
+      : tr.barber}
+    :
+  </strong>{" "}
+  {provider?.name || barber?.name}
+</p>
         <p className="text-sm"><strong>{tr.business}:</strong> {business?.name}</p>
 
         <p className="text-sm mt-2"><strong>{tr.date}:</strong> {appointment.date}</p>
-<p className="text-sm"><strong>{tr.time}:</strong> {appointment.time}</p>
+<p className="text-sm"><strong>{tr.time}:</strong> {formatTime12(appointment.time)}</p>
 
-<p className="text-sm"><strong>{lang === "es" ? "Precio" : "Price"}:</strong> ${appointment.price}</p>
-
+<p className="text-sm">
+  <strong>{lang === "es" ? "Precio" : "Price"}:</strong>{" "}
+  {appointment.price !== null && appointment.price !== undefined
+    ? `RD$${Number(appointment.price).toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      })}`
+    : lang === "es"
+    ? "No disponible"
+    : "Not available"}
+</p>
 <p className="text-sm mt-2"><strong>{tr.name}:</strong> {appointment.customer_name}</p>
 <p className="text-sm"><strong>{tr.phone}:</strong> {appointment.customer_phone}</p>
 <p className="text-sm"><strong>{tr.email}:</strong> {appointment.customer_email}</p>

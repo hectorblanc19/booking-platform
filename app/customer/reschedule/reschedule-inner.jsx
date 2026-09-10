@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -38,6 +36,74 @@ const t = {
   },
 };
 
+function formatTime12(time) {
+  if (!time) return "";
+
+  const [hourString, minute] = time.split(":");
+  let hour = Number(hourString);
+
+  const period = hour >= 12 ? "PM" : "AM";
+
+  hour = hour % 12 || 12;
+
+  return `${hour}:${minute} ${period}`;
+}
+
+// DOMINICAN REPUBLIC CURRENT DATE AND TIME
+function getDominicanNow() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santo_Domingo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+
+  const values = {};
+
+  parts.forEach((part) => {
+    if (part.type !== "literal") {
+      values[part.type] = part.value;
+    }
+  });
+
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    hours: Number(values.hour),
+    minutes: Number(values.minute),
+  };
+}
+
+// CHECK IF APPOINTMENT HAS PASSED IN DOMINICAN REPUBLIC
+function isAppointmentPastInDominican(date, time) {
+  if (!date || !time) return false;
+
+  const dominicanNow = getDominicanNow();
+
+  if (date < dominicanNow.date) {
+    return true;
+  }
+
+  if (date > dominicanNow.date) {
+    return false;
+  }
+
+  const [hour, minute] = time
+    .slice(0, 5)
+    .split(":")
+    .map(Number);
+
+  const appointmentMinutes = hour * 60 + minute;
+
+  const currentMinutes =
+    dominicanNow.hours * 60 + dominicanNow.minutes;
+
+  return appointmentMinutes < currentMinutes;
+}
+
+
 // Time slot button
 function TimeSlot({ time, selected, onSelect }) {
   return (
@@ -47,7 +113,7 @@ function TimeSlot({ time, selected, onSelect }) {
         selected === time ? "bg-black text-white" : "bg-white text-black"
       }`}
     >
-      {time}
+      {formatTime12(time)}
     </button>
   );
 }
@@ -98,123 +164,251 @@ useEffect(() => {
 
 
   async function loadAppointment() {
-    const { data: appt } = await supabase
+  // FIRST TRY APPOINTMENT ID
+  let { data: appt } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("id", secret)
+    .maybeSingle();
+
+  // FALLBACK FOR EXISTING BARBER / OLD SECRET LINKS
+  if (!appt) {
+    const { data: apptBySecret } = await supabase
       .from("appointments")
       .select("*")
       .eq("secret_link", secret)
-      .single();
+      .maybeSingle();
 
-    if (!appt) {
-      setAppointment("not-found");
-      return;
-    }
-
-    setAppointment(appt);
-    setLoading(false);
+    appt = apptBySecret;
   }
 
+  if (!appt) {
+  setAppointment("not-found");
+  setLoading(false);
+  return;
+}
+
+// Keep reschedule page in the language saved with the appointment
+if (appt.lang === "es" || appt.lang === "en") {
+  setLang(appt.lang);
+}
+
+setAppointment(appt);
+setLoading(false);
+
+}
   async function loadAvailableTimes(selectedDate) {
-    if (!selectedDate || !appointment) return;
+  if (!selectedDate || !appointment) return;
 
-    setLoadingTimes(true);
+  setLoadingTimes(true);
 
-    // ⭐ Block past dates completely
-    const todayDate = new Date().toISOString().split("T")[0];
+  try {
+    const dominicanNow = getDominicanNow();
+const todayDate = dominicanNow.date;
+
+    // DON'T ALLOW PAST DATES
     if (selectedDate < todayDate) {
       setAvailableTimes([]);
-      setLoadingTimes(false);
       return;
     }
 
-    // ⭐ FIXED: Local-time date parsing
-    const dayOfWeek = new Date(selectedDate + "T00:00:00")
-      .toLocaleDateString("en-US", { weekday: "long" })
-      .toLowerCase();
+    const selectedDateObject = new Date(
+      `${selectedDate}T00:00:00`
+    );
 
-    // Barber availability
-    const { data: availability } = await supabase
-      .from("barber_availability")
-      .select("*")
-      .eq("barber_id", appointment.barber_id)
-      .eq("day_of_week", dayOfWeek)
-      .single();
+    const selectedDuration =
+      Number(appointment.duration) || 60;
 
-    if (!availability || availability.is_closed) {
+    let startTime = null;
+    let endTime = null;
+
+    // ============================================
+    // GENERIC PROVIDER
+    // ============================================
+    if (appointment.provider_id) {
+      const dayOfWeek = selectedDateObject.getDay();
+
+      const { data: availability, error: availabilityError } =
+        await supabase
+          .from("provider_availability")
+          .select("*")
+          .eq("provider_id", appointment.provider_id)
+          .eq("day_of_week", dayOfWeek)
+          .maybeSingle();
+
+      if (
+        availabilityError ||
+        !availability ||
+        !availability.is_available
+      ) {
+        setAvailableTimes([]);
+        return;
+      }
+
+      startTime = availability.start_time;
+      endTime = availability.end_time;
+    }
+
+    // ============================================
+    // BARBER — KEEP EXISTING SYSTEM
+    // ============================================
+    else if (appointment.barber_id) {
+      const dayOfWeek = selectedDateObject
+        .toLocaleDateString("en-US", {
+          weekday: "long",
+        })
+        .toLowerCase();
+
+      const { data: availability } = await supabase
+        .from("barber_availability")
+        .select("*")
+        .eq("barber_id", appointment.barber_id)
+        .eq("day_of_week", dayOfWeek)
+        .maybeSingle();
+
+      if (!availability || availability.is_closed) {
+        setAvailableTimes([]);
+        return;
+      }
+
+      startTime = availability.start_time;
+      endTime = availability.end_time;
+    } else {
       setAvailableTimes([]);
-      setLoadingTimes(false);
       return;
     }
 
-    // ⭐ Duration-aware slot generation
+    function toMinutes(time) {
+      const [hours, minutes] = time
+        .slice(0, 5)
+        .split(":")
+        .map(Number);
+
+      return hours * 60 + minutes;
+    }
+
+    function toTime(minutes) {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+
+      return `${String(hours).padStart(2, "0")}:${String(
+        mins
+      ).padStart(2, "0")}`;
+    }
+
+    function overlaps(
+      startA,
+      durationA,
+      startB,
+      durationB
+    ) {
+      const aStart = toMinutes(startA);
+      const aEnd = aStart + durationA;
+
+      const bStart = toMinutes(startB);
+      const bEnd = bStart + durationB;
+
+      return aStart < bEnd && bStart < aEnd;
+    }
+
+    // GET EXISTING APPOINTMENTS
+    let appointmentQuery = supabase
+      .from("appointments")
+      .select("id, time, duration")
+      .eq("date", selectedDate)
+      .eq("status", "confirmed")
+      .neq("id", appointment.id);
+
+    if (appointment.provider_id) {
+      appointmentQuery = appointmentQuery.eq(
+        "provider_id",
+        appointment.provider_id
+      );
+    } else {
+      appointmentQuery = appointmentQuery.eq(
+        "barber_id",
+        appointment.barber_id
+      );
+    }
+
+    const { data: bookedAppointments } =
+      await appointmentQuery;
+
+    const existingAppointments =
+      bookedAppointments || [];
+
+    const startMinutes = toMinutes(startTime);
+    const endMinutes = toMinutes(endTime);
+
     let slots = [];
 
-    let current = new Date(`${selectedDate}T${availability.start_time}`);
-    const end = new Date(`${selectedDate}T${availability.end_time}`);
+    // SAME 30-MINUTE SLOT SYSTEM AS GENERIC BOOKING
+    for (
+      let current = startMinutes;
+      current + selectedDuration <= endMinutes;
+      current += 30
+    ) {
+      // DON'T SHOW TIMES THAT ALREADY PASSED TODAY
+      if (selectedDate === todayDate) {
+        const currentMinutes =
+  dominicanNow.hours * 60 + dominicanNow.minutes;
+        if (current <= currentMinutes) {
+          continue;
+        }
+      }
 
-    const selectedDuration = appointment.duration || 60;
+      const slotTime = toTime(current);
 
-    while (current < end) {
-      const slotStr = current.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
+      const hasConflict = existingAppointments.some(
+        (existingAppointment) =>
+          overlaps(
+            slotTime,
+            selectedDuration,
+            existingAppointment.time,
+            Number(existingAppointment.duration) || 60
+          )
+      );
 
-      slots.push(slotStr);
-
-      current = new Date(current.getTime() + selectedDuration * 60 * 1000);
+      if (!hasConflict) {
+        slots.push(slotTime);
+      }
     }
 
-    // Booked appointments
-    const { data: bookedAppts } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("barber_id", appointment.barber_id)
-      .eq("date", selectedDate)
-      .eq("status", "confirmed");
+    // BARBER BLOCKS — BARBER ONLY
+    if (appointment.barber_id) {
+      const { data: blocks } = await supabase
+        .from("barber_blocks")
+        .select("*")
+        .eq("barber_id", appointment.barber_id)
+        .eq("date", selectedDate);
 
-    const booked = bookedAppts?.map((a) => a.time.slice(0, 5)) || [];
-    slots = slots.filter((t) => !booked.includes(t));
+      if (blocks?.length) {
+        slots = slots.filter((slot) => {
+          return !blocks.some((block) => {
+            const blockStart = block.start_time.slice(0, 5);
+            const blockEnd = block.end_time.slice(0, 5);
 
-    // Barber blocks
-    const { data: blocks } = await supabase
-      .from("barber_blocks")
-      .select("*")
-      .eq("barber_id", appointment.barber_id)
-      .eq("date", selectedDate);
-
-    if (blocks && blocks.length > 0) {
-      blocks.forEach((block) => {
-        const blockStart = block.start_time.slice(0, 5);
-        const blockEnd = block.end_time.slice(0, 5);
-
-        slots = slots.filter(
-          (t) => !(t >= blockStart && t < blockEnd)
-        );
-      });
-    }
-
-    // ⭐ SAME-DAY: remove past times
-    if (selectedDate === todayDate) {
-      const now = new Date();
-      const currentTime = now.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
-
-      const toMinutes = (t) => {
-        const [h, m] = t.split(":").map(Number);
-        return h * 60 + m;
-      };
-
-      slots = slots.filter((t) => toMinutes(t) >= toMinutes(currentTime));
+            return (
+              slot >= blockStart &&
+              slot < blockEnd
+            );
+          });
+        });
+      }
     }
 
     setAvailableTimes(slots);
+  } catch (error) {
+    console.error(
+      "Error loading reschedule times:",
+      error
+    );
+
+    setAvailableTimes([]);
+  } finally {
     setLoadingTimes(false);
   }
-
+}
   async function saveChanges() {
     if (!newDate || !newTime) {
       alert(tr.selectDateTime);
@@ -222,9 +416,10 @@ useEffect(() => {
     }
 
     // ⭐ Block saving past dates
-    const todayDate = new Date().toISOString().split("T")[0];
-    if (newDate < todayDate) {
-      alert(
+   const todayDate = getDominicanNow().date;
+   
+ if (newDate < todayDate) {
+    alert(
         lang === "es"
           ? "No puede seleccionar una fecha pasada."
           : "You cannot select a past date."
@@ -232,76 +427,163 @@ useEffect(() => {
       return;
     }
 
-    // Prevent rescheduling past appointments
-    const now = new Date();
-    const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+   // Prevent rescheduling past appointments
+if (
+  isAppointmentPastInDominican(
+    appointment.date,
+    appointment.time
+  )
+) {
+  alert(tr.past);
+  return;
+}
 
-    if (apptDateTime < now) {
-      alert(tr.past);
-      return;
+const formattedTime = newTime + ":00";
+
+// ⭐ UPDATE APPOINTMENT
+const { error: updateError } = await supabase
+  .from("appointments")
+  .update({
+    date: newDate,
+    time: formattedTime,
+    status: "confirmed",
+  })
+  .eq("id", appointment.id);
+
+if (updateError) {
+  console.error("Reschedule update error:", updateError);
+
+  alert(
+    lang === "es"
+      ? "Error reprogramando la cita."
+      : "Error rescheduling appointment."
+  );
+
+  return;
+}
+
+// ⭐ SEND RESCHEDULE EMAIL TO PROVIDER
+if (appointment.provider_id) {
+  try {
+    const { data: providerData } = await supabase
+      .from("providers")
+      .select("name, email")
+      .eq("id", appointment.provider_id)
+      .maybeSingle();
+
+    if (providerData?.email) {
+      const response = await fetch(
+        "/api/send-barber-notification",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider_email: providerData.email,
+            provider_name: providerData.name,
+            provider_id: appointment.provider_id,
+
+            customer_name: appointment.customer_name,
+            customer_phone: appointment.customer_phone,
+            customer_email: appointment.customer_email,
+
+            service: appointment.service,
+            date: newDate,
+            time: formattedTime,
+            notes: appointment.notes || null,
+
+           dashboard_link: null,
+
+lang: appointment.lang || lang,
+notification_type: "reschedule",
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!data.success) {
+        console.error(
+          "Provider reschedule email error:",
+          data
+        );
+      }
     }
+  } catch (error) {
+    console.error(
+      "Provider reschedule email request failed:",
+      error
+    );
+  }
+}
 
-    const formattedTime = newTime + ":00";
+// ⭐ SEND PUSH NOTIFICATION TO BARBER — BARBER APPOINTMENTS ONLY
+if (appointment.barber_id) {
+  const notificationLang = appointment.lang || lang;
 
-    // ⭐ UPDATE APPOINTMENT
-    await supabase
-      .from("appointments")
-      .update({
-        date: newDate,
-        time: formattedTime,
-        status: "confirmed",
-      })
-      .eq("secret_link", secret);
-
-    // ⭐ SEND PUSH NOTIFICATION TO BARBER
-    await fetch("/api/push/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        role: "business",
-        barber_id: appointment.barber_id,
-        title: "Appointment Rescheduled",
-        message: `Client moved appointment to ${newDate} at ${newTime}.`,
-      }),
-    });
-
-    router.push(`/customer/${secret}`);
+  await fetch("/api/push/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      role: "business",
+      barber_id: appointment.barber_id,
+      title:
+        notificationLang === "es"
+          ? "Cita Reprogramada"
+          : "Appointment Rescheduled",
+      message:
+        notificationLang === "es"
+          ? `El cliente reprogramó su cita para el ${newDate} a las ${formatTime12(
+              formattedTime
+            )}.`
+          : `Client moved appointment to ${newDate} at ${formatTime12(
+              formattedTime
+            )}.`,
+    }),
+  });
+}   
+ router.push(`/customer/${secret}`);
   }
 
   if (appointment === "not-found") {
     return <p className="p-6 text-red-600">{tr.notFound}</p>;
   }
 
-  if (loading) return <p className="p-6">{tr.loading}</p>;
+ if (loading) return <p className="p-6">{tr.loading}</p>;
 
-  const now = new Date();
-  const apptDateTime = new Date(`${appointment.date}T${appointment.time}`);
-  const isPast = apptDateTime < now;
+const isPast = isAppointmentPastInDominican(
+  appointment.date,
+  appointment.time
+);
 
-  return (
-    <div className="max-w-xl mx-auto p-6">
+return (
+  <div className="max-w-xl mx-auto p-6">
 
       {/* Language Toggle */}
-      <div className="flex justify-end gap-2 mb-4">
-        <span className="text-sm">Idioma:</span>
-        <button
-          className={`px-2 py-1 rounded ${
-            lang === "es" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setLang("es")}
-        >
-          ES
-        </button>
-        <button
-          className={`px-2 py-1 rounded ${
-            lang === "en" ? "bg-black text-white" : "bg-gray-200"
-          }`}
-          onClick={() => setLang("en")}
-        >
-          EN
-        </button>
-      </div>
+<div className="flex justify-end gap-2 mb-4">
+  <span className="text-sm">
+    {lang === "es" ? "Idioma:" : "Language:"}
+  </span>
 
+  <button
+    className={`px-2 py-1 rounded ${
+      lang === "es" ? "bg-black text-white" : "bg-gray-200"
+    }`}
+    onClick={() => setLang("es")}
+  >
+    ES
+  </button>
+
+  <button
+    className={`px-2 py-1 rounded ${
+      lang === "en" ? "bg-black text-white" : "bg-gray-200"
+    }`}
+    onClick={() => setLang("en")}
+  >
+    EN
+  </button>
+</div>
       <h1 className="text-2xl font-bold mb-4">{tr.title}</h1>
 
       <div className="border p-4 rounded-xl bg-white shadow-sm">
@@ -309,7 +591,7 @@ useEffect(() => {
           <strong>{tr.currentDate}:</strong> {appointment.date}
         </p>
         <p>
-          <strong>{tr.currentTime}:</strong> {appointment.time}
+          <strong>{tr.currentTime}:</strong> {formatTime12(appointment.time)}
         </p>
       </div>
 
@@ -325,7 +607,7 @@ useEffect(() => {
             <input
               type="date"
               className="w-full p-3 border rounded-xl"
-              min={new Date().toISOString().split("T")[0]}
+              min={getDominicanNow().date}
               onChange={(e) => {
                 setNewDate(e.target.value);
                 setNewTime("");
@@ -336,11 +618,16 @@ useEffect(() => {
 
           {/* Time slots */}
           {newDate && !loadingTimes && availableTimes.length === 0 && (
-            <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-xl text-red-700">
-              <p>{tr.blockedDay}</p>
-            </div>
-          )}
-
+  <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-xl text-red-700">
+    <p>
+      {appointment.provider_id
+        ? lang === "es"
+          ? "El profesional no está disponible este día."
+          : "The professional is not available on this day."
+        : tr.blockedDay}
+    </p>
+  </div>
+)}
           {newDate && loadingTimes && (
             <p className="mt-4 text-sm text-gray-500">{tr.loading}</p>
           )}

@@ -525,6 +525,33 @@ async function markAppointmentCompleted(id) {
     return;
   }
 
+  // ⭐ SEND REVIEW EMAIL AFTER COMPLETED
+  try {
+    const response = await fetch("/api/send-rating-link", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        appointment_id: id,
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+
+      console.error(
+        "Barber rating email error:",
+        data
+      );
+    }
+  } catch (ratingError) {
+    console.error(
+      "Could not send barber rating email:",
+      ratingError
+    );
+  }
+
   loadAppointments();
   setCustomerHistoryRefresh((value) => value + 1);
 }

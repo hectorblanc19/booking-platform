@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import GetUserLocation from "./GetUserLocation";
@@ -8,6 +8,7 @@ import { calculateDistance } from "./distance";
 
 type Barber = {
   id: string;
+  business_id: string | null;
   name: string;
   email: string | null;
   phone: string | null;
@@ -22,6 +23,29 @@ type Barber = {
   distance?: number | null;
 };
 
+type Business = {
+  id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  map_url: string | null;
+  category: string | null;
+  featured: boolean | null;
+  photo_url: string | null;
+  distance?: number | null;
+};
+
+type MarketplaceItem =
+  | (Barber & { itemType: "barber" })
+  | (Business & {
+      itemType: "business";
+      email: null;
+      services: string[];
+
+    });
+
 const translations = {
   en: {
     searchPlaceholder: "Search by name or address...",
@@ -30,7 +54,8 @@ const translations = {
     viewMap: "View map",
     viewProfile: "View profile",
     viewSchedule: "View schedule",
-    noResults: "No barbers found with these filters.",
+    bookBusiness: "Book",
+    noResults: "No businesses or barbers found with these filters.",
     more: "more",
     away: "km away",
   },
@@ -41,13 +66,20 @@ const translations = {
     viewMap: "Ver mapa",
     viewProfile: "Ver perfil",
     viewSchedule: "Ver horario",
-    noResults: "No se encontraron barberos con estos filtros.",
+    bookBusiness: "Reservar",
+    noResults: "No se encontraron negocios o barberos con estos filtros.",
     more: "más",
     away: "km de distancia",
   },
 };
 
-const serviceTranslations = {
+const serviceTranslations: Record<
+  string,
+  {
+    en: string;
+    es: string;
+  }
+> = {
   haircut: { en: "haircut", es: "corte de pelo" },
   beard: { en: "beard", es: "barba" },
   color: { en: "color", es: "coloración" },
@@ -61,9 +93,11 @@ const serviceTranslations = {
 
 export default function MarketplaceClient({
   barbers,
+  businesses,
   lang,
 }: {
   barbers: Barber[];
+  businesses: Business[];
   lang: "en" | "es";
 }) {
   const t = translations[lang];
@@ -84,62 +118,113 @@ export default function MarketplaceClient({
   const CATEGORY_FILTERS = ["barbershop", "independent"];
 
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(
+    null
+  );
+  const [selectedService, setSelectedService] = useState<string | null>(
+    null
+  );
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
 
   // ⭐ GPS location
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
-  // ⭐ Add distance to each barber
-  const barbersWithDistance = useMemo(() => {
-    if (!userLocation) return barbers;
+  // ⭐ Combine barbers + businesses
+  const marketplaceItems = useMemo<MarketplaceItem[]>(() => {
+    const barberItems: MarketplaceItem[] = barbers.map((barber) => ({
+      ...barber,
+      itemType: "barber" as const,
+    }));
 
-    return barbers.map((b) => {
-      if (!b.lat || !b.lng) return { ...b, distance: null };
+    const businessItems: MarketplaceItem[] = businesses.map((business) => ({
+      ...business,
+      itemType: "business" as const,
+      email: null,
+      photo_url: business.photo_url,
+      services: [],
+    }));
+
+    return [...barberItems, ...businessItems];
+  }, [barbers, businesses]);
+
+  // ⭐ Add distance to each marketplace item
+  const itemsWithDistance = useMemo(() => {
+    if (!userLocation) return marketplaceItems;
+
+    return marketplaceItems.map((item) => {
+      if (!item.lat || !item.lng) {
+        return {
+          ...item,
+          distance: null,
+        };
+      }
 
       const distance = calculateDistance(
         userLocation.lat,
         userLocation.lng,
-        b.lat,
-        b.lng
+        item.lat,
+        item.lng
       );
 
-      return { ...b, distance };
+      return {
+        ...item,
+        distance,
+      };
     });
-  }, [barbers, userLocation]);
+  }, [marketplaceItems, userLocation]);
 
   // ⭐ Sort by nearest
-  const sortedBarbers = useMemo(() => {
-    return [...barbersWithDistance].sort((a, b) => {
-      if (a.distance === null) return 1;
-      if (b.distance === null) return -1;
+  const sortedItems = useMemo(() => {
+    return [...itemsWithDistance].sort((a, b) => {
+      if (a.distance === null || a.distance === undefined) return 1;
+      if (b.distance === null || b.distance === undefined) return -1;
+
       return a.distance - b.distance;
     });
-  }, [barbersWithDistance]);
+  }, [itemsWithDistance]);
 
-  // ⭐ Apply your existing filters AFTER sorting
-  const filteredBarbers = useMemo(() => {
-    return sortedBarbers.filter((b) => {
+  // ⭐ Apply filters AFTER sorting
+  const filteredItems = useMemo(() => {
+    return sortedItems.filter((item) => {
       const matchesSearch =
         !search ||
-        b.name.toLowerCase().includes(search.toLowerCase()) ||
-        (b.address || "").toLowerCase().includes(search.toLowerCase());
+        item.name.toLowerCase().includes(search.toLowerCase()) ||
+        (item.address || "")
+          .toLowerCase()
+          .includes(search.toLowerCase());
 
       const matchesCategory =
-        !selectedCategory || b.category === selectedCategory;
+        !selectedCategory ||
+        (item.itemType === "barber" &&
+          item.category === selectedCategory);
 
-      const matchesFeatured = !showFeaturedOnly || !!b.featured;
+      const matchesFeatured =
+        !showFeaturedOnly || !!item.featured;
 
       const matchesService =
         !selectedService ||
-        (b.services || []).includes(selectedService.toLowerCase());
+        (item.itemType === "barber" &&
+          (item.services || []).includes(
+            selectedService.toLowerCase()
+          ));
 
       return (
-        matchesSearch && matchesCategory && matchesFeatured && matchesService
+        matchesSearch &&
+        matchesCategory &&
+        matchesFeatured &&
+        matchesService
       );
     });
-  }, [sortedBarbers, search, selectedCategory, showFeaturedOnly, selectedService]);
+  }, [
+    sortedItems,
+    search,
+    selectedCategory,
+    showFeaturedOnly,
+    selectedService,
+  ]);
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] px-4 py-6 max-w-6xl mx-auto">
@@ -151,7 +236,9 @@ export default function MarketplaceClient({
         <button
           onClick={() => router.push("/marketplace?lang=en")}
           className={`px-3 py-1 border rounded ${
-            lang === "en" ? "bg-slate-900 text-white" : ""
+            lang === "en"
+              ? "bg-slate-900 text-white"
+              : ""
           }`}
         >
           EN
@@ -160,7 +247,9 @@ export default function MarketplaceClient({
         <button
           onClick={() => router.push("/marketplace?lang=es")}
           className={`px-3 py-1 border rounded ${
-            lang === "es" ? "bg-slate-900 text-white" : ""
+            lang === "es"
+              ? "bg-slate-900 text-white"
+              : ""
           }`}
         >
           ES
@@ -183,7 +272,9 @@ export default function MarketplaceClient({
             <button
               key={cat}
               onClick={() =>
-                setSelectedCategory(selectedCategory === cat ? null : cat)
+                setSelectedCategory(
+                  selectedCategory === cat ? null : cat
+                )
               }
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 selectedCategory === cat
@@ -200,13 +291,18 @@ export default function MarketplaceClient({
         <div className="mt-3 flex flex-wrap gap-2">
           {SERVICE_FILTERS.map((service) => {
             const translated =
-              serviceTranslations[service]?.[lang] || service;
+              serviceTranslations[service]?.[lang] ||
+              service;
 
             return (
               <button
                 key={service}
                 onClick={() =>
-                  setSelectedService(selectedService === service ? null : service)
+                  setSelectedService(
+                    selectedService === service
+                      ? null
+                      : service
+                  )
                 }
                 className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                   selectedService === service
@@ -223,23 +319,25 @@ export default function MarketplaceClient({
 
       {/* Grid */}
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        {filteredBarbers.map((barber, index) => (
+        {filteredItems.map((item, index) => (
           <article
-            key={barber.id}
+            key={`${item.itemType}-${item.id}`}
             className="overflow-hidden rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
           >
             {/* Photo */}
             <div className="relative h-96 w-full">
-              {barber.photo_url ? (
+              {item.photo_url ? (
                 <Image
-                  src={barber.photo_url}
-                  alt={barber.name}
+                  src={item.photo_url}
+                  alt={item.name}
                   fill
                   sizes="(max-width: 768px) 100vw,
                          (max-width: 1200px) 50vw,
                          33vw"
                   unoptimized
-                  loading={index === 0 ? "eager" : "lazy"}
+                  loading={
+                    index === 0 ? "eager" : "lazy"
+                  }
                   className="object-cover object-center"
                 />
               ) : (
@@ -248,7 +346,7 @@ export default function MarketplaceClient({
                 </div>
               )}
 
-              {barber.featured && (
+              {item.featured && (
                 <span className="absolute left-3 top-3 rounded-full bg-yellow-400 px-2 py-1 text-xs font-semibold text-slate-900 shadow">
                   ⭐ {t.featured}
                 </span>
@@ -259,93 +357,113 @@ export default function MarketplaceClient({
             <div className="space-y-3 px-4 py-4">
               <div className="flex items-center justify-between">
                 <h2 className="truncate text-base font-semibold text-slate-900">
-                  {barber.name}
+                  {item.name}
                 </h2>
-                {barber.category && (
+
+                {item.category && (
                   <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium capitalize text-blue-700">
-                    {barber.category}
+                    {item.category}
                   </span>
                 )}
               </div>
 
-              {barber.address && (
+              {item.address && (
                 <p className="line-clamp-2 text-sm text-slate-600">
-                  📍 {barber.address}
+                  📍 {item.address}
                 </p>
               )}
 
-             {/* ⭐ Distance + Navigation */}
-{barber.distance && barber.lat && barber.lng && userLocation && (
-  <div className="flex items-center gap-3">
-    <span className="text-sm font-medium text-blue-600">
-      🧭 {barber.distance.toFixed(1)} {t.away}
-    </span>
-
-    {/* Google Maps */}
-    <a
-      href={`https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${barber.lat},${barber.lng}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-xs font-medium text-blue-600 underline"
-    >
-      Google Maps
-    </a>
-
-    {/* Waze */}
-    <a
-      href={`https://waze.com/ul?ll=${barber.lat},${barber.lng}&navigate=yes`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-xs font-medium text-blue-600 underline"
-    >
-      Waze
-    </a>
-  </div>
-)}
-
-              {/* Services */}
-              <div className="flex flex-wrap gap-2">
-                {(barber.services || []).slice(0, 5).map((service) => {
-                  const key = service.toLowerCase();
-                  const translated =
-                    serviceTranslations[key]?.[lang] || service;
-
-                  return (
-                    <span
-                      key={service}
-                      className="rounded-full bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-medium capitalize text-slate-800"
-                    >
-                      {translated}
+              {/* ⭐ Distance + Navigation */}
+              {item.distance &&
+                item.lat &&
+                item.lng &&
+                userLocation && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-blue-600">
+                      🧭 {item.distance.toFixed(1)}{" "}
+                      {t.away}
                     </span>
-                  );
-                })}
 
-                {(barber.services || []).length > 5 && (
-                  <span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700">
-                    +{(barber.services || []).length - 5} {t.more}
-                  </span>
+                    {/* Google Maps */}
+                    <a
+                      href={`https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${item.lat},${item.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-medium text-blue-600 underline"
+                    >
+                      Google Maps
+                    </a>
+
+                    {/* Waze */}
+                    <a
+                      href={`https://waze.com/ul?ll=${item.lat},${item.lng}&navigate=yes`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-medium text-blue-600 underline"
+                    >
+                      Waze
+                    </a>
+                  </div>
                 )}
-              </div>
+
+              {/* Barber Services */}
+              {item.itemType === "barber" && (
+                <div className="flex flex-wrap gap-2">
+                  {(item.services || [])
+                    .slice(0, 5)
+                    .map((service) => {
+                      const key = service.toLowerCase();
+
+                      const translated =
+                        serviceTranslations[key]?.[lang] ||
+                        service;
+
+                      return (
+                        <span
+                          key={service}
+                          className="rounded-full bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] font-medium capitalize text-slate-800"
+                        >
+                          {translated}
+                        </span>
+                      );
+                    })}
+
+                  {(item.services || []).length > 5 && (
+                    <span className="rounded-full bg-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700">
+                      +
+                      {(item.services || []).length - 5}{" "}
+                      {t.more}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Contact + actions */}
               <div className="mt-2 flex items-center justify-between">
                 <div className="space-y-1 text-sm text-slate-600">
-                  {barber.phone && (
+                  {item.phone && (
                     <p className="truncate">
-                      📞 <span className="font-medium text-slate-900">{barber.phone}</span>
+                      📞{" "}
+                      <span className="font-medium text-slate-900">
+                        {item.phone}
+                      </span>
                     </p>
                   )}
-                  {barber.email && (
+
+                  {item.email && (
                     <p className="truncate">
-                      ✉️ <span className="font-medium text-slate-900">{barber.email}</span>
+                      ✉️{" "}
+                      <span className="font-medium text-slate-900">
+                        {item.email}
+                      </span>
                     </p>
                   )}
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
-                  {barber.map_url && (
+                  {item.map_url && (
                     <a
-                      href={`${barber.map_url}`}
+                      href={item.map_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white shadow hover:bg-blue-700"
@@ -354,26 +472,37 @@ export default function MarketplaceClient({
                     </a>
                   )}
 
-                  <a
-                    href={`/barbers/${barber.id}?lang=${lang}`}
-                    className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow hover:bg-slate-700"
-                  >
-                    {t.viewProfile}
-                  </a>
+                  {item.itemType === "barber" ? (
+                    <>
+                      <a
+                        href={`/barbers/${item.id}?lang=${lang}`}
+                        className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow hover:bg-slate-700"
+                      >
+                        {t.viewProfile}
+                      </a>
 
-                  <a
-                    href={`/booking/${barber.id}?lang=${lang}`}
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-900 hover:border-blue-600"
-                  >
-                    {t.viewSchedule}
-                  </a>
+                      <a
+                        href={`/booking/${item.id}?lang=${lang}`}
+                        className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-900 hover:border-blue-600"
+                      >
+                        {t.viewSchedule}
+                      </a>
+                    </>
+                  ) : (
+                    <a
+                      href={`/business/${item.id}/booking?lang=${lang}`}
+                      className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow hover:bg-slate-700"
+                    >
+                      {t.bookBusiness}
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
           </article>
         ))}
 
-        {filteredBarbers.length === 0 && (
+        {filteredItems.length === 0 && (
           <div className="col-span-full rounded-xl bg-white p-6 text-center text-sm text-slate-600">
             {t.noResults}
           </div>

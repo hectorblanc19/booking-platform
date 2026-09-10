@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -13,7 +12,7 @@ export default function HomeClient() {
       title: "Reserva tu cita fácil,",
       title2: "rápido y profesional.",
       subtitle:
-        "Encuentra tu barbería o barbero favorito, selecciona tu servicio y reserva tu horario.",
+        "Encuentra el negocio o profesional que necesitas, selecciona tu servicio y reserva tu horario.",
       book: "Reservar una Cita",
       dashboard: "Entrar al Panel",
       whyTitle: "¿Por qué usar FlowPayDR?",
@@ -24,8 +23,8 @@ export default function HomeClient() {
         "Recibe tu confirmación y recordatorios de tu cita.",
       feature3Title: "Google Maps y Waze",
       feature3Text:
-        "Encuentra fácilmente dónde está tu barbería.",
-      feature4Title: "Barberías y barberos",
+        "Encuentra fácilmente la ubicación del negocio o profesional.",
+      feature4Title: "Negocios y profesionales",
       feature4Text:
         "Reserva con negocios o profesionales independientes.",
       categories1: "Barberías • Barberos • Uñas",
@@ -38,7 +37,7 @@ export default function HomeClient() {
       title: "Book your appointment",
       title2: "easy, fast and professional.",
       subtitle:
-        "Find your favorite barbershop or barber, select your service and book your time.",
+        "Find the business or professional you need, select your service and book your time.",
       book: "Book an Appointment",
       dashboard: "Login to Dashboard",
       whyTitle: "Why use FlowPayDR?",
@@ -49,8 +48,8 @@ export default function HomeClient() {
         "Receive your confirmation and appointment reminders by email.",
       feature3Title: "Google Maps & Waze",
       feature3Text:
-        "Easily find the location of your barbershop.",
-      feature4Title: "Barbershops & Barbers",
+        "Easily find the location of the business or professional.",
+      feature4Title: "Businesses & Professionals",
       feature4Text:
         "Book with businesses or independent professionals.",
       categories1: "Barbershops • Barbers • Nails",
@@ -137,7 +136,7 @@ export default function HomeClient() {
             </Link>
 
             <Link
-              href="/barber/login"
+             href="/login"
               className="bg-gray-100 text-gray-900 px-8 py-4 rounded-xl text-lg font-bold hover:bg-gray-200 transition"
             >
               {tr.dashboard}
@@ -238,4 +237,3 @@ export default function HomeClient() {
     </main>
   );
 }
-

@@ -9,51 +9,131 @@ export default function HomeClient() {
   const t = {
     es: {
       brand: "FLOWPAYDR BOOKING",
-      title: "Reserva tu cita fácil,",
-      title2: "rápido y profesional.",
+
+      title: "Reservas fáciles para",
+      title2: "clientes y negocios.",
+
       subtitle:
-        "Encuentra el negocio o profesional que necesitas, selecciona tu servicio y reserva tu horario.",
+        "Reserva una cita online o administra las citas, clientes, servicios y profesionales de tu negocio desde un solo lugar.",
+
       book: "Reservar una Cita",
       dashboard: "Entrar al Panel",
-      whyTitle: "¿Por qué usar FlowPayDR?",
+
+      customerTitle: "¿Buscas reservar una cita?",
+      customerText:
+        "Encuentra un negocio o profesional, selecciona tu servicio, fecha y horario disponible.",
+      customerButton: "Buscar dónde reservar",
+
+      businessTitle: "¿Tienes un negocio?",
+      businessText:
+        "Organiza tus citas, clientes, servicios, horarios y profesionales con FlowPayDR Booking.",
+
+      barberRegister: "Registrar Barbería / Barbero",
+      businessRegister: "Registrar Otro Negocio",
+      businessButton: "Entrar al Panel",
+
+      whyTitle: "Todo lo que necesitas para tus citas",
+
       feature1Title: "Reservas 24/7",
-      feature1Text: "Reserva cuando quieras.",
-      feature2Title: "Confirmaciones por email",
+      feature1Text:
+        "Tus clientes pueden reservar en cualquier momento desde su teléfono.",
+
+      feature2Title: "Confirmaciones y recordatorios",
       feature2Text:
-        "Recibe tu confirmación y recordatorios de tu cita.",
-      feature3Title: "Google Maps y Waze",
+        "Los clientes reciben confirmaciones y recordatorios de sus citas por email.",
+
+      feature3Title: "Clientes e historial",
       feature3Text:
-        "Encuentra fácilmente la ubicación del negocio o profesional.",
+        "Mantén organizada la información y el historial de citas de tus clientes.",
+
       feature4Title: "Negocios y profesionales",
       feature4Text:
-        "Reserva con negocios o profesionales independientes.",
-      categories1: "Barberías • Barberos • Uñas",
-      categories2: "Salones • Spas • Car Wash",
+        "Funciona para negocios con equipos y también para profesionales independientes.",
+
+      feature5Title: "Servicios y horarios",
+      feature5Text:
+        "Configura tus servicios, duración, disponibilidad y días de trabajo.",
+
+      feature6Title: "Google Maps y Waze",
+      feature6Text:
+        "Ayuda a tus clientes a encontrar fácilmente la ubicación de tu negocio.",
+
+      categoriesTitle: "Hecho para negocios y profesionales",
+
+      categories1:
+        "Barberías • Barberos • Uñas • Salones",
+
+      categories2:
+        "Spas • Veterinarios • Car Wash • Y más",
+
+      finalTitle:
+        "Reserva cuando quieras. Administra desde un solo lugar.",
+
       footer: "FlowPayDR — Booking Platform",
     },
 
     en: {
       brand: "FLOWPAYDR BOOKING",
-      title: "Book your appointment",
-      title2: "easy, fast and professional.",
+
+      title: "Easy booking for",
+      title2: "customers and businesses.",
+
       subtitle:
-        "Find the business or professional you need, select your service and book your time.",
+        "Book an appointment online or manage your business appointments, customers, services and professionals from one place.",
+
       book: "Book an Appointment",
       dashboard: "Login to Dashboard",
-      whyTitle: "Why use FlowPayDR?",
+
+      customerTitle: "Looking to book an appointment?",
+      customerText:
+        "Find a business or professional, choose your service, date and available time.",
+      customerButton: "Find a place to book",
+
+      businessTitle: "Do you own a business?",
+      businessText:
+        "Manage your appointments, customers, services, schedules and professionals with FlowPayDR Booking.",
+
+      barberRegister: "Register Barbershop / Barber",
+      businessRegister: "Register Other Business",
+      businessButton: "Login to Dashboard",
+
+      whyTitle: "Everything you need for appointments",
+
       feature1Title: "24/7 Booking",
-      feature1Text: "Book whenever you want.",
-      feature2Title: "Email Confirmations",
+      feature1Text:
+        "Customers can book appointments anytime directly from their phone.",
+
+      feature2Title: "Confirmations & Reminders",
       feature2Text:
-        "Receive your confirmation and appointment reminders by email.",
-      feature3Title: "Google Maps & Waze",
+        "Customers receive appointment confirmations and reminders by email.",
+
+      feature3Title: "Customers & History",
       feature3Text:
-        "Easily find the location of the business or professional.",
+        "Keep your customer information and appointment history organized.",
+
       feature4Title: "Businesses & Professionals",
       feature4Text:
-        "Book with businesses or independent professionals.",
-      categories1: "Barbershops • Barbers • Nails",
-      categories2: "Salons • Spas • Car Wash",
+        "Built for businesses with teams and independent professionals.",
+
+      feature5Title: "Services & Schedules",
+      feature5Text:
+        "Configure services, duration, availability and working days.",
+
+      feature6Title: "Google Maps & Waze",
+      feature6Text:
+        "Help customers easily find the location of your business.",
+
+      categoriesTitle: "Built for businesses and professionals",
+
+      categories1:
+        "Barbershops • Barbers • Nails • Salons",
+
+      categories2:
+        "Spas • Veterinarians • Car Wash • And more",
+
+      finalTitle:
+        "Book anytime. Manage everything from one place.",
+
       footer: "FlowPayDR — Booking Platform",
     },
   };
@@ -121,11 +201,10 @@ export default function HomeClient() {
             {tr.title2}
           </h1>
 
-          <p className="mt-6 text-lg sm:text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-6 text-lg sm:text-xl text-gray-500 max-w-3xl mx-auto leading-relaxed">
             {tr.subtitle}
           </p>
 
-          {/* BUTTONS */}
           <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
 
             <Link
@@ -136,7 +215,7 @@ export default function HomeClient() {
             </Link>
 
             <Link
-             href="/login"
+              href="/login"
               className="bg-gray-100 text-gray-900 px-8 py-4 rounded-xl text-lg font-bold hover:bg-gray-200 transition"
             >
               {tr.dashboard}
@@ -146,75 +225,135 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* WHY FLOWPAYDR */}
+      {/* CUSTOMER / BUSINESS */}
       <section className="bg-gray-50 px-6 py-16">
         <div className="max-w-5xl mx-auto">
 
-          <h2 className="text-3xl sm:text-4xl font-black text-center mb-10">
-            {tr.whyTitle}
-          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* CUSTOMER */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
 
-            {/* FEATURE 1 */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="text-3xl mb-4">📅</div>
+              <div className="text-4xl mb-5">📅</div>
 
-              <h3 className="text-xl font-bold mb-2">
-                {tr.feature1Title}
-              </h3>
+              <h2 className="text-2xl font-black mb-3">
+                {tr.customerTitle}
+              </h2>
 
-              <p className="text-gray-500 leading-relaxed">
-                {tr.feature1Text}
+              <p className="text-gray-500 leading-relaxed mb-6">
+                {tr.customerText}
               </p>
+
+              <Link
+                href="/select-business"
+                className="inline-block bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition"
+              >
+                {tr.customerButton}
+              </Link>
+
             </div>
 
-            {/* FEATURE 2 */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="text-3xl mb-4">✉️</div>
+            {/* BUSINESS */}
+            <div className="bg-black text-white rounded-2xl p-8 shadow-sm">
 
-              <h3 className="text-xl font-bold mb-2">
-                {tr.feature2Title}
-              </h3>
+              <div className="text-4xl mb-5">💼</div>
 
-              <p className="text-gray-500 leading-relaxed">
-                {tr.feature2Text}
+              <h2 className="text-2xl font-black mb-3">
+                {tr.businessTitle}
+              </h2>
+
+              <p className="text-gray-300 leading-relaxed mb-6">
+                {tr.businessText}
               </p>
-            </div>
 
-            {/* FEATURE 3 */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="text-3xl mb-4">📍</div>
+              <div className="flex flex-col gap-3">
 
-              <h3 className="text-xl font-bold mb-2">
-                {tr.feature3Title}
-              </h3>
+                <Link
+                  href={`/register-barber?lang=${lang}`}
+                  className="inline-block bg-white text-black px-6 py-3 rounded-xl font-bold text-center hover:bg-gray-100 transition"
+                >
+                  {tr.barberRegister}
+                </Link>
 
-              <p className="text-gray-500 leading-relaxed">
-                {tr.feature3Text}
-              </p>
-            </div>
+                <Link
+                  href="/business/register"
+                  className="inline-block bg-white text-black px-6 py-3 rounded-xl font-bold text-center hover:bg-gray-100 transition"
+                >
+                  {tr.businessRegister}
+                </Link>
 
-            {/* FEATURE 4 */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <div className="text-3xl mb-4">💈</div>
+                <Link
+                  href="/login"
+                  className="inline-block border border-gray-600 text-white px-6 py-3 rounded-xl font-bold text-center hover:bg-gray-900 transition"
+                >
+                  {tr.businessButton}
+                </Link>
 
-              <h3 className="text-xl font-bold mb-2">
-                {tr.feature4Title}
-              </h3>
+              </div>
 
-              <p className="text-gray-500 leading-relaxed">
-                {tr.feature4Text}
-              </p>
             </div>
 
           </div>
         </div>
       </section>
 
+      {/* FEATURES */}
+      <section className="px-6 py-20">
+        <div className="max-w-5xl mx-auto">
+
+          <h2 className="text-3xl sm:text-4xl font-black text-center mb-12">
+            {tr.whyTitle}
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+            <Feature
+              icon="📅"
+              title={tr.feature1Title}
+              text={tr.feature1Text}
+            />
+
+            <Feature
+              icon="✉️"
+              title={tr.feature2Title}
+              text={tr.feature2Text}
+            />
+
+            <Feature
+              icon="👥"
+              title={tr.feature3Title}
+              text={tr.feature3Text}
+            />
+
+            <Feature
+              icon="💈"
+              title={tr.feature4Title}
+              text={tr.feature4Text}
+            />
+
+            <Feature
+              icon="🕐"
+              title={tr.feature5Title}
+              text={tr.feature5Text}
+            />
+
+            <Feature
+              icon="📍"
+              title={tr.feature6Title}
+              text={tr.feature6Text}
+            />
+
+          </div>
+        </div>
+      </section>
+
       {/* CATEGORIES */}
-      <section className="px-6 py-14 text-center">
+      <section className="bg-gray-50 px-6 py-16 text-center">
         <div className="max-w-4xl mx-auto">
+
+          <h2 className="text-2xl sm:text-3xl font-black mb-6">
+            {tr.categoriesTitle}
+          </h2>
 
           <p className="text-lg sm:text-xl font-semibold text-gray-700">
             {tr.categories1}
@@ -227,6 +366,34 @@ export default function HomeClient() {
         </div>
       </section>
 
+      {/* FINAL CTA */}
+      <section className="px-6 py-20 text-center">
+        <div className="max-w-3xl mx-auto">
+
+          <h2 className="text-3xl sm:text-4xl font-black">
+            {tr.finalTitle}
+          </h2>
+
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
+
+            <Link
+              href="/select-business"
+              className="bg-black text-white px-8 py-4 rounded-xl font-bold hover:bg-gray-800 transition"
+            >
+              {tr.book}
+            </Link>
+
+            <Link
+              href="/login"
+              className="border border-gray-200 px-8 py-4 rounded-xl font-bold hover:bg-gray-50 transition"
+            >
+              {tr.dashboard}
+            </Link>
+
+          </div>
+        </div>
+      </section>
+
       {/* FOOTER */}
       <footer className="mt-auto border-t border-gray-100 px-6 py-8 text-center">
         <p className="text-sm text-gray-400">
@@ -235,5 +402,25 @@ export default function HomeClient() {
       </footer>
 
     </main>
+  );
+}
+
+function Feature({ icon, title, text }) {
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+
+      <div className="text-3xl mb-4">
+        {icon}
+      </div>
+
+      <h3 className="text-xl font-bold mb-2">
+        {title}
+      </h3>
+
+      <p className="text-gray-500 leading-relaxed">
+        {text}
+      </p>
+
+    </div>
   );
 }

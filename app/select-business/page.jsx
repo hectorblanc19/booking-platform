@@ -315,6 +315,16 @@ export default function WelcomePage() {
       .trim();
   }
 
+  // Tours stay in the system, but are hidden from the public marketplace.
+  function isTourCategory(category) {
+    const value = normalizeText(category);
+
+    return (
+      value.includes("tour") ||
+      value.includes("excursion")
+    );
+  }
+
   /*
    * This converts similar category names into one filter.
    *
@@ -429,6 +439,11 @@ export default function WelcomePage() {
     }
   }
 
+  // Public marketplace list. Tour businesses are intentionally excluded.
+  const visibleBusinesses = businesses.filter(function (business) {
+    return !isTourCategory(business.category);
+  });
+
   /*
    * ---------------------------------------------------
    * AVAILABLE CATEGORIES
@@ -441,7 +456,7 @@ export default function WelcomePage() {
 
   const categoryKeys = Array.from(
     new Set([
-      ...businesses.map(function (business) {
+      ...visibleBusinesses.map(function (business) {
         return getCategoryKey(business.category);
       }),
 
@@ -494,7 +509,7 @@ export default function WelcomePage() {
 
   const normalizedSearch = normalizeText(searchTerm);
 
-  const filteredBusinesses = businesses.filter(
+  const filteredBusinesses = visibleBusinesses.filter(
     function (business) {
       const categoryKey = getCategoryKey(
         business.category

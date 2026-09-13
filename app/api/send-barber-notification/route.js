@@ -28,13 +28,23 @@ function formatTime(timeStr) {
 // ⭐ SERVICE TRANSLATIONS
 const SERVICE_TRANSLATIONS = {
   Haircut: { en: "Haircut", es: "Corte" },
+
   Beard: { en: "Beard", es: "Barba" },
+
   "Haircut + Beard": {
     en: "Haircut + Beard",
     es: "Corte + Barba",
   },
-  Fade: { en: "Fade", es: "Degradado" },
-  Other: { en: "Other", es: "Otro" },
+
+  Fade: {
+    en: "Fade",
+    es: "Degradado",
+  },
+
+  Other: {
+    en: "Other",
+    es: "Otro",
+  },
 };
 
 export async function POST(req) {
@@ -53,15 +63,22 @@ export async function POST(req) {
     customer_name,
     customer_phone,
     customer_email,
+
     service,
     date,
     time,
     notes,
+
     dashboard_link,
     lang = "en",
 
     // ⭐ EMAIL TYPE
     notification_type = "new",
+
+    // ⭐ TOUR / GROUP BOOKING FIELDS
+    guest_count,
+    pickup_location,
+    is_group_booking = false,
   } = body;
 
   // ⭐ DETERMINE IF THIS IS A PROVIDER OR BARBER
@@ -96,7 +113,10 @@ export async function POST(req) {
   }
 
   // ⭐ DETERMINE LANGUAGE
-  const langCode = lang === "es" ? "es" : "en";
+  const langCode =
+    lang === "es"
+      ? "es"
+      : "en";
 
   // ⭐ TRANSLATE SERVICE
   const translatedService =
@@ -127,18 +147,33 @@ export async function POST(req) {
         : "You have a new appointment.",
 
       customerDetails: "Customer Details",
+
       name: "Name",
+
       phone: "Phone",
+
       email: "Email",
+
       apptDetails: "Appointment Details",
+
       service: "Service",
+
       date: "Date",
+
       time: "Time",
+
       notes: "Notes",
+
       none: "None",
+
+      guests: "Guests",
+
+      pickup: "Meeting / Pickup Location",
+
       professional: isProvider
         ? "Professional"
         : "Barber",
+
       button: "Open Dashboard",
     },
 
@@ -164,32 +199,95 @@ export async function POST(req) {
         : "Tienes una nueva cita.",
 
       customerDetails: "Detalles del Cliente",
+
       name: "Nombre",
+
       phone: "Teléfono",
+
       email: "Correo",
+
       apptDetails: "Detalles de la Cita",
+
       service: "Servicio",
+
       date: "Fecha",
+
       time: "Hora",
+
       notes: "Notas",
+
       none: "Ninguna",
+
+      guests: "Personas",
+
+      pickup: "Punto de encuentro o recogida",
+
       professional: isProvider
         ? "Profesional"
         : "Barbero",
+
       button: "Abrir Panel",
     },
   }[langCode];
 
+  // ⭐ TOUR DETAILS
+  // These only appear for Tour / group reservations.
+  const tourDetailsHtml =
+    is_group_booking
+      ? `
+        <div
+          style="
+            margin-top: 15px;
+            padding: 14px;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 10px;
+          "
+        >
+          <p style="margin: 5px 0;">
+            <strong>${tr.guests}:</strong>
+            ${
+              guest_count !== null &&
+              guest_count !== undefined &&
+              guest_count !== ""
+                ? guest_count
+                : "N/A"
+            }
+          </p>
+
+          <p style="margin: 5px 0;">
+            <strong>${tr.pickup}:</strong>
+            ${pickup_location || "N/A"}
+          </p>
+        </div>
+      `
+      : "";
+
   // ⭐ SEND EMAIL TO BARBER OR PROVIDER
   try {
-    await resend.emails.send({
-      from: "info@flowpaydr.com",
+    const {
+      data: emailData,
+      error: emailError,
+    } = await resend.emails.send({
+      from: "FlowPayDR <info@flowpaydr.com>",
+
       to: professionalEmail,
+
       subject: tr.subject,
 
       html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: auto; border-radius: 12px; background: #ffffff; border: 1px solid #eee;">
-          
+        <div
+          style="
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 500px;
+            margin: auto;
+            border-radius: 12px;
+            background: #ffffff;
+            border: 1px solid #eeeeee;
+          "
+        >
+
           <h2 style="text-align:center;">
             ${tr.title}
           </h2>
@@ -199,56 +297,99 @@ export async function POST(req) {
           </p>
 
           <p style="text-align:center;">
-            <strong>${tr.professional}:</strong>
+            <strong>
+              ${tr.professional}:
+            </strong>
+
             ${professionalName || "N/A"}
           </p>
 
-          <h3>${tr.customerDetails}</h3>
+          <h3>
+            ${tr.customerDetails}
+          </h3>
 
           <p>
-            <strong>${tr.name}:</strong>
+            <strong>
+              ${tr.name}:
+            </strong>
+
             ${customer_name || "N/A"}
           </p>
 
           <p>
-            <strong>${tr.phone}:</strong>
+            <strong>
+              ${tr.phone}:
+            </strong>
+
             ${customer_phone || "N/A"}
           </p>
 
           <p>
-            <strong>${tr.email}:</strong>
+            <strong>
+              ${tr.email}:
+            </strong>
+
             ${customer_email || "N/A"}
           </p>
 
-          <h3>${tr.apptDetails}</h3>
+          <h3>
+            ${tr.apptDetails}
+          </h3>
 
           <p>
-            <strong>${tr.service}:</strong>
+            <strong>
+              ${tr.service}:
+            </strong>
+
             ${translatedService}
           </p>
 
           <p>
-            <strong>${tr.date}:</strong>
+            <strong>
+              ${tr.date}:
+            </strong>
+
             ${date}
           </p>
 
           <p>
-            <strong>${tr.time}:</strong>
+            <strong>
+              ${tr.time}:
+            </strong>
+
             ${formatTime(time)}
           </p>
 
+          ${tourDetailsHtml}
+
           <p>
-            <strong>${tr.notes}:</strong>
+            <strong>
+              ${tr.notes}:
+            </strong>
+
             ${notes || tr.none}
           </p>
 
           ${
             dashboard_link
               ? `
-                <div style="text-align:center; margin-top:25px;">
+                <div
+                  style="
+                    text-align:center;
+                    margin-top:25px;
+                  "
+                >
                   <a
                     href="${dashboard_link}"
-                    style="background:#2563eb; color:white; padding:12px 20px; border-radius:8px; text-decoration:none; font-size:16px;"
+                    style="
+                      background:#2563eb;
+                      color:white;
+                      padding:12px 20px;
+                      border-radius:8px;
+                      text-decoration:none;
+                      font-size:16px;
+                      display:inline-block;
+                    "
                   >
                     ${tr.button}
                   </a>
@@ -257,7 +398,14 @@ export async function POST(req) {
               : ""
           }
 
-          <p style="margin-top:30px; font-size:12px; text-align:center; color:#666;">
+          <p
+            style="
+              margin-top:30px;
+              font-size:12px;
+              text-align:center;
+              color:#666666;
+            "
+          >
             FlowPayDR • info@flowpaydr.com
           </p>
 
@@ -265,9 +413,36 @@ export async function POST(req) {
       `,
     });
 
+    if (emailError) {
+      console.error(
+        `${
+          isProvider
+            ? "Provider"
+            : "Barber"
+        } email send error:`,
+        emailError
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Failed to send ${
+            isProvider
+              ? "provider"
+              : "barber"
+          } email`,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
     console.log(
       `📧 ${
-        isProvider ? "Provider" : "Barber"
+        isProvider
+          ? "Provider"
+          : "Barber"
       } ${
         isCancellation
           ? "cancellation"
@@ -280,38 +455,72 @@ export async function POST(req) {
   } catch (err) {
     console.error(
       `${
-        isProvider ? "Provider" : "Barber"
+        isProvider
+          ? "Provider"
+          : "Barber"
       } email error:`,
       err
     );
 
-    return NextResponse.json({
-      error: `Failed to send ${
-        isProvider ? "provider" : "barber"
-      } email`,
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Failed to send ${
+          isProvider
+            ? "provider"
+            : "barber"
+        } email`,
+      },
+      {
+        status: 500,
+      }
+    );
   }
 
   // ⭐ KEEP EXISTING BARBER PUSH NOTIFICATION
   // Generic providers do not use barber push-token logic.
-  if (!isProvider && professionalId) {
+  if (
+    !isProvider &&
+    professionalId
+  ) {
     try {
-      const { data: tokens } = await supabase
+      const {
+        data: tokens,
+        error: tokenError,
+      } = await supabase
         .from("push_tokens")
         .select("subscription")
-        .eq("user_id", professionalId)
-        .eq("role", "barber");
+        .eq(
+          "user_id",
+          professionalId
+        )
+        .eq(
+          "role",
+          "barber"
+        );
 
-      if (!tokens || tokens.length === 0) {
+      if (tokenError) {
+        console.error(
+          "Barber push-token lookup error:",
+          tokenError
+        );
+      }
+
+      if (
+        !tokens ||
+        tokens.length === 0
+      ) {
         console.log(
           "ℹ️ No push tokens for barber:",
           professionalId
         );
       }
 
-      for (const t of tokens || []) {
+      for (
+        const token of tokens || []
+      ) {
         await sendPushToSubscription(
-          t.subscription,
+          token.subscription,
           {
             title: isCancellation
               ? "Appointment Cancelled"

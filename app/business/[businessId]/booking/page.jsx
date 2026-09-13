@@ -30,12 +30,15 @@ export default function BusinessBookingPage() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
+  const [guestCount, setGuestCount] = useState("");
+  const [pickupLocation, setPickupLocation] = useState("");
   const [savingAppointment, setSavingAppointment] = useState(false);
 
   // PROVIDER AVAILABILITY
   const [availableTimes, setAvailableTimes] = useState([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [dayClosed, setDayClosed] = useState(false);
+  const [tourSeatsRemaining, setTourSeatsRemaining] = useState({});
 
   // STARTING TIMES EVERY 30 MINUTES
   const SLOT_INTERVAL = 30;
@@ -66,6 +69,11 @@ export default function BusinessBookingPage() {
     normalizedCategory.includes("barbero") ||
     normalizedCategory.includes("barbería") ||
     normalizedCategory.includes("barberia");
+
+  const isTourBusiness =
+    normalizedCategory.includes("tour") ||
+    normalizedCategory.includes("excursion") ||
+    normalizedCategory.includes("excursión");
 
   const baseUrl =
     typeof window !== "undefined"
@@ -211,6 +219,7 @@ function getDominicanNow() {
     if (!date || !provider?.id || !service) {
       setAvailableTimes([]);
       setAppointmentTime("");
+      setTourSeatsRemaining({});
       return;
     }
 
@@ -219,22 +228,97 @@ function getDominicanNow() {
     setLoadingTimes(true);
     setAppointmentTime("");
     setAvailableTimes([]);
+    setTourSeatsRemaining({});
     setDayClosed(false);
 
     try {
+      const dominicanNow = getDominicanNow();
+      const todayString = dominicanNow.date;
+      const isToday = date === todayString;
+      const currentMinutes =
+        dominicanNow.hours * 60 + dominicanNow.minutes;
+
+      // TOURS USE FIXED DEPARTURE TIMES + GUEST CAPACITY.
+      // Multiple customers may book the same departure until capacity is full.
+      if (isTourBusiness) {
+        const departureTimes = Array.isArray(service.departure_times)
+          ? service.departure_times
+          : [];
+
+        const maxGuests = Number(service.max_guests_per_departure) || 0;
+
+        if (departureTimes.length === 0 || maxGuests < 1) {
+          setDayClosed(true);
+          setAvailableTimes([]);
+          return;
+        }
+
+        const { data: appointments, error: appointmentsError } =
+          await supabase
+            .from("appointments")
+            .select("service_id, service, time, guest_count, status")
+            .eq("provider_id", provider.id)
+            .eq("date", date)
+            .eq("status", "confirmed");
+
+        if (appointmentsError) {
+          console.error(
+            "Error loading tour reservations:",
+            appointmentsError
+          );
+          setAvailableTimes([]);
+          return;
+        }
+
+        const seatsByTime = {};
+        const availableDepartures = [];
+
+        departureTimes.forEach((departure) => {
+          const cleanDeparture = String(departure).slice(0, 5);
+          const departureMinutes = timeToMinutes(cleanDeparture);
+
+          // Do not show a departure that has already passed today.
+          if (isToday && departureMinutes <= currentMinutes) {
+            return;
+          }
+
+          const bookedGuests = (appointments || [])
+            .filter((appointment) => {
+              const sameTime =
+                String(appointment.time || "").slice(0, 5) === cleanDeparture;
+
+              // New Tour reservations use service_id. The service-name fallback
+              // keeps older Tour reservations counted too.
+              const sameService =
+                appointment.service_id === service.id ||
+                (!appointment.service_id &&
+                  appointment.service === service.name);
+
+              return sameTime && sameService;
+            })
+            .reduce(
+              (total, appointment) =>
+                total + Math.max(1, Number(appointment.guest_count) || 1),
+              0
+            );
+
+          const remaining = Math.max(0, maxGuests - bookedGuests);
+          seatsByTime[cleanDeparture] = remaining;
+
+          if (remaining > 0) {
+            availableDepartures.push(cleanDeparture);
+          }
+        });
+
+        setTourSeatsRemaining(seatsByTime);
+        setAvailableTimes(availableDepartures);
+        return;
+      }
+
+      // NORMAL PROVIDERS KEEP THE EXISTING WORKING-HOURS / 30-MINUTE LOGIC.
       const selectedDate = new Date(`${date}T00:00:00`);
-const dayOfWeek = selectedDate.getDay();
+      const dayOfWeek = selectedDate.getDay();
 
-// CHECK IF SELECTED DATE IS TODAY IN DOMINICAN REPUBLIC
-const dominicanNow = getDominicanNow();
-
-const todayString = dominicanNow.date;
-const isToday = date === todayString;
-
-const currentMinutes =
-  dominicanNow.hours * 60 + dominicanNow.minutes;
-
-      // PROVIDER WORKING HOURS
       const {
         data: availability,
         error: availabilityError,
@@ -251,7 +335,6 @@ const currentMinutes =
           "Error loading provider availability:",
           availabilityError
         );
-
         setAvailableTimes([]);
         return;
       }
@@ -262,7 +345,6 @@ const currentMinutes =
         return;
       }
 
-      // EXISTING APPOINTMENTS
       const {
         data: appointments,
         error: appointmentsError,
@@ -278,32 +360,25 @@ const currentMinutes =
           "Error loading appointments:",
           appointmentsError
         );
-
         setAvailableTimes([]);
         return;
       }
 
       const existingAppointments = appointments || [];
-
-      const startMinutes =
-        timeToMinutes(availability.start_time);
-
-      const endMinutes =
-        timeToMinutes(availability.end_time);
-
+      const startMinutes = timeToMinutes(availability.start_time);
+      const endMinutes = timeToMinutes(availability.end_time);
       const slots = [];
 
       for (
-  let current = startMinutes;
-  current + serviceDuration <= endMinutes;
-  current += SLOT_INTERVAL
-) {
-  // DON'T SHOW TIMES THAT ALREADY PASSED TODAY
-  if (isToday && current <= currentMinutes) {
-    continue;
-  }
+        let current = startMinutes;
+        current + serviceDuration <= endMinutes;
+        current += SLOT_INTERVAL
+      ) {
+        if (isToday && current <= currentMinutes) {
+          continue;
+        }
 
-  const slotTime = minutesToTime(current);
+        const slotTime = minutesToTime(current);
 
         const hasConflict = existingAppointments.some(
           (appointment) =>
@@ -367,58 +442,138 @@ const currentMinutes =
       return;
     }
 
-    // RECHECK AVAILABILITY BEFORE SAVING
-    const {
-      data: currentAppointments,
-      error: checkError,
-    } = await supabase
-      .from("appointments")
-      .select("time, duration")
-      .eq("provider_id", provider.id)
-      .eq("date", appointmentDate)
-      .eq("status", "confirmed");
-
-    if (checkError) {
-      console.error(
-        "Error checking appointments:",
-        checkError
-      );
-
+    if (
+      isTourBusiness &&
+      (!guestCount || Number(guestCount) < 1 || !pickupLocation.trim())
+    ) {
       alert(
         lang === "es"
-          ? "No se pudo verificar el horario. Intenta otra vez."
-          : "Could not verify the appointment time. Please try again."
+          ? "Para reservar un tour, indica la cantidad de personas y el punto de encuentro o recogida."
+          : "For a tour booking, enter the number of guests and the meeting or pickup location."
       );
 
       return;
     }
 
-    const selectedDuration =
-      Number(selectedService.duration) || 60;
+    // RECHECK AVAILABILITY / CAPACITY IMMEDIATELY BEFORE SAVING
+    const selectedDuration = Number(selectedService.duration) || 60;
 
-    const hasConflict = (currentAppointments || []).some(
-      (appointment) =>
-        appointmentsOverlap(
-          appointmentTime,
-          selectedDuration,
-          appointment.time,
-          Number(appointment.duration) || 60
-        )
-    );
+    if (isTourBusiness) {
+      const maxGuests = Number(selectedService.max_guests_per_departure) || 0;
+      const requestedGuests = Number(guestCount) || 0;
+      const configuredDepartures = Array.isArray(selectedService.departure_times)
+        ? selectedService.departure_times.map((time) => String(time).slice(0, 5))
+        : [];
+      const cleanAppointmentTime = String(appointmentTime).slice(0, 5);
 
-    if (hasConflict) {
-      alert(
-        lang === "es"
-          ? "Ese horario acaba de ser reservado o entra en conflicto con otra cita. Selecciona otra hora."
-          : "That time was just booked or conflicts with another appointment. Please select another time."
+      if (!configuredDepartures.includes(cleanAppointmentTime)) {
+        alert(
+          lang === "es"
+            ? "Esa hora ya no está configurada para este tour. Selecciona otra salida."
+            : "That departure is no longer configured for this tour. Please select another departure."
+        );
+        await loadAvailableTimes(appointmentDate, selectedService);
+        return;
+      }
+
+      if (maxGuests < 1) {
+        alert(
+          lang === "es"
+            ? "Este tour todavía no tiene una capacidad configurada."
+            : "This tour does not have a guest capacity configured yet."
+        );
+        return;
+      }
+
+      const { data: tourReservations, error: tourCheckError } =
+        await supabase
+          .from("appointments")
+          .select("service_id, service, time, guest_count")
+          .eq("provider_id", provider.id)
+          .eq("date", appointmentDate)
+          .eq("status", "confirmed");
+
+      if (tourCheckError) {
+        console.error("Error checking tour capacity:", tourCheckError);
+        alert(
+          lang === "es"
+            ? "No se pudo verificar la capacidad del tour. Intenta otra vez."
+            : "Could not verify tour capacity. Please try again."
+        );
+        return;
+      }
+
+      const bookedGuests = (tourReservations || [])
+        .filter((appointment) => {
+          const sameTime =
+            String(appointment.time || "").slice(0, 5) === cleanAppointmentTime;
+          const sameService =
+            appointment.service_id === selectedService.id ||
+            (!appointment.service_id &&
+              appointment.service === selectedService.name);
+          return sameTime && sameService;
+        })
+        .reduce(
+          (total, appointment) =>
+            total + Math.max(1, Number(appointment.guest_count) || 1),
+          0
+        );
+
+      const remainingGuests = Math.max(0, maxGuests - bookedGuests);
+
+      if (requestedGuests > remainingGuests) {
+        alert(
+          lang === "es"
+            ? remainingGuests > 0
+              ? `Solo quedan ${remainingGuests} espacios para esta salida.`
+              : "Esta salida ya está llena. Selecciona otra hora o fecha."
+            : remainingGuests > 0
+            ? `Only ${remainingGuests} spots remain for this departure.`
+            : "This departure is full. Please select another time or date."
+        );
+        await loadAvailableTimes(appointmentDate, selectedService);
+        return;
+      }
+    } else {
+      const {
+        data: currentAppointments,
+        error: checkError,
+      } = await supabase
+        .from("appointments")
+        .select("time, duration")
+        .eq("provider_id", provider.id)
+        .eq("date", appointmentDate)
+        .eq("status", "confirmed");
+
+      if (checkError) {
+        console.error("Error checking appointments:", checkError);
+        alert(
+          lang === "es"
+            ? "No se pudo verificar el horario. Intenta otra vez."
+            : "Could not verify the appointment time. Please try again."
+        );
+        return;
+      }
+
+      const hasConflict = (currentAppointments || []).some(
+        (appointment) =>
+          appointmentsOverlap(
+            appointmentTime,
+            selectedDuration,
+            appointment.time,
+            Number(appointment.duration) || 60
+          )
       );
 
-      await loadAvailableTimes(
-        appointmentDate,
-        selectedService
-      );
-
-      return;
+      if (hasConflict) {
+        alert(
+          lang === "es"
+            ? "Ese horario acaba de ser reservado o entra en conflicto con otra cita. Selecciona otra hora."
+            : "That time was just booked or conflicts with another appointment. Please select another time."
+        );
+        await loadAvailableTimes(appointmentDate, selectedService);
+        return;
+      }
     }
 
     setSavingAppointment(true);
@@ -430,6 +585,8 @@ try {
       business_id: businessId,
       barber_id: null,
       provider_id: provider.id,
+      service_id: selectedService.id,
+      is_group_booking: isTourBusiness,
       service: selectedService.name,
       date: appointmentDate,
       time: appointmentTime,
@@ -441,6 +598,8 @@ try {
       customer_name: customerName,
       customer_phone: customerPhone,
       customer_email: customerEmail || null,
+      guest_count: isTourBusiness ? Number(guestCount) : null,
+      pickup_location: isTourBusiness ? pickupLocation.trim() : null,
       status: "confirmed",
       lang: lang,
     })
@@ -452,7 +611,7 @@ try {
           error
         );
 
-        if (error.code === "23505") {
+        if (error.code === "23505" && !isTourBusiness) {
           alert(
             lang === "es"
               ? "Ese horario acaba de ser reservado. Selecciona otra hora."
@@ -483,19 +642,33 @@ if (customerEmail) {
       headers: {
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify({
-        customer_email: customerEmail,
-        customer_name: customerName,
-        service: selectedService.name,
-        barber_id: null,
-        provider_id: provider.id,
-        business_id: businessId,
-        date: appointmentDate,
-        time: appointmentTime,
-        secret_link: `${baseUrl}/customer/${createdAppointment.id}`,
-        lang: lang,
-      }),
-    });
+  customer_email: customerEmail,
+  customer_name: customerName,
+  service: selectedService.name,
+  barber_id: null,
+  provider_id: provider.id,
+  business_id: businessId,
+  date: appointmentDate,
+  time: appointmentTime,
+  secret_link: `${baseUrl}/customer/${createdAppointment.id}`,
+  lang: lang,
+
+  guest_count: isTourBusiness
+    ? Number(guestCount)
+    : null,
+
+  pickup_location: isTourBusiness
+    ? pickupLocation.trim()
+    : null,
+
+  is_group_booking:
+    isTourBusiness,
+
+}),   
+
+ });
 
     const confirmationData = await confirmationResponse.json();
 
@@ -523,20 +696,35 @@ if (provider?.email) {
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           provider_email: provider.email,
           provider_name: provider.name,
           provider_id: provider.id,
+
           customer_name: customerName,
           customer_phone: customerPhone,
           customer_email: customerEmail || null,
+
           service: selectedService.name,
           date: appointmentDate,
           time: appointmentTime,
           notes: null,
-         dashboard_link: null,
-lang: lang,       
- }),
+
+          dashboard_link: null,
+          lang: lang,
+
+          // TOUR / GROUP BOOKING DATA
+          guest_count: isTourBusiness
+            ? Number(guestCount)
+            : null,
+
+          pickup_location: isTourBusiness
+            ? pickupLocation.trim()
+            : null,
+
+          is_group_booking: isTourBusiness,
+        }),
       }
     );
 
@@ -562,10 +750,11 @@ alert(
     : "Appointment created successfully"
 );
 
-router.push(`/customer/${createdAppointment.id}`);    } finally {
-      setSavingAppointment(false);
-    }
-  }
+router.push(`/customer/${createdAppointment.id}`);
+} finally {
+  setSavingAppointment(false);
+}
+}
 
   async function loadData() {
     setLoading(true);
@@ -738,6 +927,47 @@ router.push(`/customer/${createdAppointment.id}`);    } finally {
               className="border p-2 rounded w-full mb-3"
             />
 
+            {/* TOUR DETAILS */}
+            {isTourBusiness && (
+              <div className="mb-4 p-4 border border-emerald-200 bg-emerald-50 rounded-xl">
+                <p className="font-semibold text-emerald-900 mb-3">
+                  {lang === "es" ? "Detalles del tour" : "Tour details"}
+                </p>
+
+                <label className="block font-semibold mb-1">
+                  {lang === "es" ? "Cantidad de personas" : "Number of guests"}
+                </label>
+
+                <input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  placeholder={lang === "es" ? "Ej. 2" : "Example: 2"}
+                  value={guestCount}
+                  onChange={(e) => setGuestCount(e.target.value)}
+                  className="border p-2 rounded w-full mb-3"
+                />
+
+                <label className="block font-semibold mb-1">
+                  {lang === "es"
+                    ? "Punto de encuentro o recogida"
+                    : "Meeting or pickup location"}
+                </label>
+
+                <input
+                  type="text"
+                  placeholder={
+                    lang === "es"
+                      ? "Ej. Lobby del Hotel Caribe"
+                      : "Example: Hotel Caribe Lobby"
+                  }
+                  value={pickupLocation}
+                  onChange={(e) => setPickupLocation(e.target.value)}
+                  className="border p-2 rounded w-full"
+                />
+              </div>
+            )}
+
             {/* SERVICE */}
             <label className="block font-semibold mb-1">
               {lang === "es" ? "Servicio" : "Service"}
@@ -904,7 +1134,14 @@ router.push(`/customer/${createdAppointment.id}`);    } finally {
                                 : "bg-white hover:bg-blue-50 border-gray-300"
                             }`}
                           >
-                            {formatTime(time)}
+                            <span>{formatTime(time)}</span>
+                            {isTourBusiness && (
+                              <span className="block text-xs font-normal mt-1">
+                                {lang === "es"
+                                  ? `${tourSeatsRemaining[time] ?? 0} espacios disponibles`
+                                  : `${tourSeatsRemaining[time] ?? 0} spots available`}
+                              </span>
+                            )}
                           </button>
                         );
                       })}

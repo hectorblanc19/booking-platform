@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -51,6 +52,11 @@ const isBarberBusiness =
   normalizedCategory.includes("barbería") ||
   normalizedCategory.includes("barberia");
 
+const isTourBusiness =
+  normalizedCategory.includes("tour") ||
+  normalizedCategory.includes("excursion") ||
+  normalizedCategory.includes("excursión");
+
   const [newBarberName, setNewBarberName] = useState("");
   const [newBarberEmail, setNewBarberEmail] = useState("");
 
@@ -71,6 +77,10 @@ const isBarberBusiness =
   const [newAppointmentBarberId, setNewAppointmentBarberId] = useState("");
   const [newAppointmentProviderId, setNewAppointmentProviderId] = useState("");
   const [savingAppointment, setSavingAppointment] = useState(false);
+
+  // TOUR MANUAL RESERVATION
+  const [newTourGuestCount, setNewTourGuestCount] = useState("");
+  const [newTourPickupLocation, setNewTourPickupLocation] = useState("");
 
 // PROVIDER
 const [newProviderName, setNewProviderName] = useState("");
@@ -109,6 +119,13 @@ const [editServicePrice, setEditServicePrice] = useState("");
 const [editServiceDuration, setEditServiceDuration] = useState("");
 const [editServiceProviderId, setEditServiceProviderId] = useState("");
 const [savingEditService, setSavingEditService] = useState(false);
+
+// TOUR SERVICE SCHEDULE SETTINGS
+const [editingTourServiceId, setEditingTourServiceId] = useState(null);
+const [tourDepartureTimes, setTourDepartureTimes] = useState([]);
+const [newTourDepartureTime, setNewTourDepartureTime] = useState("");
+const [tourMaxGuests, setTourMaxGuests] = useState("");
+const [savingTourSettings, setSavingTourSettings] = useState(false);
  
  // TOAST
   const [toast, setToast] = useState(null);
@@ -907,6 +924,124 @@ async function updateService() {
   );
 }
 
+// TOUR SERVICE SCHEDULE
+function formatTourDepartureTime(timeValue) {
+  if (!timeValue) return "";
+
+  const clean = String(timeValue).slice(0, 5);
+  const [hourString, minute] = clean.split(":");
+  let hour = Number(hourString);
+  const period = hour >= 12 ? "PM" : "AM";
+
+  hour = hour % 12 || 12;
+  return `${hour}:${minute} ${period}`;
+}
+
+function startEditTourSettings(service) {
+  setEditingTourServiceId(service.id);
+  setTourDepartureTimes(
+    Array.isArray(service.departure_times)
+      ? service.departure_times.map((time) => String(time).slice(0, 5)).sort()
+      : []
+  );
+  setTourMaxGuests(
+    service.max_guests_per_departure !== null &&
+    service.max_guests_per_departure !== undefined
+      ? String(service.max_guests_per_departure)
+      : ""
+  );
+  setNewTourDepartureTime("");
+}
+
+function cancelEditTourSettings() {
+  setEditingTourServiceId(null);
+  setTourDepartureTimes([]);
+  setNewTourDepartureTime("");
+  setTourMaxGuests("");
+}
+
+function addTourDepartureTime() {
+  if (!newTourDepartureTime) return;
+
+  setTourDepartureTimes((current) => {
+    if (current.includes(newTourDepartureTime)) {
+      return current;
+    }
+
+    return [...current, newTourDepartureTime].sort();
+  });
+
+  setNewTourDepartureTime("");
+}
+
+function removeTourDepartureTime(timeToRemove) {
+  setTourDepartureTimes((current) =>
+    current.filter((time) => time !== timeToRemove)
+  );
+}
+
+async function saveTourSettings() {
+  if (!editingTourServiceId) return;
+
+  if (tourDepartureTimes.length === 0) {
+    showToast(
+      lang === "es"
+        ? "Agrega por lo menos una hora de salida."
+        : "Add at least one departure time."
+    );
+    return;
+  }
+
+  const maxGuests = Number(tourMaxGuests);
+
+  if (!Number.isInteger(maxGuests) || maxGuests <= 0) {
+    showToast(
+      lang === "es"
+        ? "La capacidad debe ser mayor de 0."
+        : "Capacity must be greater than 0."
+    );
+    return;
+  }
+
+  setSavingTourSettings(true);
+
+  try {
+    const departureTimesForDatabase = tourDepartureTimes.map(
+      (time) => `${time}:00`
+    );
+
+    const { error } = await supabase
+      .from("business_services")
+      .update({
+        departure_times: departureTimesForDatabase,
+        max_guests_per_departure: maxGuests,
+      })
+      .eq("id", editingTourServiceId)
+      .eq("business_id", businessId);
+
+    if (error) {
+      console.error("Save tour schedule error:", error);
+      showToast(
+        lang === "es"
+          ? "No se pudo guardar el horario del tour."
+          : "Could not save the tour schedule."
+      );
+      return;
+    }
+
+    await loadDashboard();
+    cancelEditTourSettings();
+
+    showToast(
+      lang === "es"
+        ? "Horario y capacidad guardados."
+        : "Departure times and capacity saved."
+    );
+  } finally {
+    setSavingTourSettings(false);
+  }
+}
+
 // TOGGLE SERVICE ACTIVE / INACTIVE
 async function toggleServiceActive(service) {
   const newStatus = !service.is_active;
@@ -941,6 +1076,284 @@ async function toggleServiceActive(service) {
       ? "Servicio desactivado."
       : "Service deactivated."
   );
+}
+
+
+// --------------------------------------------------
+// TOUR MANUAL RESERVATION
+// --------------------------------------------------
+async function addTourReservation() {
+  if (
+    !newAppointmentName.trim() ||
+    !newAppointmentPhone.trim() ||
+    !newAppointmentService ||
+    !newAppointmentDate ||
+    !newAppointmentTime ||
+    !newTourGuestCount ||
+    Number(newTourGuestCount) < 1 ||
+    !newTourPickupLocation.trim()
+  ) {
+    showToast(
+      lang === "es"
+        ? "Completa todos los campos de la reserva."
+        : "Complete all reservation fields."
+    );
+    return;
+  }
+
+  const selectedService = services.find(
+    (service) => service.id === newAppointmentService
+  );
+
+  if (!selectedService) {
+    showToast(
+      lang === "es"
+        ? "Selecciona un tour válido."
+        : "Select a valid tour."
+    );
+    return;
+  }
+
+  const providerId =
+    selectedService.provider_id ||
+    newAppointmentProviderId ||
+    null;
+
+  if (!providerId) {
+    showToast(
+      lang === "es"
+        ? "Este tour necesita un profesional o guía asignado."
+        : "This tour needs an assigned provider or guide."
+    );
+    return;
+  }
+
+  const configuredDepartures = Array.isArray(
+    selectedService.departure_times
+  )
+    ? selectedService.departure_times.map((time) =>
+        String(time).slice(0, 5)
+      )
+    : [];
+
+  const selectedDeparture =
+    String(newAppointmentTime).slice(0, 5);
+
+  if (!configuredDepartures.includes(selectedDeparture)) {
+    showToast(
+      lang === "es"
+        ? "Selecciona una hora de salida configurada para este tour."
+        : "Select a configured departure time for this tour."
+    );
+    return;
+  }
+
+  const maxGuests =
+    Number(selectedService.max_guests_per_departure) || 0;
+
+  if (maxGuests < 1) {
+    showToast(
+      lang === "es"
+        ? "Este tour no tiene capacidad configurada."
+        : "This tour does not have a configured capacity."
+    );
+    return;
+  }
+
+  setSavingAppointment(true);
+
+  try {
+    const {
+      data: existingReservations,
+      error: capacityError,
+    } = await supabase
+      .from("appointments")
+      .select("service_id, service, time, guest_count, status")
+      .eq("business_id", businessId)
+      .eq("provider_id", providerId)
+      .eq("date", newAppointmentDate)
+      .eq("status", "confirmed");
+
+    if (capacityError) {
+      console.error(
+        "Tour capacity check error:",
+        capacityError
+      );
+
+      showToast(
+        lang === "es"
+          ? "No se pudo verificar la capacidad."
+          : "Could not verify capacity."
+      );
+      return;
+    }
+
+    const bookedGuests = (existingReservations || [])
+      .filter((reservation) => {
+        const sameTime =
+          String(reservation.time || "").slice(0, 5) ===
+          selectedDeparture;
+
+        const sameService =
+          reservation.service_id === selectedService.id ||
+          (!reservation.service_id &&
+            reservation.service === selectedService.name);
+
+        return sameTime && sameService;
+      })
+      .reduce(
+        (total, reservation) =>
+          total +
+          Math.max(
+            1,
+            Number(reservation.guest_count) || 1
+          ),
+        0
+      );
+
+    const requestedGuests = Number(newTourGuestCount);
+    const remainingGuests = maxGuests - bookedGuests;
+
+    if (requestedGuests > remainingGuests) {
+      showToast(
+        lang === "es"
+          ? remainingGuests > 0
+            ? `Solo quedan ${remainingGuests} espacios para esta salida.`
+            : "Esta salida está llena."
+          : remainingGuests > 0
+          ? `Only ${remainingGuests} spots remain for this departure.`
+          : "This departure is full."
+      );
+      return;
+    }
+
+    const {
+      data: createdReservation,
+      error: insertError,
+    } = await supabase
+      .from("appointments")
+      .insert({
+        business_id: businessId,
+        barber_id: null,
+        provider_id: providerId,
+        service_id: selectedService.id,
+        service: selectedService.name,
+        date: newAppointmentDate,
+        time: newAppointmentTime,
+        duration: Number(selectedService.duration) || 60,
+        price:
+          selectedService.price !== null &&
+          selectedService.price !== undefined
+            ? Number(selectedService.price)
+            : null,
+        customer_name: newAppointmentName.trim(),
+        customer_phone: newAppointmentPhone.trim(),
+        customer_email: newAppointmentEmail.trim() || null,
+        guest_count: requestedGuests,
+        pickup_location: newTourPickupLocation.trim(),
+        is_group_booking: true,
+        status: "confirmed",
+        lang: lang,
+        whatsapp_reminder_sent: false,
+      })
+      .select("id")
+      .single();
+
+    if (insertError) {
+      console.error(
+        "Tour reservation insert error:",
+        insertError
+      );
+
+      showToast(
+        lang === "es"
+          ? "No se pudo guardar la reserva."
+          : "Could not save the reservation."
+      );
+      return;
+    }
+
+    console.log(
+      "Tour reservation created:",
+      createdReservation?.id
+    );
+
+    // --------------------------------------------------
+    // SEND CUSTOMER CONFIRMATION EMAIL
+    // --------------------------------------------------
+    if (newAppointmentEmail.trim()) {
+      try {
+        const baseUrl = window.location.origin;
+
+        const confirmationResponse = await fetch(
+          "/api/send-confirmation",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              customer_email: newAppointmentEmail.trim(),
+              customer_name: newAppointmentName.trim(),
+              service: selectedService.name,
+              barber_id: null,
+              provider_id: providerId,
+              business_id: businessId,
+              date: newAppointmentDate,
+              time: newAppointmentTime,
+              secret_link: `${baseUrl}/customer/${createdReservation.id}`,
+              lang: lang,
+              guest_count: requestedGuests,
+              pickup_location: newTourPickupLocation.trim(),
+              is_group_booking: true,
+            }),
+          }
+        );
+
+        const confirmationData =
+          await confirmationResponse.json();
+
+        if (
+          !confirmationResponse.ok ||
+          !confirmationData?.success
+        ) {
+          console.error(
+            "Tour confirmation email error:",
+            confirmationData
+          );
+        } else {
+          console.log(
+            "Tour confirmation email sent successfully."
+          );
+        }
+      } catch (emailError) {
+        console.error(
+          "Tour confirmation email request failed:",
+          emailError
+        );
+      }
+    }
+
+    setNewAppointmentName("");
+    setNewAppointmentPhone("");
+    setNewAppointmentEmail("");
+    setNewAppointmentService("");
+    setNewAppointmentDate("");
+    setNewAppointmentTime("");
+    setNewAppointmentProviderId("");
+    setNewTourGuestCount("");
+    setNewTourPickupLocation("");
+
+    await loadDashboard();
+
+    showToast(
+      lang === "es"
+        ? "Reserva agregada correctamente."
+        : "Reservation added successfully."
+    );
+  } finally {
+    setSavingAppointment(false);
+  }
 }
 
 
@@ -1357,43 +1770,247 @@ if (!accessGranted) {
 </div>  
 </section>
 
-{/* ADD APPOINTMENT */}
-<ManualAppointment
-  t={t}
-  lang={lang}
-  isBarberBusiness={isBarberBusiness}
+{/* TOUR RESERVATION OR NORMAL APPOINTMENT */}
+{isTourBusiness ? (
+  <section className="mb-12">
+    <h2 className="text-2xl font-semibold mb-3">
+      {lang === "es" ? "Agregar Reserva" : "Add Reservation"}
+    </h2>
 
-  newAppointmentName={newAppointmentName}
-  setNewAppointmentName={setNewAppointmentName}
-  newAppointmentPhone={newAppointmentPhone}
-  setNewAppointmentPhone={setNewAppointmentPhone}
-  newAppointmentEmail={newAppointmentEmail}
-  setNewAppointmentEmail={setNewAppointmentEmail}
-  newAppointmentService={newAppointmentService}
-  setNewAppointmentService={setNewAppointmentService}
-  newAppointmentDate={newAppointmentDate}
-  setNewAppointmentDate={setNewAppointmentDate}
-  newAppointmentTime={newAppointmentTime}
-  setNewAppointmentTime={setNewAppointmentTime}
+    <div className="bg-white border rounded-xl shadow p-4 space-y-4">
+      <input
+        type="text"
+        value={newAppointmentName}
+        onChange={(e) => setNewAppointmentName(e.target.value)}
+        placeholder={
+          lang === "es"
+            ? "Nombre del cliente"
+            : "Customer name"
+        }
+        className="border p-2 rounded w-full"
+      />
 
-  newAppointmentBarberId={newAppointmentBarberId}
-  setNewAppointmentBarberId={setNewAppointmentBarberId}
-  newAppointmentProviderId={newAppointmentProviderId}
-  setNewAppointmentProviderId={setNewAppointmentProviderId}
+      <input
+        type="tel"
+        value={newAppointmentPhone}
+        onChange={(e) => setNewAppointmentPhone(e.target.value)}
+        placeholder={
+          lang === "es"
+            ? "WhatsApp / Teléfono"
+            : "WhatsApp / Phone"
+        }
+        className="border p-2 rounded w-full"
+      />
 
-  barbers={barbers}
-  providers={providers}
-  services={services}
+      <input
+        type="email"
+        value={newAppointmentEmail}
+        onChange={(e) => setNewAppointmentEmail(e.target.value)}
+        placeholder={
+          lang === "es"
+            ? "Correo del cliente"
+            : "Customer email"
+        }
+        className="border p-2 rounded w-full"
+      />
 
-  addAppointment={addAppointment}
-  savingAppointment={savingAppointment}
-/>
-{/* BUSINESS QR CODE */}
-<BusinessQRCode
-  t={t}
-  lang={lang}
-  businessId={businessId}
-/>
+      <div>
+        <label className="block font-semibold mb-1">
+          Tour
+        </label>
+
+        <select
+          value={newAppointmentService}
+          onChange={(e) => {
+            const serviceId = e.target.value;
+
+            setNewAppointmentService(serviceId);
+            setNewAppointmentTime("");
+
+            const service = services.find(
+              (item) => item.id === serviceId
+            );
+
+            setNewAppointmentProviderId(
+              service?.provider_id || ""
+            );
+          }}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">
+            {lang === "es"
+              ? "Selecciona un tour"
+              : "Select a tour"}
+          </option>
+
+          {services
+            .filter((service) => service.is_active !== false)
+            .map((service) => (
+              <option
+                key={service.id}
+                value={service.id}
+              >
+                {service.name}
+              </option>
+            ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block font-semibold mb-1">
+          {lang === "es" ? "Fecha" : "Date"}
+        </label>
+
+        <input
+          type="date"
+          value={newAppointmentDate}
+          onChange={(e) =>
+            setNewAppointmentDate(e.target.value)
+          }
+          className="border p-2 rounded w-full"
+        />
+      </div>
+
+      <div>
+        <label className="block font-semibold mb-1">
+          {lang === "es"
+            ? "Hora de salida"
+            : "Departure Time"}
+        </label>
+
+        <select
+          value={newAppointmentTime}
+          onChange={(e) =>
+            setNewAppointmentTime(e.target.value)
+          }
+          className="border p-2 rounded w-full"
+          disabled={!newAppointmentService}
+        >
+          <option value="">
+            {lang === "es"
+              ? "Selecciona una salida"
+              : "Select a departure"}
+          </option>
+
+          {(
+            services.find(
+              (service) =>
+                service.id === newAppointmentService
+            )?.departure_times || []
+          ).map((time) => {
+            const cleanTime = String(time).slice(0, 5);
+
+            return (
+              <option
+                key={cleanTime}
+                value={cleanTime}
+              >
+                {formatTourDepartureTime(cleanTime)}
+              </option>
+            );
+          })}
+        </select>
+      </div>
+
+      <div>
+        <label className="block font-semibold mb-1">
+          {lang === "es"
+            ? "Cantidad de personas"
+            : "Number of Guests"}
+        </label>
+
+        <input
+          type="number"
+          min="1"
+          step="1"
+          value={newTourGuestCount}
+          onChange={(e) =>
+            setNewTourGuestCount(e.target.value)
+          }
+          placeholder="3"
+          className="border p-2 rounded w-full"
+        />
+      </div>
+
+      <div>
+        <label className="block font-semibold mb-1">
+          {lang === "es"
+            ? "Punto de encuentro o recogida"
+            : "Meeting / Pickup Location"}
+        </label>
+
+        <input
+          type="text"
+          value={newTourPickupLocation}
+          onChange={(e) =>
+            setNewTourPickupLocation(e.target.value)
+          }
+          placeholder={
+            lang === "es"
+              ? "Ej. Barceló Resort"
+              : "Example: Barceló Resort"
+          }
+          className="border p-2 rounded w-full"
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={addTourReservation}
+        disabled={savingAppointment}
+        className="bg-green-600 text-white px-5 py-3 rounded-lg w-full disabled:opacity-50"
+      >
+        {savingAppointment
+          ? lang === "es"
+            ? "Guardando..."
+            : "Saving..."
+          : lang === "es"
+          ? "Guardar Reserva"
+          : "Save Reservation"}
+      </button>
+    </div>
+  </section>
+) : (
+  <>
+    <ManualAppointment
+      t={t}
+      lang={lang}
+      isBarberBusiness={isBarberBusiness}
+
+      newAppointmentName={newAppointmentName}
+      setNewAppointmentName={setNewAppointmentName}
+      newAppointmentPhone={newAppointmentPhone}
+      setNewAppointmentPhone={setNewAppointmentPhone}
+      newAppointmentEmail={newAppointmentEmail}
+      setNewAppointmentEmail={setNewAppointmentEmail}
+      newAppointmentService={newAppointmentService}
+      setNewAppointmentService={setNewAppointmentService}
+      newAppointmentDate={newAppointmentDate}
+      setNewAppointmentDate={setNewAppointmentDate}
+      newAppointmentTime={newAppointmentTime}
+      setNewAppointmentTime={setNewAppointmentTime}
+
+      newAppointmentBarberId={newAppointmentBarberId}
+      setNewAppointmentBarberId={setNewAppointmentBarberId}
+      newAppointmentProviderId={newAppointmentProviderId}
+      setNewAppointmentProviderId={setNewAppointmentProviderId}
+
+      barbers={barbers}
+      providers={providers}
+      services={services}
+
+      addAppointment={addAppointment}
+      savingAppointment={savingAppointment}
+    />
+
+    <BusinessQRCode
+      t={t}
+      lang={lang}
+      businessId={businessId}
+    />
+  </>
+)}
+
 {/* BARBERS */}
 {isBarberBusiness && (
   <BarberManagement
@@ -1486,21 +2103,20 @@ if (!accessGranted) {
   updateProvider={updateProvider}
   deleteProvider={deleteProvider}
 />
-    {/* PROVIDER AVAILABILITY */}
-<ProviderAvailability
-  lang={lang}
-  providers={providers}
-
-  selectedAvailabilityProviderId={selectedAvailabilityProviderId}
-  setSelectedAvailabilityProviderId={setSelectedAvailabilityProviderId}
-
-  providerAvailability={providerAvailability}
-  setProviderAvailability={setProviderAvailability}
-
-  loadProviderAvailability={loadProviderAvailability}
-  saveProviderAvailability={saveProviderAvailability}
-  savingProviderAvailability={savingProviderAvailability}
-/>
+   {/* PROVIDER AVAILABILITY — NOT USED FOR TOURS */}
+{!isTourBusiness && (
+  <ProviderAvailability
+    lang={lang}
+    providers={providers}
+    selectedAvailabilityProviderId={selectedAvailabilityProviderId}
+    setSelectedAvailabilityProviderId={setSelectedAvailabilityProviderId}
+    providerAvailability={providerAvailability}
+    setProviderAvailability={setProviderAvailability}
+    loadProviderAvailability={loadProviderAvailability}
+    saveProviderAvailability={saveProviderAvailability}
+    savingProviderAvailability={savingProviderAvailability}
+  />
+)}
   </section>
 )}
 
@@ -1543,6 +2159,190 @@ if (!accessGranted) {
     toggleServiceActive={toggleServiceActive}
   />
 )}
+
+{/* TOUR DEPARTURE TIMES + CAPACITY */}
+{isTourBusiness && (
+  <section className="mb-12">
+    <h2 className="text-2xl font-semibold mb-3">
+      {lang === "es" ? "Horarios de Tours" : "Tour Departure Times"}
+    </h2>
+
+    <div className="bg-white p-4 rounded-xl shadow border space-y-4">
+      <p className="text-sm text-gray-600">
+        {lang === "es"
+          ? "Configura las horas reales de salida y la cantidad máxima de personas para cada tour. Varias reservas pueden usar la misma hora hasta completar la capacidad."
+          : "Set the real departure times and maximum number of guests for each tour. Multiple reservations can use the same departure until capacity is reached."}
+      </p>
+
+      {services.length === 0 ? (
+        <p className="text-sm text-gray-500">
+          {lang === "es"
+            ? "Primero agrega un servicio de tour."
+            : "Add a tour service first."}
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {services.map((service) => {
+            const departureTimes = Array.isArray(service.departure_times)
+              ? service.departure_times
+              : [];
+
+            const isEditing = editingTourServiceId === service.id;
+
+            return (
+              <div
+                key={service.id}
+                className="border rounded-xl p-4 bg-gray-50"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-lg">{service.name}</p>
+
+                    <p className="text-sm text-gray-600 mt-1">
+                      {lang === "es" ? "Salidas:" : "Departures:"}{" "}
+                      {departureTimes.length > 0
+                        ? departureTimes
+                            .map((time) => formatTourDepartureTime(time))
+                            .join(", ")
+                        : lang === "es"
+                        ? "Sin configurar"
+                        : "Not configured"}
+                    </p>
+
+                    <p className="text-sm text-gray-600">
+                      {lang === "es" ? "Capacidad por salida:" : "Capacity per departure:"}{" "}
+                      {service.max_guests_per_departure ||
+                        (lang === "es" ? "Sin configurar" : "Not configured")}
+                    </p>
+                  </div>
+
+                  {!isEditing && (
+                    <button
+                      type="button"
+                      onClick={() => startEditTourSettings(service)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                    >
+                      {lang === "es" ? "Configurar" : "Configure"}
+                    </button>
+                  )}
+                </div>
+
+                {isEditing && (
+                  <div className="mt-4 pt-4 border-t space-y-4">
+                    <div>
+                      <label className="block font-semibold mb-1">
+                        {lang === "es"
+                          ? "Máximo de personas por salida"
+                          : "Maximum guests per departure"}
+                      </label>
+
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={tourMaxGuests}
+                        onChange={(e) => setTourMaxGuests(e.target.value)}
+                        className="border p-2 rounded w-full sm:w-64"
+                        placeholder="40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-1">
+                        {lang === "es" ? "Agregar hora de salida" : "Add departure time"}
+                      </label>
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="time"
+                          value={newTourDepartureTime}
+                          onChange={(e) => setNewTourDepartureTime(e.target.value)}
+                          className="border p-2 rounded sm:w-64"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={addTourDepartureTime}
+                          disabled={!newTourDepartureTime}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                        >
+                          {lang === "es" ? "+ Agregar Hora" : "+ Add Time"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold mb-2">
+                        {lang === "es" ? "Horas configuradas" : "Configured departures"}
+                      </p>
+
+                      {tourDepartureTimes.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                          {lang === "es"
+                            ? "Todavía no hay horas de salida."
+                            : "No departure times yet."}
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {tourDepartureTimes.map((time) => (
+                            <div
+                              key={time}
+                              className="flex items-center gap-2 border bg-white rounded-lg px-3 py-2"
+                            >
+                              <span className="font-semibold">
+                                {formatTourDepartureTime(time)}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => removeTourDepartureTime(time)}
+                                className="text-red-600 font-bold"
+                                title={lang === "es" ? "Eliminar" : "Remove"}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={saveTourSettings}
+                        disabled={savingTourSettings}
+                        className="bg-black text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                      >
+                        {savingTourSettings
+                          ? lang === "es"
+                            ? "Guardando..."
+                            : "Saving..."
+                          : lang === "es"
+                          ? "Guardar Horario"
+                          : "Save Schedule"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={cancelEditTourSettings}
+                        disabled={savingTourSettings}
+                        className="border px-4 py-2 rounded-lg"
+                      >
+                        {lang === "es" ? "Cancelar" : "Cancel"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </section>
+)}
+
 {/* TODAY'S SCHEDULE */}
 <TodaysSchedule
   t={t}
@@ -1611,5 +2411,6 @@ if (!accessGranted) {
 }
 
  
+
 
 

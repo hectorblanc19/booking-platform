@@ -196,47 +196,124 @@ export default function BusinessRegisterPage() {
     setLoading(true);
 
     try {
-      const { data: authData, error: authError } =
-        await supabase.auth.signUp({
-          email: form.email.trim().toLowerCase(),
+      const email = form.email.trim().toLowerCase();
+
+      let userId = null;
+      let currentSession = null;
+      let isExistingAccount = false;
+
+      // --------------------------------------------------
+      // 1. TRY TO CREATE A NEW SUPABASE AUTH USER
+      // --------------------------------------------------
+      const {
+        data: authData,
+        error: authError,
+      } = await supabase.auth.signUp({
+        email,
+        password: form.password,
+        options: {
+          emailRedirectTo:
+            "https://www.flowpaydr.com/business/login",
+        },
+      });
+
+      // Supabase can report an existing user either through
+      // an error or by returning a user with zero identities.
+      const alreadyRegistered =
+        authError?.message
+          ?.toLowerCase()
+          .includes("already registered") ||
+        (authData?.user &&
+          Array.isArray(authData.user.identities) &&
+          authData.user.identities.length === 0);
+
+      // --------------------------------------------------
+      // 2. EXISTING AUTH ACCOUNT
+      // Sign in using the email/password entered in the form
+      // --------------------------------------------------
+      if (alreadyRegistered) {
+        isExistingAccount = true;
+
+        const {
+          data: signInData,
+          error: signInError,
+        } = await supabase.auth.signInWithPassword({
+          email,
           password: form.password,
-          options: {
-            emailRedirectTo:
-              "https://www.flowpaydr.com/business/login",
-          },
         });
 
-      if (authError) {
-        if (
-          authError.message
-            ?.toLowerCase()
-            .includes("already registered")
-        ) {
-          setError(tr.existingAccountAlt);
+        if (signInError || !signInData?.user) {
+          console.error(
+            "Existing account sign-in error:",
+            signInError
+          );
+
+          setError(
+            lang === "es"
+              ? "Este correo ya tiene una cuenta. Verifica tu contraseña o inicia sesión."
+              : "This email already has an account. Check your password or sign in."
+          );
+
           return;
         }
 
-        throw authError;
+        userId = signInData.user.id;
+        currentSession = signInData.session;
+      } else {
+        // --------------------------------------------------
+        // NEW AUTH ACCOUNT
+        // --------------------------------------------------
+        if (authError) {
+          throw authError;
+        }
+
+        if (!authData?.user) {
+          throw new Error(tr.accountFailed);
+        }
+
+        userId = authData.user.id;
+        currentSession = authData.session;
       }
-
-      if (!authData.user) {
-        throw new Error(tr.accountFailed);
-      }
-
-      const identities =
-        authData.user.identities || [];
-
-      if (identities.length === 0) {
-        setError(tr.existingAccount);
-        return;
-      }
-
-      const userId = authData.user.id;
 
       if (!userId) {
         throw new Error(tr.ownerFailed);
       }
 
+      // --------------------------------------------------
+      // 3. CHECK WHETHER THIS USER ALREADY OWNS A BUSINESS
+      // --------------------------------------------------
+      const {
+        data: existingBusinesses,
+        error: existingBusinessError,
+      } = await supabase
+        .from("businesses")
+        .select("id, name")
+        .eq("owner_id", userId)
+        .limit(1);
+
+      if (existingBusinessError) {
+        throw existingBusinessError;
+      }
+
+      if (
+        existingBusinesses &&
+        existingBusinesses.length > 0
+      ) {
+        const existingBusiness = existingBusinesses[0];
+
+        setError(
+          lang === "es"
+            ? `Esta cuenta ya está asociada al negocio "${existingBusiness.name}". Inicia sesión para acceder al panel.`
+            : `This account is already associated with "${existingBusiness.name}". Sign in to access the dashboard.`
+        );
+
+        return;
+      }
+
+      // --------------------------------------------------
+      // 4. USER HAS NO BUSINESS
+      // Create a new business under this Auth user
+      // --------------------------------------------------
       const {
         data: business,
         error: businessError,
@@ -258,7 +335,22 @@ export default function BusinessRegisterPage() {
         throw businessError;
       }
 
-      if (!authData.session) {
+      // --------------------------------------------------
+      // 5. EXISTING USER WHO RE-REGISTERED
+      // Already has a valid session, so go straight to dashboard
+      // --------------------------------------------------
+      if (isExistingAccount && currentSession) {
+        router.push(
+          `/business/${business.id}/dashboard`
+        );
+
+        return;
+      }
+
+      // --------------------------------------------------
+      // 6. NEW ACCOUNT WITH EMAIL CONFIRMATION REQUIRED
+      // --------------------------------------------------
+      if (!currentSession) {
         setSuccess(tr.success);
 
         setTimeout(() => {
@@ -268,6 +360,9 @@ export default function BusinessRegisterPage() {
         return;
       }
 
+      // --------------------------------------------------
+      // 7. NEW ACCOUNT WITH ACTIVE SESSION
+      // --------------------------------------------------
       router.push(
         `/business/${business.id}/dashboard`
       );

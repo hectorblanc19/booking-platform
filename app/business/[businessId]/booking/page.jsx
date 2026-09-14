@@ -777,7 +777,7 @@ router.push(`/customer/${createdAppointment.id}`);
     const { data: prov, error: providerError } =
       await supabase
         .from("providers")
-        .select("id, name, specialty, email, business_id")
+        .select("*")
         .eq("business_id", businessId);
 
     if (providerError) {
@@ -795,7 +795,7 @@ router.push(`/customer/${createdAppointment.id}`);
         error: selectedProviderError,
       } = await supabase
         .from("providers")
-        .select("id, name, specialty, email, business_id")
+        .select("*")
         .eq("id", providerId)
         .eq("business_id", businessId)
         .single();
@@ -852,10 +852,56 @@ router.push(`/customer/${createdAppointment.id}`);
         </button>
       </div>
 
+      {/* BUSINESS PHOTO / LOGO */}
+      {business?.photo_url && (
+        <div className="flex justify-center mb-4">
+          <img
+            src={business.photo_url}
+            alt={business?.name || "Business"}
+            className="w-28 h-28 rounded-2xl object-cover bg-white border border-gray-200 shadow-sm"
+          />
+        </div>
+      )}
+
       {/* BUSINESS NAME */}
-      <h1 className="text-3xl font-bold mb-6 text-center">
+      <h1 className="text-3xl font-bold mb-4 text-center">
         {tr.bookAt} {business?.name}
       </h1>
+
+      {/* BUSINESS LOCATION */}
+      {(business?.address || business?.phone || business?.map_url) && (
+        <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl shadow-sm text-center">
+          {business?.address && (
+            <p className="text-sm text-gray-700">
+              📍 {business.address}
+            </p>
+          )}
+
+          {business?.phone && (
+            <p className="text-sm text-gray-700 mt-1">
+              📞 {business.phone}
+            </p>
+          )}
+
+          {(business?.map_url || business?.address) && (
+            <a
+              href={
+                business?.map_url ||
+                `https://maps.google.com/?q=${encodeURIComponent(
+                  business?.address || ""
+                )}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-3 text-blue-600 underline font-medium text-sm"
+            >
+              {lang === "es"
+                ? "Ver ubicación en Google Maps"
+                : "Open location in Google Maps"}
+            </a>
+          )}
+        </div>
+      )}
 
       {/* BUSINESS QR */}
       <div className="mb-8 text-center">
@@ -1260,8 +1306,22 @@ router.push(`/customer/${createdAppointment.id}`);
                 className="p-4 border rounded-xl shadow bg-white"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-2xl">
-                    👨‍⚕️
+                  <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+                    {providerItem.photo_url ||
+                    providerItem.avatar_url ||
+                    providerItem.image_url ? (
+                      <img
+                        src={
+                          providerItem.photo_url ||
+                          providerItem.avatar_url ||
+                          providerItem.image_url
+                        }
+                        alt={providerItem.name || "Provider"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl">👤</span>
+                    )}
                   </div>
 
                   <div className="flex-1">

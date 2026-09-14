@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -42,6 +41,10 @@ const [loading, setLoading] = useState(true);
 // BUSINESS PHOTO
 const [uploadingBusinessPhoto, setUploadingBusinessPhoto] = useState(false);
 const [businessPhotoPreview, setBusinessPhotoPreview] = useState(null);
+
+// BUSINESS GOOGLE MAPS PIN
+const [businessMapUrl, setBusinessMapUrl] = useState("");
+const [savingBusinessMapUrl, setSavingBusinessMapUrl] = useState(false);
 
 // Detect whether this business is a barber business
 const normalizedCategory = business?.category?.trim().toLowerCase() || "";
@@ -95,6 +98,12 @@ const [editProviderEmail, setEditProviderEmail] = useState("");
 const [editProviderPhone, setEditProviderPhone] = useState("");
 const [editProviderSpecialty, setEditProviderSpecialty] = useState("");
 const [savingEditProvider, setSavingEditProvider] = useState(false);
+
+// PROVIDER PROFILE PHOTO
+const [uploadingProviderPhotoId, setUploadingProviderPhotoId] = useState(null);
+
+// BUSINESS ACCOUNT DELETION
+const [deletingBusiness, setDeletingBusiness] = useState(false);
 
 // PROVIDER AVAILABILITY
 const [providerAvailability, setProviderAvailability] = useState([]);
@@ -342,6 +351,60 @@ async function uploadBusinessPhoto(file) {
   }
 }
 
+// SAVE BUSINESS GOOGLE MAPS PIN
+async function saveBusinessMapUrl() {
+  const cleanUrl = businessMapUrl.trim();
+
+  if (cleanUrl) {
+    try {
+      const parsedUrl = new URL(cleanUrl);
+
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        throw new Error("Invalid protocol");
+      }
+    } catch {
+      showToast(
+        lang === "es"
+          ? "Escribe un enlace válido de Google Maps."
+          : "Enter a valid Google Maps link."
+      );
+      return;
+    }
+  }
+
+  setSavingBusinessMapUrl(true);
+
+  try {
+    const { error } = await supabase
+      .from("businesses")
+      .update({
+        map_url: cleanUrl || null,
+      })
+      .eq("id", businessId);
+
+    if (error) {
+      console.error("Business Google Maps save error:", error);
+
+      showToast(
+        lang === "es"
+          ? "No se pudo guardar la ubicación."
+          : "Could not save the location."
+      );
+      return;
+    }
+
+    await loadDashboard();
+
+    showToast(
+      lang === "es"
+        ? "Ubicación de Google Maps guardada."
+        : "Google Maps location saved."
+    );
+  } finally {
+    setSavingBusinessMapUrl(false);
+  }
+}
+
   async function loadDashboard() {
     setLoading(true);
 
@@ -351,6 +414,7 @@ async function uploadBusinessPhoto(file) {
       .eq("id", businessId)
       .single();
     setBusiness(biz || null);
+    setBusinessMapUrl(biz?.map_url || "");
 
    const { data: bar } = await supabase
   .from("barbers")
@@ -622,6 +686,76 @@ async function addProvider() {
       ? "Profesional agregado"
       : "Provider added"
   );
+}
+
+// PROVIDER PROFILE PHOTO
+async function uploadProviderPhoto(provider, file) {
+  if (!provider?.id || !file) return;
+
+  if (!file.type.startsWith("image/")) {
+    showToast(
+      lang === "es"
+        ? "Selecciona una imagen válida."
+        : "Select a valid image."
+    );
+    return;
+  }
+
+  setUploadingProviderPhotoId(provider.id);
+
+  try {
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const safeId = Math.random().toString(36).substring(2);
+    const fileName =
+      `providers/${businessId}/${provider.id}/${safeId}-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("barber-photos")
+      .upload(fileName, file);
+
+    if (uploadError) {
+      console.error("Provider photo upload error:", uploadError);
+
+      showToast(
+        lang === "es"
+          ? "No se pudo subir la foto del profesional."
+          : "Could not upload the provider photo."
+      );
+      return;
+    }
+
+    const photoUrl =
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/barber-photos/${fileName}`;
+
+    const { error: updateError } = await supabase
+      .from("providers")
+      .update({
+        photo_url: photoUrl,
+      })
+      .eq("id", provider.id)
+      .eq("business_id", businessId);
+
+    if (updateError) {
+      console.error("Provider photo database error:", updateError);
+
+      showToast(
+        lang === "es"
+          ? "La foto subió, pero no se pudo guardar en el profesional."
+          : "The photo uploaded, but could not be saved to the provider."
+      );
+      return;
+    }
+
+    await loadDashboard();
+
+    showToast(
+      lang === "es"
+        ? "Foto del profesional actualizada."
+        : "Provider photo updated."
+    );
+  } finally {
+    setUploadingProviderPhotoId(null);
+  }
 }
 
 // EDIT PROVIDER
@@ -1656,6 +1790,82 @@ const changeBarberPage = (barberId, newPage) => {
 };
 
 
+async function handleDeleteBusiness() {
+  if (!businessId || deletingBusiness) return;
+
+  const firstConfirm = window.confirm(
+    lang === "es"
+      ? "¿Seguro que deseas eliminar este negocio? Se eliminarán sus citas, profesionales, servicios y horarios. Esta acción no se puede deshacer."
+      : "Are you sure you want to delete this business? Its appointments, providers, services, and schedules will be deleted. This cannot be undone."
+  );
+
+  if (!firstConfirm) return;
+
+  const secondConfirm = window.confirm(
+    lang === "es"
+      ? "Confirmación final: ¿Eliminar permanentemente tu cuenta de negocio?"
+      : "Final confirmation: permanently delete your business account?"
+  );
+
+  if (!secondConfirm) return;
+
+  setDeletingBusiness(true);
+
+  try {
+const {
+  data: { session },
+  error: sessionError,
+} = await supabase.auth.getSession();
+
+if (sessionError || !session?.access_token) {
+  showToast(
+    lang === "es"
+      ? "Tu sesión expiró. Inicia sesión nuevamente."
+      : "Your session expired. Please sign in again."
+  );
+
+  return;
+}
+
+const response = await fetch("/api/business/delete", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session.access_token}`,
+  },
+  body: JSON.stringify({ businessId }),
+});    
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      console.error("Delete business error:", result);
+
+      showToast(
+        lang === "es"
+          ? result?.error || "No se pudo eliminar el negocio."
+          : result?.error || "Could not delete the business."
+      );
+
+      return;
+    }
+
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  } catch (error) {
+    console.error("Delete business request error:", error);
+
+    showToast(
+      lang === "es"
+        ? "Ocurrió un error al eliminar el negocio."
+        : "An error occurred while deleting the business."
+    );
+  } finally {
+    setDeletingBusiness(false);
+  }
+}
+
+
  if (checkingAuth) {
   return <p className="p-6 text-center">Checking access…</p>;
 }
@@ -1716,7 +1926,66 @@ if (!accessGranted) {
   <p><strong>Address:</strong> {business?.address}</p>
 
   {!isBarberBusiness && (
-    <div className="pt-3 border-t">
+    <div className="pt-3 border-t space-y-5">
+      {/* GOOGLE MAPS PIN */}
+      <div>
+        <p className="font-semibold mb-2">
+          {lang === "es"
+            ? "Ubicación exacta en Google Maps"
+            : "Exact Google Maps Location"}
+        </p>
+
+        <p className="text-sm text-gray-500 mb-2">
+          {lang === "es"
+            ? "Pega aquí el enlace del pin de tu negocio en Google Maps."
+            : "Paste your business Google Maps pin link here."}
+        </p>
+
+        <input
+          type="url"
+          value={businessMapUrl}
+          onChange={(e) => setBusinessMapUrl(e.target.value)}
+          placeholder="https://maps.app.goo.gl/..."
+          className="border p-2 rounded w-full"
+        />
+
+        <div className="flex flex-wrap items-center gap-3 mt-3">
+          <button
+            type="button"
+            onClick={saveBusinessMapUrl}
+            disabled={savingBusinessMapUrl}
+            className={`px-4 py-2 rounded font-medium ${
+              savingBusinessMapUrl
+                ? "bg-gray-300 text-gray-600"
+                : "bg-blue-600 text-white"
+            }`}
+          >
+            {savingBusinessMapUrl
+              ? lang === "es"
+                ? "Guardando..."
+                : "Saving..."
+              : lang === "es"
+              ? "Guardar ubicación"
+              : "Save Location"}
+          </button>
+
+          {business?.map_url && (
+            <a
+              href={business.map_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 underline text-sm"
+            >
+              {lang === "es"
+                ? "Ver pin guardado"
+                : "View saved pin"}
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* BUSINESS PHOTO */}
+      <div className="pt-4 border-t">
       <p className="font-semibold mb-3">
         {lang === "es" ? "Foto del negocio" : "Business Photo"}
       </p>
@@ -1765,6 +2034,7 @@ if (!accessGranted) {
           }}
         />
       </label>
+      </div>
     </div>
   )}
 </div>  
@@ -2082,6 +2352,90 @@ if (!accessGranted) {
       </button>
     </div>
 
+    {/* PROVIDER PROFILE PHOTOS */}
+    {providers.length > 0 && (
+      <div className="bg-white border rounded-xl shadow p-4 mb-5">
+        <h3 className="text-lg font-semibold mb-1">
+          {lang === "es" ? "Fotos de los profesionales" : "Provider Photos"}
+        </h3>
+
+        <p className="text-sm text-gray-500 mb-4">
+          {lang === "es"
+            ? "Cada profesional puede tener su propia foto para mostrarla en la página de reservas."
+            : "Each provider can have their own photo shown on the booking page."}
+        </p>
+
+        <div className="space-y-4">
+          {providers.map((provider) => (
+            <div
+              key={provider.id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-lg p-3"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-16 h-16 rounded-full bg-gray-100 border overflow-hidden flex items-center justify-center shrink-0">
+                  {provider.photo_url ? (
+                    <img
+                      src={provider.photo_url}
+                      alt={provider.name || "Provider"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl">👤</span>
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{provider.name}</p>
+                  {provider.specialty && (
+                    <p className="text-sm text-gray-500 truncate">
+                      {provider.specialty}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <label
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded cursor-pointer whitespace-nowrap ${
+                  uploadingProviderPhotoId === provider.id
+                    ? "bg-gray-300 text-gray-600"
+                    : "bg-blue-600 text-white"
+                }`}
+              >
+                📸{" "}
+                {uploadingProviderPhotoId === provider.id
+                  ? lang === "es"
+                    ? "Subiendo..."
+                    : "Uploading..."
+                  : provider.photo_url
+                  ? lang === "es"
+                    ? "Cambiar Foto"
+                    : "Change Photo"
+                  : lang === "es"
+                  ? "Subir Foto"
+                  : "Upload Photo"}
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingProviderPhotoId === provider.id}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+
+                    if (file) {
+                      uploadProviderPhoto(provider, file);
+                    }
+
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
     <ProviderList
   providers={providers}
   lang={lang}
@@ -2395,6 +2749,40 @@ if (!accessGranted) {
   toggleBarberOpen={toggleBarberOpen}
   changeBarberPage={changeBarberPage}
 />
+      {/* CLOSE / DELETE BUSINESS ACCOUNT — GENERIC BUSINESSES ONLY */}
+      {!isBarberBusiness && (
+        <section className="mt-8 border border-red-200 bg-red-50 rounded-xl p-5">
+          <h2 className="text-xl font-bold text-red-700 mb-2">
+            {lang === "es" ? "Eliminar cuenta" : "Delete Account"}
+          </h2>
+
+          <p className="text-sm text-red-700 mb-4">
+            {lang === "es"
+              ? "Esto eliminará permanentemente este negocio, sus citas, profesionales, servicios y horarios. Esta acción no se puede deshacer."
+              : "This permanently deletes this business, its appointments, providers, services, and schedules. This action cannot be undone."}
+          </p>
+
+          <button
+            type="button"
+            onClick={handleDeleteBusiness}
+            disabled={deletingBusiness}
+            className={`px-4 py-2 rounded-lg font-semibold ${
+              deletingBusiness
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : "bg-red-600 text-white hover:bg-red-700"
+            }`}
+          >
+            {deletingBusiness
+              ? lang === "es"
+                ? "Eliminando..."
+                : "Deleting..."
+              : lang === "es"
+              ? "Eliminar mi cuenta de negocio"
+              : "Delete My Business Account"}
+          </button>
+        </section>
+      )}
+
       {/* ANIMATION */}
       <style jsx>{`
         @keyframes fadeIn {

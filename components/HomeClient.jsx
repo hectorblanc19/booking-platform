@@ -28,7 +28,8 @@ export default function HomeClient() {
       businessText:
         "Organiza tus citas, clientes, servicios, horarios y profesionales con FlowPayDR Booking.",
 
-      barberRegister: "Registrar Barbería / Barbero",
+      barbershopRegister: "Registrar una Barbería",
+      barberRegister: "Registrar como Barbero",
       businessRegister: "Registrar Otro Negocio",
       businessButton: "Entrar al Panel",
 
@@ -64,7 +65,7 @@ export default function HomeClient() {
         "Barberías • Barberos • Uñas • Salones",
 
       categories2:
-        "Spas • Veterinarios • Car Wash • Y más",
+        "Spas • Veterinarios • Clínicas • Car Wash • Y más",
 
       finalTitle:
         "Reserva cuando quieras. Administra desde un solo lugar.",
@@ -93,7 +94,8 @@ export default function HomeClient() {
       businessText:
         "Manage your appointments, customers, services, schedules and professionals with FlowPayDR Booking.",
 
-      barberRegister: "Register Barbershop / Barber",
+      barbershopRegister: "Register a Barbershop",
+      barberRegister: "Register as a Barber",
       businessRegister: "Register Other Business",
       businessButton: "Login to Dashboard",
 
@@ -129,7 +131,7 @@ export default function HomeClient() {
         "Barbershops • Barbers • Nails • Salons",
 
       categories2:
-        "Spas • Veterinarians • Car Wash • And more",
+        "Spas • Veterinarians • Clinics • Car Wash • And more",
 
       finalTitle:
         "Book anytime. Manage everything from one place.",
@@ -268,6 +270,15 @@ export default function HomeClient() {
 
               <div className="flex flex-col gap-3">
 
+                {/* BARBERSHOP OWNER */}
+                <Link
+                  href="/business/register"
+                  className="inline-block bg-white text-black px-6 py-3 rounded-xl font-bold text-center hover:bg-gray-100 transition"
+                >
+                  {tr.barbershopRegister}
+                </Link>
+
+                {/* BARBER */}
                 <Link
                   href={`/register-barber?lang=${lang}`}
                   className="inline-block bg-white text-black px-6 py-3 rounded-xl font-bold text-center hover:bg-gray-100 transition"
@@ -275,6 +286,7 @@ export default function HomeClient() {
                   {tr.barberRegister}
                 </Link>
 
+                {/* OTHER BUSINESS */}
                 <Link
                   href="/business/register"
                   className="inline-block bg-white text-black px-6 py-3 rounded-xl font-bold text-center hover:bg-gray-100 transition"
@@ -282,6 +294,7 @@ export default function HomeClient() {
                   {tr.businessRegister}
                 </Link>
 
+                {/* LOGIN */}
                 <Link
                   href="/login"
                   className="inline-block border border-gray-600 text-white px-6 py-3 rounded-xl font-bold text-center hover:bg-gray-900 transition"

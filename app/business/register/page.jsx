@@ -32,7 +32,7 @@ export default function BusinessRegisterPage() {
         "Registra tu negocio y comienza a administrar tus citas.",
 
       businessName: "Nombre del negocio",
-      businessPlaceholder: "Ej. Salón Premium",
+      businessPlaceholder: "Ej. Barbería Premium",
 
       email: "Correo electrónico",
       emailPlaceholder: "correo@ejemplo.com",
@@ -49,6 +49,7 @@ export default function BusinessRegisterPage() {
       category: "Categoría",
       selectCategory: "Selecciona una categoría",
 
+      barbershop: "Barbería",
       nails: "Uñas / Nail Tech",
       salon: "Salón de Belleza",
       spa: "Spa",
@@ -98,7 +99,7 @@ export default function BusinessRegisterPage() {
         "Register your business and start managing your appointments.",
 
       businessName: "Business Name",
-      businessPlaceholder: "Example: Premium Salon",
+      businessPlaceholder: "Example: Premium Barbershop",
 
       email: "Email",
       emailPlaceholder: "email@example.com",
@@ -115,6 +116,7 @@ export default function BusinessRegisterPage() {
       category: "Category",
       selectCategory: "Select a category",
 
+      barbershop: "Barbershop",
       nails: "Nails / Nail Tech",
       salon: "Beauty Salon",
       spa: "Spa",
@@ -604,6 +606,11 @@ export default function BusinessRegisterPage() {
             >
               <option value="">
                 {tr.selectCategory}
+              </option>
+
+              {/* BARBERSHOP OWNER */}
+              <option value="barbershop">
+                {tr.barbershop}
               </option>
 
               <option value="nails">

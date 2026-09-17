@@ -2274,12 +2274,13 @@ if (!accessGranted) {
     />
 
     <BusinessQRCode
-      t={t}
-      lang={lang}
-      businessId={businessId}
-    />
-  </>
-)}
+  t={t}
+  lang={lang}
+  businessId={businessId}
+  isBarberBusiness={isBarberBusiness}
+  /> 
+ </>
+ )}
 
 {/* BARBERS */}
 {isBarberBusiness && (
@@ -2799,6 +2800,5 @@ if (!accessGranted) {
 }
 
  
-
 
 

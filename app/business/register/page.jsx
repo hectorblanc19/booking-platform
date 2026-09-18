@@ -655,8 +655,16 @@ export default function BusinessRegisterPage() {
               marginBottom: "22px",
             }}
           >
-            <div>
-              <label>{tr.openTime}</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label
+                style={{
+                  minHeight: "40px",
+                  display: "flex",
+                  alignItems: "flex-end",
+                }}
+              >
+                {tr.openTime}
+              </label>
 
               <input
                 type="time"
@@ -667,8 +675,16 @@ export default function BusinessRegisterPage() {
               />
             </div>
 
-            <div>
-              <label>{tr.closeTime}</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label
+                style={{
+                  minHeight: "40px",
+                  display: "flex",
+                  alignItems: "flex-end",
+                }}
+              >
+                {tr.closeTime}
+              </label>
 
               <input
                 type="time"

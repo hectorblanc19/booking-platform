@@ -51,9 +51,10 @@ export default function HomeClient() {
       businessText:
         "Comienza a organizar tus citas, clientes, servicios, horarios y profesionales con FlowPayDR Booking.",
 
-      barbershopRegister: "Registrar una Barbería",
-      barberRegister: "Registrar como Barbero",
-      businessRegister: "Registrar Otro Negocio",
+      businessRegister: "Registrar Negocio",
+      businessRegisterSub: "Barbería, salón, uñas, spa y más",
+      barberRegister: "Soy Barbero",
+      barberRegisterSub: "Crear mi perfil profesional",
 
       whyEyebrow: "HERRAMIENTAS PARA TU DÍA A DÍA",
       whyTitle: "Menos tiempo organizando.",
@@ -173,9 +174,10 @@ export default function HomeClient() {
       businessText:
         "Start organizing appointments, customers, services, schedules and professionals with FlowPayDR Booking.",
 
-      barbershopRegister: "Register a Barbershop",
-      barberRegister: "Register as a Barber",
-      businessRegister: "Register Other Business",
+      businessRegister: "Register Business",
+      businessRegisterSub: "Barbershop, salon, nails, spa & more",
+      barberRegister: "I'm a Barber",
+      barberRegisterSub: "Create my professional profile",
 
       whyEyebrow: "TOOLS FOR YOUR DAY",
       whyTitle: "Less time organizing.",
@@ -603,23 +605,26 @@ export default function HomeClient() {
               <div className="grid sm:grid-cols-2 gap-3 mt-8">
                 <Link
                   href="/business/register"
-                  className="bg-white text-black px-5 py-3.5 rounded-xl font-black text-center hover:bg-gray-100 transition"
+                  className="bg-white text-black px-5 py-4 rounded-xl text-center hover:bg-gray-100 transition"
                 >
-                  {tr.barbershopRegister}
+                  <span className="block font-black">
+                    🏢 {tr.businessRegister}
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-1 font-semibold">
+                    {tr.businessRegisterSub}
+                  </span>
                 </Link>
 
                 <Link
                   href={`/register-barber?lang=${lang}`}
-                  className="bg-white text-black px-5 py-3.5 rounded-xl font-black text-center hover:bg-gray-100 transition"
+                  className="bg-white text-black px-5 py-4 rounded-xl text-center hover:bg-gray-100 transition"
                 >
-                  {tr.barberRegister}
-                </Link>
-
-                <Link
-                  href="/business/register"
-                  className="bg-white text-black px-5 py-3.5 rounded-xl font-black text-center hover:bg-gray-100 transition"
-                >
-                  {tr.businessRegister}
+                  <span className="block font-black">
+                    💈 {tr.barberRegister}
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-1 font-semibold">
+                    {tr.barberRegisterSub}
+                  </span>
                 </Link>
 
                 <Link
@@ -631,7 +636,7 @@ export default function HomeClient() {
 
                 <Link
                   href="/barber/login"
-                  className="sm:col-span-2 border border-gray-700 text-white px-5 py-3.5 rounded-xl font-black text-center hover:bg-gray-900 transition"
+                  className="border border-gray-700 text-white px-5 py-3.5 rounded-xl font-black text-center hover:bg-gray-900 transition"
                 >
                   {tr.barberDashboard}
                 </Link>

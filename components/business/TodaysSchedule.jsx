@@ -12,6 +12,19 @@ export default function TodaysSchedule({
     (a) => a.status !== "cancelled"
   );
 
+  // DISPLAY TIME IN 12-HOUR FORMAT
+  function formatTime(time) {
+    if (!time) return "";
+
+    const [hourString, minute] = String(time).slice(0, 5).split(":");
+    let hour = Number(hourString);
+
+    const period = hour >= 12 ? "PM" : "AM";
+    hour = hour % 12 || 12;
+
+    return `${hour}:${minute} ${period}`;
+  }
+
   return (
     <section className="mb-12">
       <h2 className="text-2xl font-semibold mb-3">
@@ -26,7 +39,7 @@ export default function TodaysSchedule({
         {activeAppointments.map((a) => (
           <div key={a.id} className="border-b py-3 last:border-none">
             <p>
-              <strong>{a.time}</strong> — {a.customer_name} ({a.service})
+              <strong>{formatTime(a.time)}</strong> — {a.customer_name} ({a.service})
             </p>
 
             <p>

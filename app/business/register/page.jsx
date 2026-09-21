@@ -657,13 +657,14 @@ export default function BusinessRegisterPage() {
           >
             <div style={{ display: "flex", flexDirection: "column" }}>
               <label
-                style={{
-                  minHeight: "40px",
-                  display: "flex",
-                  alignItems: "flex-end",
-                }}
-              >
-                {tr.openTime}
+  style={{
+    height: "52px",
+    display: "flex",
+    alignItems: "flex-end",
+    lineHeight: "1.25",
+  }}
+>               
+ {tr.openTime}
               </label>
 
               <input
@@ -676,13 +677,15 @@ export default function BusinessRegisterPage() {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <label
-                style={{
-                  minHeight: "40px",
-                  display: "flex",
-                  alignItems: "flex-end",
-                }}
-              >
+             
+<label
+  style={{
+    height: "52px",
+    display: "flex",
+    alignItems: "flex-end",
+    lineHeight: "1.25",
+  }}
+>
                 {tr.closeTime}
               </label>
 

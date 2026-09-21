@@ -364,12 +364,29 @@ function getDominicanNow() {
         return;
       }
 
-      const existingAppointments = appointments || [];
-      const startMinutes = timeToMinutes(availability.start_time);
-      const endMinutes = timeToMinutes(availability.end_time);
-      const slots = [];
+     const existingAppointments = appointments || [];
 
-      for (
+// LOAD BLOCKS FOR THIS PROVIDER + DATE
+const { data: providerBlocks, error: blocksError } = await supabase
+  .from("provider_blocks")
+  .select("start_time, end_time")
+  .eq("provider_id", provider.id)
+  .eq("date", date);
+
+if (blocksError) {
+  console.error("Error loading provider blocks:", blocksError);
+  setAvailableTimes([]);
+  return;
+}
+
+const existingBlocks = providerBlocks || [];
+
+const startMinutes = timeToMinutes(availability.start_time);
+const endMinutes = timeToMinutes(availability.end_time);
+const slots = [];
+        
+
+        for (
         let current = startMinutes;
         current + serviceDuration <= endMinutes;
         current += SLOT_INTERVAL
@@ -380,20 +397,31 @@ function getDominicanNow() {
 
         const slotTime = minutesToTime(current);
 
-        const hasConflict = existingAppointments.some(
-          (appointment) =>
-            appointmentsOverlap(
-              slotTime,
-              serviceDuration,
-              appointment.time,
-              Number(appointment.duration) || 60
-            )
-        );
+        const hasAppointmentConflict = existingAppointments.some(
+  (appointment) =>
+    appointmentsOverlap(
+      slotTime,
+      serviceDuration,
+      appointment.time,
+      Number(appointment.duration) || 60
+    )
+);
 
-        if (!hasConflict) {
-          slots.push(slotTime);
-        }
-      }
+const hasBlockConflict = existingBlocks.some((block) => {
+  const blockStart = timeToMinutes(block.start_time);
+  const blockEnd = timeToMinutes(block.end_time);
+
+  const slotStart = timeToMinutes(slotTime);
+  const slotEnd = slotStart + serviceDuration;
+
+  return slotStart < blockEnd && slotEnd > blockStart;
+});
+
+if (!hasAppointmentConflict && !hasBlockConflict) {
+  slots.push(slotTime);
+}     
+
+    }
 
       setAvailableTimes(slots);
     } finally {
@@ -534,47 +562,125 @@ function getDominicanNow() {
         await loadAvailableTimes(appointmentDate, selectedService);
         return;
       }
+
+
     } else {
-      const {
-        data: currentAppointments,
-        error: checkError,
-      } = await supabase
-        .from("appointments")
-        .select("time, duration")
-        .eq("provider_id", provider.id)
-        .eq("date", appointmentDate)
-        .eq("status", "confirmed");
+  // FINAL CHECK BEFORE SAVING A NORMAL PROVIDER APPOINTMENT
 
-      if (checkError) {
-        console.error("Error checking appointments:", checkError);
-        alert(
-          lang === "es"
-            ? "No se pudo verificar el horario. Intenta otra vez."
-            : "Could not verify the appointment time. Please try again."
-        );
-        return;
-      }
+  // 1. CHECK EXISTING APPOINTMENTS
+  const {
+    data: currentAppointments,
+    error: checkError,
+  } = await supabase
+    .from("appointments")
+    .select("time, duration")
+    .eq("provider_id", provider.id)
+    .eq("date", appointmentDate)
+    .eq("status", "confirmed");
 
-      const hasConflict = (currentAppointments || []).some(
-        (appointment) =>
-          appointmentsOverlap(
-            appointmentTime,
-            selectedDuration,
-            appointment.time,
-            Number(appointment.duration) || 60
-          )
-      );
+  if (checkError) {
+    console.error("Error checking appointments:", checkError);
 
-      if (hasConflict) {
-        alert(
-          lang === "es"
-            ? "Ese horario acaba de ser reservado o entra en conflicto con otra cita. Selecciona otra hora."
-            : "That time was just booked or conflicts with another appointment. Please select another time."
-        );
-        await loadAvailableTimes(appointmentDate, selectedService);
-        return;
-      }
-    }
+    alert(
+      lang === "es"
+        ? "No se pudo verificar el horario. Intenta otra vez."
+        : "Could not verify the appointment time. Please try again."
+    );
+
+    return;
+  }
+
+  const hasAppointmentConflict = (currentAppointments || []).some(
+    (appointment) =>
+      appointmentsOverlap(
+        appointmentTime,
+        selectedDuration,
+        appointment.time,
+        Number(appointment.duration) || 60
+      )
+  );
+
+  if (hasAppointmentConflict) {
+    alert(
+      lang === "es"
+        ? "Ese horario acaba de ser reservado o entra en conflicto con otra cita. Selecciona otra hora."
+        : "That time was just booked or conflicts with another appointment. Please select another time."
+    );
+
+    await loadAvailableTimes(
+      appointmentDate,
+      selectedService
+    );
+
+    return;
+  }
+
+  // 2. CHECK PROVIDER BLOCKS AGAIN
+  // This protects against a block being created after
+  // the customer already opened the booking page.
+  const {
+    data: currentProviderBlocks,
+    error: blockCheckError,
+  } = await supabase
+    .from("provider_blocks")
+    .select("start_time, end_time")
+    .eq("provider_id", provider.id)
+    .eq("date", appointmentDate);
+
+  if (blockCheckError) {
+    console.error(
+      "Error checking provider blocks:",
+      blockCheckError
+    );
+
+    alert(
+      lang === "es"
+        ? "No se pudo verificar la disponibilidad del profesional. Intenta otra vez."
+        : "Could not verify the provider's availability. Please try again."
+    );
+
+    return;
+  }
+
+  const appointmentStart =
+    timeToMinutes(appointmentTime);
+
+  const appointmentEnd =
+    appointmentStart + selectedDuration;
+
+  const hasBlockConflict = (
+    currentProviderBlocks || []
+  ).some((block) => {
+    const blockStart =
+      timeToMinutes(block.start_time);
+
+    const blockEnd =
+      timeToMinutes(block.end_time);
+
+    return (
+      appointmentStart < blockEnd &&
+      appointmentEnd > blockStart
+    );
+  });
+
+  if (hasBlockConflict) {
+    alert(
+      lang === "es"
+        ? "Este horario acaba de ser bloqueado por el profesional. Selecciona otra hora."
+        : "This time was just blocked by the provider. Please select another time."
+    );
+
+    setAppointmentTime("");
+
+    await loadAvailableTimes(
+      appointmentDate,
+      selectedService
+    );
+
+    return;
+  }
+}
+
 
     setSavingAppointment(true);
 

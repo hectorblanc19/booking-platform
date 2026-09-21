@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import ProviderList from "@/components/business/ProviderList";
 import ProviderAvailability from "@/components/business/ProviderAvailability";
+import ProviderBlockingPanel from "@/components/ProviderBlockingPanel";
 import BusinessServices from "@/components/business/BusinessServices";
 import ManualAppointment from "@/components/business/ManualAppointment";
 import BusinessQRCode from "@/components/business/BusinessQRCode";
@@ -2458,21 +2459,31 @@ if (!accessGranted) {
   updateProvider={updateProvider}
   deleteProvider={deleteProvider}
 />
-   {/* PROVIDER AVAILABILITY — NOT USED FOR TOURS */}
+   
+{/* PROVIDER AVAILABILITY + BLOCKS — NOT USED FOR TOURS */}
 {!isTourBusiness && (
-  <ProviderAvailability
-    lang={lang}
-    providers={providers}
-    selectedAvailabilityProviderId={selectedAvailabilityProviderId}
-    setSelectedAvailabilityProviderId={setSelectedAvailabilityProviderId}
-    providerAvailability={providerAvailability}
-    setProviderAvailability={setProviderAvailability}
-    loadProviderAvailability={loadProviderAvailability}
-    saveProviderAvailability={saveProviderAvailability}
-    savingProviderAvailability={savingProviderAvailability}
-  />
+  <>
+    <ProviderAvailability
+      lang={lang}
+      providers={providers}
+      selectedAvailabilityProviderId={selectedAvailabilityProviderId}
+      setSelectedAvailabilityProviderId={setSelectedAvailabilityProviderId}
+      providerAvailability={providerAvailability}
+      setProviderAvailability={setProviderAvailability}
+      loadProviderAvailability={loadProviderAvailability}
+      saveProviderAvailability={saveProviderAvailability}
+      savingProviderAvailability={savingProviderAvailability}
+    />
+
+    {selectedAvailabilityProviderId && (
+      <ProviderBlockingPanel
+        providerId={selectedAvailabilityProviderId}
+        lang={lang}
+      />
+    )}
+  </>
 )}
-  </section>
+</section>
 )}
 
 {/* BUSINESS SERVICES */}

@@ -13,7 +13,7 @@ export default function BusinessPublicPage() {
   const [barbers, setBarbers] = useState([]);
   const [userBarber, setUserBarber] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState("es");
 
   const baseUrl =
     typeof window !== "undefined"

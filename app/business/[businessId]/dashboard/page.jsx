@@ -30,7 +30,7 @@ const dayLabels = {
 export default function BusinessDashboard() {
   const { businessId } = useParams();
 
- const [lang, setLang] = useState("en");
+ const [lang, setLang] = useState("es");
 const [business, setBusiness] = useState(null);
 const [barbers, setBarbers] = useState([]);
 const [providers, setProviders] = useState([]);

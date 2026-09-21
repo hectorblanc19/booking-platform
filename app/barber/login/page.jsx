@@ -13,7 +13,7 @@ export default function BarberLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPin, setShowPin] = useState(false);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState("es");
 
   // Detect browser language
   useEffect(() => {

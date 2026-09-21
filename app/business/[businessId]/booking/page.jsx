@@ -18,7 +18,7 @@ export default function BusinessBookingPage() {
   const [providers, setProviders] = useState([]);
   const [provider, setProvider] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState("es");
 
   // SERVICES
   const [services, setServices] = useState([]);

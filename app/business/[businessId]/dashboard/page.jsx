@@ -14,6 +14,7 @@ import CustomerList from "@/components/business/CustomerList";
 import CalendarView from "@/components/business/CalendarView";
 import AllAppointments from "@/components/business/AllAppointments";
 import BarberManagement from "@/components/business/BarberManagement";
+import BusinessProfileCustomizer from "@/components/BusinessProfileCustomizer";
 
 /* ⭐ ADD THIS BLOCK RIGHT HERE */
 const serviceLabels = {
@@ -1928,6 +1929,7 @@ if (!accessGranted) {
 
   {!isBarberBusiness && (
     <div className="pt-3 border-t space-y-5">
+
       {/* GOOGLE MAPS PIN */}
       <div>
         <p className="font-semibold mb-2">
@@ -2040,6 +2042,17 @@ if (!accessGranted) {
   )}
 </div>  
 </section>
+
+{/* BUSINESS PROFILE CUSTOMIZATION */}
+{!isBarberBusiness && (
+  <div className="mb-12">
+    <BusinessProfileCustomizer
+      businessId={businessId}
+      lang={lang}
+      showToast={showToast}
+    />
+  </div>
+)}
 
 {/* TOUR RESERVATION OR NORMAL APPOINTMENT */}
 {isTourBusiness ? (

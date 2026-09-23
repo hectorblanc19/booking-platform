@@ -33,14 +33,8 @@ export default function BusinessProfilePage() {
     setAuthMessage("");
 
     try {
-      // ==================================================
-      // 1. LOAD PUBLISHED PROFILE
-      // Public RLS only allows published profiles to load.
-      // ==================================================
-      const {
-        data: profileData,
-        error: profileError,
-      } = await supabase
+      // Verify the storefront is published before loading public content.
+      const { data: profileData, error: profileError } = await supabase
         .from("business_profile_settings")
         .select("*")
         .eq("business_id", businessId)
@@ -48,10 +42,7 @@ export default function BusinessProfilePage() {
         .maybeSingle();
 
       if (profileError) {
-        console.error(
-          "Public profile load error:",
-          profileError
-        );
+        console.error("Public profile load error:", profileError);
       }
 
       if (!profileData) {
@@ -65,44 +56,19 @@ export default function BusinessProfilePage() {
 
       setProfile(profileData);
 
-      // ==================================================
-      // 2. LOAD BUSINESS
-      // ==================================================
-      const {
-        data: businessData,
-        error: businessError,
-      } = await supabase
-        .from("businesses")
-        .select("*")
-        .eq("id", businessId)
-        .single();
-
-      if (businessError || !businessData) {
-        console.error(
-          "Public business load error:",
-          businessError
-        );
-
-        setAuthMessage(
-          lang === "es"
-            ? "No se pudo cargar este negocio."
-            : "This business could not be loaded."
-        );
-        return;
-      }
-
-      setBusiness(businessData);
-
-      // ==================================================
-      // 3. SERVICES
-      // ==================================================
-      const {
-        data: serviceData,
-        error: serviceError,
-      } = await supabase
-        .from("business_services")
-        .select(
-          `
+      // Load independent storefront data at the same time.
+      const [
+        businessResult,
+        serviceResult,
+        providerResult,
+        galleryResult,
+        businessHoursResult,
+        ratingResult,
+      ] = await Promise.all([
+        supabase.from("businesses").select("*").eq("id", businessId).single(),
+        supabase
+          .from("business_services")
+          .select(`
             id,
             name,
             name_en,
@@ -112,111 +78,37 @@ export default function BusinessProfilePage() {
             duration,
             provider_id,
             is_active
-          `
-        )
-        .eq("business_id", businessId)
-        .eq("is_active", true)
-        .order("name", { ascending: true });
-
-      if (serviceError) {
-        console.error(
-          "Public services load error:",
-          serviceError
-        );
-      }
-
-      setServices(serviceData || []);
-
-      // ==================================================
-      // 4. PROVIDERS
-      // ==================================================
-      const {
-        data: providerData,
-        error: providerError,
-      } = await supabase
-        .from("providers")
-        .select(
-          `
+          `)
+          .eq("business_id", businessId)
+          .eq("is_active", true)
+          .order("name", { ascending: true }),
+        supabase
+          .from("providers")
+          .select(`
             id,
             name,
             specialty,
             photo_url
-          `
-        )
-        .eq("business_id", businessId)
-        .order("name", { ascending: true });
-
-      if (providerError) {
-        console.error(
-          "Public providers load error:",
-          providerError
-        );
-      }
-
-      setProviders(providerData || []);
-
-      // ==================================================
-      // 5. GALLERY
-      // Public RLS only exposes gallery images when the
-      // matching business profile is published.
-      // ==================================================
-      const {
-        data: galleryData,
-        error: galleryError,
-      } = await supabase
-        .from("business_gallery")
-        .select(
-          `
+          `)
+          .eq("business_id", businessId)
+          .order("name", { ascending: true }),
+        supabase
+          .from("business_gallery")
+          .select(`
             id,
             image_url,
             sort_order
-          `
-        )
-        .eq("business_id", businessId)
-        .order("sort_order", { ascending: true });
-
-      if (galleryError) {
-        console.error(
-          "Public gallery load error:",
-          galleryError
-        );
-      }
-
-      setGallery(galleryData || []);
-
-      // ==================================================
-      // 6. BUSINESS / STORE HOURS
-      // These are separate from each professional's hours.
-      // ==================================================
-      const {
-        data: businessHoursData,
-        error: businessHoursError,
-      } = await supabase
-        .from("business_hours")
-        .select("day_of_week, open_time, close_time, is_open")
-        .eq("business_id", businessId)
-        .order("day_of_week", { ascending: true });
-
-      if (businessHoursError) {
-        console.error(
-          "Public business hours load error:",
-          businessHoursError
-        );
-      }
-
-      setBusinessHours(businessHoursData || []);
-
-      // ==================================================
-      // 7. VERIFIED CUSTOMER REVIEWS
-      // Reviews are tied to real FlowPayDR appointments.
-      // ==================================================
-      const {
-        data: ratingData,
-        error: ratingError,
-      } = await supabase
-        .from("ratings")
-        .select(
-          `
+          `)
+          .eq("business_id", businessId)
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("business_hours")
+          .select("day_of_week, open_time, close_time, is_open")
+          .eq("business_id", businessId)
+          .order("day_of_week", { ascending: true }),
+        supabase
+          .from("ratings")
+          .select(`
             id,
             rating,
             review_text,
@@ -227,23 +119,43 @@ export default function BusinessProfilePage() {
               service,
               date
             )
-          `
-        )
-        .eq("business_id", businessId)
-        .order("created_at", { ascending: false });
+          `)
+          .eq("business_id", businessId)
+          .order("created_at", { ascending: false }),
+      ]);
 
-      if (ratingError) {
-        console.error(
-          "Public reviews load error:",
-          ratingError
+      const { data: businessData, error: businessError } = businessResult;
+      const { data: serviceData, error: serviceError } = serviceResult;
+      const { data: providerData, error: providerError } = providerResult;
+      const { data: galleryData, error: galleryError } = galleryResult;
+      const { data: businessHoursData, error: businessHoursError } = businessHoursResult;
+      const { data: ratingData, error: ratingError } = ratingResult;
+
+      if (businessError || !businessData) {
+        console.error("Public business load error:", businessError);
+        setAuthMessage(
+          lang === "es"
+            ? "No se pudo cargar este negocio."
+            : "This business could not be loaded."
         );
+        return;
       }
 
+      if (serviceError) console.error("Public services load error:", serviceError);
+      if (providerError) console.error("Public providers load error:", providerError);
+      if (galleryError) console.error("Public gallery load error:", galleryError);
+      if (businessHoursError) console.error("Public business hours load error:", businessHoursError);
+      if (ratingError) console.error("Public reviews load error:", ratingError);
+
+      setBusiness(businessData);
+      setServices(serviceData || []);
+      setProviders(providerData || []);
+      setGallery(galleryData || []);
+      setBusinessHours(businessHoursData || []);
       setReviews(ratingData || []);
       setAuthorized(true);
     } catch (error) {
       console.error("Public profile load error:", error);
-
       setAuthMessage(
         lang === "es"
           ? "Ocurrió un error cargando esta página."
@@ -265,8 +177,8 @@ export default function BusinessProfilePage() {
 
           <p className="text-gray-500 mt-4">
             {lang === "es"
-              ? "Cargando vista previa..."
-              : "Loading preview..."}
+              ? "Cargando página..."
+              : "Loading page..."}
           </p>
         </div>
       </div>

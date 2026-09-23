@@ -375,6 +375,543 @@ export default function BusinessProfilePage() {
   }));
 
   // ==================================================
+  // CUSTOM SECTION ORDER
+  // Hero stays fixed at the top. Final CTA and footer stay fixed below.
+  // Existing profiles fall back to the original FlowPayDR order.
+  // ==================================================
+  const DEFAULT_SECTION_ORDER = [
+    "about",
+    "services",
+    "team",
+    "gallery",
+    "reviews",
+    "location",
+  ];
+
+  const allowedSectionKeys = new Set(DEFAULT_SECTION_ORDER);
+
+  const savedSectionOrder = Array.isArray(profile?.section_order)
+    ? profile.section_order.filter((key) => allowedSectionKeys.has(key))
+    : [];
+
+  const sectionOrder = [
+    ...savedSectionOrder,
+    ...DEFAULT_SECTION_ORDER.filter(
+      (key) => !savedSectionOrder.includes(key)
+    ),
+  ];
+
+  function renderSection(sectionKey) {
+    switch (sectionKey) {
+      case "about":
+        return (
+          <div key="about">
+            {(profile?.about || profile?.about_en) && (
+              <section className="max-w-5xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
+                <SectionLabel
+                  text={
+                    lang === "es"
+                      ? "Sobre nosotros"
+                      : "About us"
+                  }
+                  brandColor={brandColor}
+                />
+            
+                <h2
+                  className={`text-3xl sm:text-4xl text-gray-900 mb-6 ${themeStyles.heading}`}
+                >
+                  {lang === "es"
+                    ? "Conoce nuestro negocio"
+                    : "Get to know our business"}
+                </h2>
+            
+                <p className="text-gray-600 text-base sm:text-lg leading-8 whitespace-pre-line max-w-3xl">
+                  {lang === "en" && profile.about_en?.trim()
+                    ? profile.about_en
+                    : profile.about}
+                </p>
+              </section>
+            )}
+          </div>
+        );
+      case "services":
+        return (
+          <div key="services">
+            {profile?.show_services && (
+              <section className={themeStyles.altSection}>
+                <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
+                  <SectionLabel
+                    text={
+                      lang === "es"
+                        ? "Nuestros servicios"
+                        : "Our services"
+                    }
+                    brandColor={brandColor}
+                  />
+            
+                  <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+                    <h2
+                      className={`text-3xl sm:text-4xl text-gray-900 ${themeStyles.heading}`}
+                    >
+                      {lang === "es"
+                        ? "Elige el servicio ideal para ti"
+                        : "Choose the right service for you"}
+                    </h2>
+            
+                    <span className="text-sm text-gray-500">
+                      {groupedServices.length}{" "}
+                      {groupedServices.length === 1
+                        ? lang === "es"
+                          ? "servicio"
+                          : "service"
+                        : lang === "es"
+                        ? "servicios"
+                        : "services"}
+                    </span>
+                  </div>
+            
+                  {groupedServices.length === 0 ? (
+                    <EmptyState
+                      text={
+                        lang === "es"
+                          ? "Todavía no hay servicios disponibles."
+                          : "There are no services available yet."
+                      }
+                    />
+                  ) : (
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {groupedServices.map((service) => (
+                        <article
+                          key={service.id}
+                          className={`bg-white border border-gray-100 p-6 ${themeStyles.card}`}
+                        >
+                          <div
+                            className="w-10 h-1 rounded-full mb-5"
+                            style={{
+                              backgroundColor: brandColor,
+                            }}
+                          />
+            
+                          <h3
+                            className={`text-xl text-gray-900 ${themeStyles.cardTitle}`}
+                          >
+                            {lang === "en" && service.name_en?.trim()
+                              ? service.name_en
+                              : service.name}
+                          </h3>
+            
+                          {(service.description ||
+                            service.description_en) && (
+                            <p className="text-sm text-gray-500 leading-6 mt-3">
+                              {lang === "en" &&
+                              service.description_en?.trim()
+                                ? service.description_en
+                                : service.description}
+                            </p>
+                          )}
+            
+                          <div className="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between gap-4">
+                            <div>
+                              {service.price !== null &&
+                                service.price !==
+                                  undefined && (
+                                  <div className="font-bold text-lg text-gray-900">
+                                    RD${" "}
+                                    {formatPrice(
+                                      service.price
+                                    )}
+                                  </div>
+                                )}
+            
+                              {service.duration && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {service.duration}{" "}
+                                  {lang === "es"
+                                    ? "minutos"
+                                    : "minutes"}
+                                </div>
+                              )}
+            
+                              {service.providerNames.length > 0 && (
+                                <div className="text-xs text-gray-500 mt-2">
+                                  <span className="font-semibold">
+                                    {lang === "es"
+                                      ? "Disponible con: "
+                                      : "Available with: "}
+                                  </span>
+                                  {service.providerNames.join(", ")}
+                                </div>
+                              )}
+                            </div>
+            
+                            <button
+                              type="button"
+                              onClick={() =>
+                                router.push(
+                                  `/business/${businessId}/booking`
+                                )
+                              }
+                              className={`px-4 py-2 text-sm font-semibold ${themeStyles.smallButton}`}
+                              style={{
+                                backgroundColor:
+                                  `${brandColor}18`,
+                                color: brandColor,
+                              }}
+                            >
+                              {lang === "es"
+                                ? "Reservar"
+                                : "Book"}
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
+        );
+      case "team":
+        return (
+          <div key="team">
+            {profile?.show_team && (
+              <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
+                <SectionLabel
+                  text={
+                    lang === "es"
+                      ? "Nuestro equipo"
+                      : "Our team"
+                  }
+                  brandColor={brandColor}
+                />
+            
+                <h2
+                  className={`text-3xl sm:text-4xl text-gray-900 mb-9 ${themeStyles.heading}`}
+                >
+                  {lang === "es"
+                    ? "Profesionales que te atenderán"
+                    : "Professionals ready to serve you"}
+                </h2>
+            
+                {providers.length === 0 ? (
+                  <EmptyState
+                    text={
+                      lang === "es"
+                        ? "Todavía no hay profesionales registrados."
+                        : "There are no professionals listed yet."
+                    }
+                  />
+                ) : (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {providers.map((provider) => (
+                      <article
+                        key={provider.id}
+                        className={`bg-white overflow-hidden border border-gray-100 ${themeStyles.card}`}
+                      >
+                        <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                          {provider.photo_url ? (
+                            <img
+                              src={provider.photo_url}
+                              alt={provider.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-6xl">
+                              👤
+                            </div>
+                          )}
+                        </div>
+            
+                        <div className="p-6">
+                          <h3
+                            className={`text-xl text-gray-900 ${themeStyles.cardTitle}`}
+                          >
+                            {provider.name}
+                          </h3>
+            
+                          {provider.specialty && (
+                            <p
+                              className="text-sm font-semibold mt-1"
+                              style={{
+                                color: brandColor,
+                              }}
+                            >
+                              {provider.specialty}
+                            </p>
+                          )}
+            
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/business/${businessId}/booking?provider=${provider.id}&start=true`
+                              )
+                            }
+                            className={`mt-5 w-full py-3 font-semibold ${themeStyles.button}`}
+                            style={{
+                              backgroundColor:
+                                brandColor,
+                              color:
+                                getContrastColor(
+                                  brandColor
+                                ),
+                            }}
+                          >
+                            {lang === "es"
+                              ? `Reservar con ${provider.name}`
+                              : `Book with ${provider.name}`}
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
+        );
+      case "gallery":
+        return (
+          <div key="gallery">
+            {profile?.show_gallery &&
+              gallery.length > 0 && (
+                <section className={themeStyles.altSection}>
+                  <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
+                    <SectionLabel
+                      text={
+                        lang === "es"
+                          ? "Galería"
+                          : "Gallery"
+                      }
+                      brandColor={brandColor}
+                    />
+            
+                    <h2
+                      className={`text-3xl sm:text-4xl text-gray-900 mb-9 ${themeStyles.heading}`}
+                    >
+                      {lang === "es"
+                        ? "Conoce nuestro trabajo"
+                        : "See our work"}
+                    </h2>
+            
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
+                      {gallery.map(
+                        (image, index) => (
+                          <div
+                            key={image.id}
+                            className={`overflow-hidden bg-gray-100 ${themeStyles.galleryImage} ${
+                              index === 0 &&
+                              gallery.length >= 3
+                                ? "md:col-span-2 md:row-span-2"
+                                : ""
+                            }`}
+                          >
+                            <img
+                              src={image.image_url}
+                              alt={`${business.name} gallery ${
+                                index + 1
+                              }`}
+                              className="w-full h-full object-cover hover:scale-105 transition duration-500"
+                            />
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </section>
+              )}
+          </div>
+        );
+      case "reviews":
+        return (
+          <div key="reviews">
+            {reviews.length > 0 && (
+              <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
+                <SectionLabel
+                  text={
+                    lang === "es"
+                      ? "Lo que dicen nuestros clientes"
+                      : "What our customers say"
+                  }
+                  brandColor={brandColor}
+                />
+            
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-9">
+                  <div>
+                    <h2
+                      className={`text-3xl sm:text-4xl text-gray-900 ${themeStyles.heading}`}
+                    >
+                      {lang === "es"
+                        ? "Opiniones de clientes"
+                        : "Customer reviews"}
+                    </h2>
+            
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                      <span className="text-yellow-400 text-lg tracking-tight">
+                        {renderStars(getAverageRating(reviews))}
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {getAverageRating(reviews).toFixed(1)}
+                      </span>
+                      <span>·</span>
+                      <span>
+                        {reviews.length}{" "}
+                        {reviews.length === 1
+                          ? lang === "es"
+                            ? "reseña"
+                            : "review"
+                          : lang === "es"
+                          ? "reseñas"
+                          : "reviews"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+            
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {reviews.map((review) => {
+                    const appointment = Array.isArray(review.appointments)
+                      ? review.appointments[0]
+                      : review.appointments;
+            
+                    const customerName =
+                      appointment?.customer_name?.trim() ||
+                      (lang === "es" ? "Cliente" : "Customer");
+            
+                    return (
+                      <article
+                        key={review.id}
+                        className={`bg-white border border-gray-100 p-6 ${themeStyles.card}`}
+                      >
+                        <div
+                          className="text-yellow-400 text-lg tracking-tight"
+                          aria-label={`${review.rating} / 5`}
+                        >
+                          {renderStars(review.rating)}
+                        </div>
+            
+                        {review.review_text?.trim() && (
+                          <p className="mt-4 text-gray-700 leading-7">
+                            “{review.review_text.trim()}”
+                          </p>
+                        )}
+            
+                        <div className="mt-6 pt-5 border-t border-gray-100">
+                          <p className="font-bold text-gray-900">
+                            {customerName}
+                          </p>
+            
+                          <p
+                            className="mt-1 text-xs font-semibold"
+                            style={{ color: brandColor }}
+                          >
+                            ✓ {lang === "es"
+                              ? "Cliente verificado"
+                              : "Verified customer"}
+                          </p>
+            
+                          {appointment?.service && (
+                            <p className="mt-2 text-xs text-gray-500">
+                              {appointment.service}
+                            </p>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+          </div>
+        );
+      case "location":
+        return (
+          <div key="location">
+            {profile?.show_location && (
+              <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
+                <SectionLabel
+                  text={
+                    lang === "es"
+                      ? "Visítanos"
+                      : "Visit us"
+                  }
+                  brandColor={brandColor}
+                />
+            
+                <h2
+                  className={`text-3xl sm:text-4xl text-gray-900 mb-8 ${themeStyles.heading}`}
+                >
+                  {lang === "es"
+                    ? "Ubicación"
+                    : "Location"}
+                </h2>
+            
+                <div
+                  className={`bg-white border border-gray-100 overflow-hidden ${themeStyles.card}`}
+                >
+                  {business.address && (
+                    <iframe
+                      title="Business location"
+                      className="w-full h-72 sm:h-96 border-0"
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                        business.address
+                      )}&z=15&output=embed`}
+                      loading="lazy"
+                    />
+                  )}
+            
+                  <div className="p-6 sm:p-8 grid md:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
+                        {lang === "es"
+                          ? "Dirección"
+                          : "Address"}
+                      </p>
+            
+                      <p className="font-semibold text-gray-900 mt-2">
+                        {business.address ||
+                          (lang === "es"
+                            ? "Dirección no disponible"
+                            : "Address unavailable")}
+                      </p>
+                    </div>
+            
+                    {business.phone && (
+                      <div>
+                        <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
+                          {lang === "es"
+                            ? "Teléfono"
+                            : "Phone"}
+                        </p>
+            
+                        <p className="font-semibold text-gray-900 mt-2">
+                          {business.phone}
+                        </p>
+                      </div>
+                    )}
+            
+                    {businessHours.length > 0 && (
+                      <div className="md:col-span-2 pt-6 border-t border-gray-100">
+                        <BusinessHoursStatus
+                          hours={businessHours}
+                          lang={lang}
+                          brandColor={brandColor}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  }
+
+  // ==================================================
   // PAGE
   // ==================================================
   return (
@@ -504,489 +1041,9 @@ export default function BusinessProfilePage() {
           </div>
         </section>
 
-        {/* ABOUT */}
-        {(profile?.about || profile?.about_en) && (
-          <section className="max-w-5xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
-            <SectionLabel
-              text={
-                lang === "es"
-                  ? "Sobre nosotros"
-                  : "About us"
-              }
-              brandColor={brandColor}
-            />
-
-            <h2
-              className={`text-3xl sm:text-4xl text-gray-900 mb-6 ${themeStyles.heading}`}
-            >
-              {lang === "es"
-                ? "Conoce nuestro negocio"
-                : "Get to know our business"}
-            </h2>
-
-            <p className="text-gray-600 text-base sm:text-lg leading-8 whitespace-pre-line max-w-3xl">
-              {lang === "en" && profile.about_en?.trim()
-                ? profile.about_en
-                : profile.about}
-            </p>
-          </section>
-        )}
-
-        {/* SERVICES */}
-        {profile?.show_services && (
-          <section className={themeStyles.altSection}>
-            <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
-              <SectionLabel
-                text={
-                  lang === "es"
-                    ? "Nuestros servicios"
-                    : "Our services"
-                }
-                brandColor={brandColor}
-              />
-
-              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
-                <h2
-                  className={`text-3xl sm:text-4xl text-gray-900 ${themeStyles.heading}`}
-                >
-                  {lang === "es"
-                    ? "Elige el servicio ideal para ti"
-                    : "Choose the right service for you"}
-                </h2>
-
-                <span className="text-sm text-gray-500">
-                  {groupedServices.length}{" "}
-                  {groupedServices.length === 1
-                    ? lang === "es"
-                      ? "servicio"
-                      : "service"
-                    : lang === "es"
-                    ? "servicios"
-                    : "services"}
-                </span>
-              </div>
-
-              {groupedServices.length === 0 ? (
-                <EmptyState
-                  text={
-                    lang === "es"
-                      ? "Todavía no hay servicios disponibles."
-                      : "There are no services available yet."
-                  }
-                />
-              ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {groupedServices.map((service) => (
-                    <article
-                      key={service.id}
-                      className={`bg-white border border-gray-100 p-6 ${themeStyles.card}`}
-                    >
-                      <div
-                        className="w-10 h-1 rounded-full mb-5"
-                        style={{
-                          backgroundColor: brandColor,
-                        }}
-                      />
-
-                      <h3
-                        className={`text-xl text-gray-900 ${themeStyles.cardTitle}`}
-                      >
-                        {lang === "en" && service.name_en?.trim()
-                          ? service.name_en
-                          : service.name}
-                      </h3>
-
-                      {(service.description ||
-                        service.description_en) && (
-                        <p className="text-sm text-gray-500 leading-6 mt-3">
-                          {lang === "en" &&
-                          service.description_en?.trim()
-                            ? service.description_en
-                            : service.description}
-                        </p>
-                      )}
-
-                      <div className="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between gap-4">
-                        <div>
-                          {service.price !== null &&
-                            service.price !==
-                              undefined && (
-                              <div className="font-bold text-lg text-gray-900">
-                                RD${" "}
-                                {formatPrice(
-                                  service.price
-                                )}
-                              </div>
-                            )}
-
-                          {service.duration && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {service.duration}{" "}
-                              {lang === "es"
-                                ? "minutos"
-                                : "minutes"}
-                            </div>
-                          )}
-
-                          {service.providerNames.length > 0 && (
-                            <div className="text-xs text-gray-500 mt-2">
-                              <span className="font-semibold">
-                                {lang === "es"
-                                  ? "Disponible con: "
-                                  : "Available with: "}
-                              </span>
-                              {service.providerNames.join(", ")}
-                            </div>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            router.push(
-                              `/business/${businessId}/booking`
-                            )
-                          }
-                          className={`px-4 py-2 text-sm font-semibold ${themeStyles.smallButton}`}
-                          style={{
-                            backgroundColor:
-                              `${brandColor}18`,
-                            color: brandColor,
-                          }}
-                        >
-                          {lang === "es"
-                            ? "Reservar"
-                            : "Book"}
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* TEAM */}
-        {profile?.show_team && (
-          <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
-            <SectionLabel
-              text={
-                lang === "es"
-                  ? "Nuestro equipo"
-                  : "Our team"
-              }
-              brandColor={brandColor}
-            />
-
-            <h2
-              className={`text-3xl sm:text-4xl text-gray-900 mb-9 ${themeStyles.heading}`}
-            >
-              {lang === "es"
-                ? "Profesionales que te atenderán"
-                : "Professionals ready to serve you"}
-            </h2>
-
-            {providers.length === 0 ? (
-              <EmptyState
-                text={
-                  lang === "es"
-                    ? "Todavía no hay profesionales registrados."
-                    : "There are no professionals listed yet."
-                }
-              />
-            ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {providers.map((provider) => (
-                  <article
-                    key={provider.id}
-                    className={`bg-white overflow-hidden border border-gray-100 ${themeStyles.card}`}
-                  >
-                    <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
-                      {provider.photo_url ? (
-                        <img
-                          src={provider.photo_url}
-                          alt={provider.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-6xl">
-                          👤
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-6">
-                      <h3
-                        className={`text-xl text-gray-900 ${themeStyles.cardTitle}`}
-                      >
-                        {provider.name}
-                      </h3>
-
-                      {provider.specialty && (
-                        <p
-                          className="text-sm font-semibold mt-1"
-                          style={{
-                            color: brandColor,
-                          }}
-                        >
-                          {provider.specialty}
-                        </p>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(
-                            `/business/${businessId}/booking?provider=${provider.id}&start=true`
-                          )
-                        }
-                        className={`mt-5 w-full py-3 font-semibold ${themeStyles.button}`}
-                        style={{
-                          backgroundColor:
-                            brandColor,
-                          color:
-                            getContrastColor(
-                              brandColor
-                            ),
-                        }}
-                      >
-                        {lang === "es"
-                          ? `Reservar con ${provider.name}`
-                          : `Book with ${provider.name}`}
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* GALLERY */}
-        {profile?.show_gallery &&
-          gallery.length > 0 && (
-            <section className={themeStyles.altSection}>
-              <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
-                <SectionLabel
-                  text={
-                    lang === "es"
-                      ? "Galería"
-                      : "Gallery"
-                  }
-                  brandColor={brandColor}
-                />
-
-                <h2
-                  className={`text-3xl sm:text-4xl text-gray-900 mb-9 ${themeStyles.heading}`}
-                >
-                  {lang === "es"
-                    ? "Conoce nuestro trabajo"
-                    : "See our work"}
-                </h2>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
-                  {gallery.map(
-                    (image, index) => (
-                      <div
-                        key={image.id}
-                        className={`overflow-hidden bg-gray-100 ${themeStyles.galleryImage} ${
-                          index === 0 &&
-                          gallery.length >= 3
-                            ? "md:col-span-2 md:row-span-2"
-                            : ""
-                        }`}
-                      >
-                        <img
-                          src={image.image_url}
-                          alt={`${business.name} gallery ${
-                            index + 1
-                          }`}
-                          className="w-full h-full object-cover hover:scale-105 transition duration-500"
-                        />
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-            </section>
-          )}
-
-        {/* CUSTOMER REVIEWS */}
-        {reviews.length > 0 && (
-          <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
-            <SectionLabel
-              text={
-                lang === "es"
-                  ? "Lo que dicen nuestros clientes"
-                  : "What our customers say"
-              }
-              brandColor={brandColor}
-            />
-
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-9">
-              <div>
-                <h2
-                  className={`text-3xl sm:text-4xl text-gray-900 ${themeStyles.heading}`}
-                >
-                  {lang === "es"
-                    ? "Opiniones de clientes"
-                    : "Customer reviews"}
-                </h2>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                  <span className="text-yellow-400 text-lg tracking-tight">
-                    {renderStars(getAverageRating(reviews))}
-                  </span>
-                  <span className="font-bold text-gray-900">
-                    {getAverageRating(reviews).toFixed(1)}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    {reviews.length}{" "}
-                    {reviews.length === 1
-                      ? lang === "es"
-                        ? "reseña"
-                        : "review"
-                      : lang === "es"
-                      ? "reseñas"
-                      : "reviews"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {reviews.map((review) => {
-                const appointment = Array.isArray(review.appointments)
-                  ? review.appointments[0]
-                  : review.appointments;
-
-                const customerName =
-                  appointment?.customer_name?.trim() ||
-                  (lang === "es" ? "Cliente" : "Customer");
-
-                return (
-                  <article
-                    key={review.id}
-                    className={`bg-white border border-gray-100 p-6 ${themeStyles.card}`}
-                  >
-                    <div
-                      className="text-yellow-400 text-lg tracking-tight"
-                      aria-label={`${review.rating} / 5`}
-                    >
-                      {renderStars(review.rating)}
-                    </div>
-
-                    {review.review_text?.trim() && (
-                      <p className="mt-4 text-gray-700 leading-7">
-                        “{review.review_text.trim()}”
-                      </p>
-                    )}
-
-                    <div className="mt-6 pt-5 border-t border-gray-100">
-                      <p className="font-bold text-gray-900">
-                        {customerName}
-                      </p>
-
-                      <p
-                        className="mt-1 text-xs font-semibold"
-                        style={{ color: brandColor }}
-                      >
-                        ✓ {lang === "es"
-                          ? "Cliente verificado"
-                          : "Verified customer"}
-                      </p>
-
-                      {appointment?.service && (
-                        <p className="mt-2 text-xs text-gray-500">
-                          {appointment.service}
-                        </p>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* LOCATION */}
-        {profile?.show_location && (
-          <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
-            <SectionLabel
-              text={
-                lang === "es"
-                  ? "Visítanos"
-                  : "Visit us"
-              }
-              brandColor={brandColor}
-            />
-
-            <h2
-              className={`text-3xl sm:text-4xl text-gray-900 mb-8 ${themeStyles.heading}`}
-            >
-              {lang === "es"
-                ? "Ubicación"
-                : "Location"}
-            </h2>
-
-            <div
-              className={`bg-white border border-gray-100 overflow-hidden ${themeStyles.card}`}
-            >
-              {business.address && (
-                <iframe
-                  title="Business location"
-                  className="w-full h-72 sm:h-96 border-0"
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                    business.address
-                  )}&z=15&output=embed`}
-                  loading="lazy"
-                />
-              )}
-
-              <div className="p-6 sm:p-8 grid md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
-                    {lang === "es"
-                      ? "Dirección"
-                      : "Address"}
-                  </p>
-
-                  <p className="font-semibold text-gray-900 mt-2">
-                    {business.address ||
-                      (lang === "es"
-                        ? "Dirección no disponible"
-                        : "Address unavailable")}
-                  </p>
-                </div>
-
-                {business.phone && (
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
-                      {lang === "es"
-                        ? "Teléfono"
-                        : "Phone"}
-                    </p>
-
-                    <p className="font-semibold text-gray-900 mt-2">
-                      {business.phone}
-                    </p>
-                  </div>
-                )}
-
-                {businessHours.length > 0 && (
-                  <div className="md:col-span-2 pt-6 border-t border-gray-100">
-                    <BusinessHoursStatus
-                      hours={businessHours}
-                      lang={lang}
-                      brandColor={brandColor}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
+        {/* CUSTOMIZABLE CONTENT SECTIONS */}
+        {sectionOrder.map((sectionKey) =>
+          renderSection(sectionKey)
         )}
 
         {/* FINAL CTA */}

@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+const DEFAULT_SECTION_ORDER = [
+  "about",
+  "services",
+  "team",
+  "gallery",
+  "reviews",
+  "location",
+];
+
 const DEFAULT_PROFILE = {
   logo_url: null,
   cover_url: null,
@@ -14,6 +23,7 @@ const DEFAULT_PROFILE = {
   show_team: true,
   show_gallery: true,
   show_location: true,
+  section_order: DEFAULT_SECTION_ORDER,
   published: false,
 };
 
@@ -189,6 +199,7 @@ const MAX_GALLERY_IMAGES = 10;
             show_team,
             show_gallery,
             show_location,
+            section_order,
             published
           `
         )
@@ -218,6 +229,17 @@ const MAX_GALLERY_IMAGES = 10;
         show_team: data.show_team ?? true,
         show_gallery: data.show_gallery ?? true,
         show_location: data.show_location ?? true,
+        section_order:
+          Array.isArray(data.section_order) && data.section_order.length > 0
+            ? [
+                ...data.section_order.filter((item) =>
+                  DEFAULT_SECTION_ORDER.includes(item)
+                ),
+                ...DEFAULT_SECTION_ORDER.filter(
+                  (item) => !data.section_order.includes(item)
+                ),
+              ]
+            : DEFAULT_SECTION_ORDER,
         published: data.published ?? false,
       });
 
@@ -232,6 +254,35 @@ const MAX_GALLERY_IMAGES = 10;
       ...current,
       [field]: value,
     }));
+  }
+
+  function moveSection(sectionKey, direction) {
+    setProfile((current) => {
+      const order = Array.isArray(current.section_order)
+        ? [...current.section_order]
+        : [...DEFAULT_SECTION_ORDER];
+
+      const currentIndex = order.indexOf(sectionKey);
+      if (currentIndex === -1) return current;
+
+      const nextIndex = direction === "up"
+        ? currentIndex - 1
+        : currentIndex + 1;
+
+      if (nextIndex < 0 || nextIndex >= order.length) {
+        return current;
+      }
+
+      [order[currentIndex], order[nextIndex]] = [
+        order[nextIndex],
+        order[currentIndex],
+      ];
+
+      return {
+        ...current,
+        section_order: order,
+      };
+    });
   }
 
   async function loadServiceTranslations() {
@@ -434,6 +485,7 @@ const MAX_GALLERY_IMAGES = 10;
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
         show_location: profile.show_location,
+        section_order: profile.section_order,
         published: false,
         updated_at: new Date().toISOString(),
       })
@@ -894,6 +946,7 @@ async function removeGalleryImage(item) {
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
         show_location: profile.show_location,
+        section_order: profile.section_order,
         published: profile.published,
         updated_at: new Date().toISOString(),
       };
@@ -1001,6 +1054,7 @@ async function removeGalleryImage(item) {
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
         show_location: profile.show_location,
+        section_order: profile.section_order,
         published: newPublishedState,
         updated_at: new Date().toISOString(),
       };
@@ -1748,6 +1802,91 @@ async function removeGalleryImage(item) {
               ))}
             </div>
           )}
+        </div>
+
+        {/* SECTION ORDER */}
+        <div>
+          <div className="mb-4">
+            <h3 className="font-bold text-gray-900">
+              {lang === "es"
+                ? "Orden de las secciones"
+                : "Section order"}
+            </h3>
+
+            <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+              {lang === "es"
+                ? "Organiza cómo aparecerán las secciones en tu página. La portada siempre permanece arriba y el botón final de reserva permanece abajo."
+                : "Choose how sections appear on your page. The hero always stays at the top and the final booking call-to-action stays at the bottom."}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {(profile.section_order || DEFAULT_SECTION_ORDER).map(
+              (sectionKey, index, order) => {
+                const labels = {
+                  about: lang === "es" ? "Sobre nosotros" : "About us",
+                  services: lang === "es" ? "Servicios" : "Services",
+                  team: lang === "es" ? "Profesionales" : "Professionals",
+                  gallery: lang === "es" ? "Galería" : "Gallery",
+                  reviews: lang === "es" ? "Opiniones" : "Reviews",
+                  location: lang === "es" ? "Ubicación" : "Location",
+                };
+
+                return (
+                  <div
+                    key={sectionKey}
+                    className="flex items-center justify-between gap-4 border border-gray-200 rounded-xl px-4 py-3 bg-white"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        {index + 1}
+                      </div>
+
+                      <span className="text-sm font-semibold text-gray-800 truncate">
+                        {labels[sectionKey] || sectionKey}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => moveSection(sectionKey, "up")}
+                        disabled={index === 0}
+                        aria-label={
+                          lang === "es"
+                            ? `Mover ${labels[sectionKey]} hacia arriba`
+                            : `Move ${labels[sectionKey]} up`
+                        }
+                        className="w-9 h-9 rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        ↑
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => moveSection(sectionKey, "down")}
+                        disabled={index === order.length - 1}
+                        aria-label={
+                          lang === "es"
+                            ? `Mover ${labels[sectionKey]} hacia abajo`
+                            : `Move ${labels[sectionKey]} down`
+                        }
+                        className="w-9 h-9 rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+            )}
+          </div>
+
+          <p className="text-xs text-gray-500 mt-3">
+            {lang === "es"
+              ? "Después de cambiar el orden, presiona Guardar cambios."
+              : "After changing the order, press Save changes."}
+          </p>
         </div>
 
         {/* SECTIONS */}

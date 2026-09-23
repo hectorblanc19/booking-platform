@@ -9,6 +9,7 @@ const DEFAULT_SECTION_ORDER = [
   "team",
   "gallery",
   "reviews",
+  "policies",
   "location",
 ];
 
@@ -19,6 +20,15 @@ const DEFAULT_PROFILE = {
   brand_color: "#2563EB",
   about: "",
   about_en: "",
+  cancellation_policy: "",
+  cancellation_policy_en: "",
+  late_policy: "",
+  late_policy_en: "",
+  payment_policy: "",
+  payment_policy_en: "",
+  general_policy: "",
+  general_policy_en: "",
+  show_policies: false,
   show_services: true,
   show_team: true,
   show_gallery: true,
@@ -37,6 +47,7 @@ export default function BusinessProfileCustomizer({
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingPolicies, setSavingPolicies] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -195,6 +206,15 @@ const MAX_GALLERY_IMAGES = 10;
             brand_color,
             about,
             about_en,
+            cancellation_policy,
+            cancellation_policy_en,
+            late_policy,
+            late_policy_en,
+            payment_policy,
+            payment_policy_en,
+            general_policy,
+            general_policy_en,
+            show_policies,
             show_services,
             show_team,
             show_gallery,
@@ -225,6 +245,15 @@ const MAX_GALLERY_IMAGES = 10;
         brand_color: data.brand_color || "#2563EB",
         about: data.about || "",
         about_en: data.about_en || "",
+        cancellation_policy: data.cancellation_policy || "",
+        cancellation_policy_en: data.cancellation_policy_en || "",
+        late_policy: data.late_policy || "",
+        late_policy_en: data.late_policy_en || "",
+        payment_policy: data.payment_policy || "",
+        payment_policy_en: data.payment_policy_en || "",
+        general_policy: data.general_policy || "",
+        general_policy_en: data.general_policy_en || "",
+        show_policies: data.show_policies ?? false,
         show_services: data.show_services ?? true,
         show_team: data.show_team ?? true,
         show_gallery: data.show_gallery ?? true,
@@ -481,6 +510,15 @@ const MAX_GALLERY_IMAGES = 10;
         brand_color: profile.brand_color,
         about: profile.about.trim() || null,
         about_en: profile.about_en.trim() || null,
+        cancellation_policy: profile.cancellation_policy.trim() || null,
+        cancellation_policy_en: profile.cancellation_policy_en.trim() || null,
+        late_policy: profile.late_policy.trim() || null,
+        late_policy_en: profile.late_policy_en.trim() || null,
+        payment_policy: profile.payment_policy.trim() || null,
+        payment_policy_en: profile.payment_policy_en.trim() || null,
+        general_policy: profile.general_policy.trim() || null,
+        general_policy_en: profile.general_policy_en.trim() || null,
+        show_policies: profile.show_policies,
         show_services: profile.show_services,
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
@@ -928,6 +966,116 @@ async function removeGalleryImage(item) {
     }
   }
 
+  async function setPoliciesVisibility(checked) {
+    if (!businessId) return;
+
+    updateProfile("show_policies", checked);
+
+    try {
+      const { error } = await supabase
+        .from("business_profile_settings")
+        .update({
+          show_policies: checked,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("business_id", businessId);
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error("Policies visibility update error:", error);
+
+      // Put the switch back if the database update failed.
+      updateProfile("show_policies", !checked);
+
+      showToast?.(
+        lang === "es"
+          ? "No se pudo actualizar la visibilidad de las políticas."
+          : "Could not update policy visibility."
+      );
+    }
+  }
+
+
+  async function savePolicies() {
+    if (!businessId || savingPolicies) return;
+
+    setSavingPolicies(true);
+
+    try {
+      const payload = {
+        business_id: businessId,
+        cancellation_policy: profile.cancellation_policy.trim() || null,
+        cancellation_policy_en:
+          profile.cancellation_policy_en.trim() || null,
+        late_policy: profile.late_policy.trim() || null,
+        late_policy_en: profile.late_policy_en.trim() || null,
+        payment_policy: profile.payment_policy.trim() || null,
+        payment_policy_en: profile.payment_policy_en.trim() || null,
+        general_policy: profile.general_policy.trim() || null,
+        general_policy_en: profile.general_policy_en.trim() || null,
+        show_policies: profile.show_policies,
+        section_order: profile.section_order,
+        updated_at: new Date().toISOString(),
+      };
+
+      let result;
+
+      if (profileId) {
+        result = await supabase
+          .from("business_profile_settings")
+          .update(payload)
+          .eq("id", profileId)
+          .eq("business_id", businessId)
+          .select("id")
+          .single();
+      } else {
+        result = await supabase
+          .from("business_profile_settings")
+          .insert({
+            ...payload,
+            theme: profile.theme,
+            brand_color: profile.brand_color,
+            about: profile.about.trim() || null,
+            about_en: profile.about_en.trim() || null,
+            show_services: profile.show_services,
+            show_team: profile.show_team,
+            show_gallery: profile.show_gallery,
+            show_location: profile.show_location,
+            published: false,
+          })
+          .select("id")
+          .single();
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      if (!profileId && result.data?.id) {
+        setProfileId(result.data.id);
+      }
+
+      showToast?.(
+        lang === "es"
+          ? "Políticas guardadas correctamente."
+          : "Policies saved successfully."
+      );
+    } catch (error) {
+      console.error("Business policies save error:", error);
+
+      showToast?.(
+        lang === "es"
+          ? "No se pudieron guardar las políticas."
+          : "Could not save policies."
+      );
+    } finally {
+      setSavingPolicies(false);
+    }
+  }
+
+
   async function saveProfile() {
     if (!businessId || saving) return;
 
@@ -942,6 +1090,15 @@ async function removeGalleryImage(item) {
         brand_color: profile.brand_color,
         about: profile.about.trim() || null,
         about_en: profile.about_en.trim() || null,
+        cancellation_policy: profile.cancellation_policy.trim() || null,
+        cancellation_policy_en: profile.cancellation_policy_en.trim() || null,
+        late_policy: profile.late_policy.trim() || null,
+        late_policy_en: profile.late_policy_en.trim() || null,
+        payment_policy: profile.payment_policy.trim() || null,
+        payment_policy_en: profile.payment_policy_en.trim() || null,
+        general_policy: profile.general_policy.trim() || null,
+        general_policy_en: profile.general_policy_en.trim() || null,
+        show_policies: profile.show_policies,
         show_services: profile.show_services,
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
@@ -1050,6 +1207,15 @@ async function removeGalleryImage(item) {
         brand_color: profile.brand_color,
         about: profile.about.trim() || null,
         about_en: profile.about_en.trim() || null,
+        cancellation_policy: profile.cancellation_policy.trim() || null,
+        cancellation_policy_en: profile.cancellation_policy_en.trim() || null,
+        late_policy: profile.late_policy.trim() || null,
+        late_policy_en: profile.late_policy_en.trim() || null,
+        payment_policy: profile.payment_policy.trim() || null,
+        payment_policy_en: profile.payment_policy_en.trim() || null,
+        general_policy: profile.general_policy.trim() || null,
+        general_policy_en: profile.general_policy_en.trim() || null,
+        show_policies: profile.show_policies,
         show_services: profile.show_services,
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
@@ -1654,6 +1820,105 @@ async function removeGalleryImage(item) {
           </div>
         </div>
 
+        {/* BUSINESS POLICIES */}
+        <div>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+            <div>
+              <h3 className="font-bold text-gray-900">
+                {lang === "es" ? "Políticas del negocio" : "Business policies"}
+              </h3>
+              <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+                {lang === "es"
+                  ? "Esta sección es opcional. Actívala solo si quieres mostrar tus políticas a los clientes."
+                  : "This section is optional. Turn it on only if you want to show your policies to customers."}
+              </p>
+            </div>
+            <ToggleOption
+              label={lang === "es" ? "Mostrar políticas en mi página" : "Show policies on my page"}
+              checked={profile.show_policies}
+              onChange={setPoliciesVisibility}
+            />
+          </div>
+
+          <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50/50">
+            <p className="text-xs text-gray-500 mb-5">
+              {lang === "es"
+                ? "Puedes completar solo las políticas que apliquen a tu negocio. Si una está vacía, no se mostrará al cliente."
+                : "Complete only the policies that apply to your business. If a policy is empty, it will not be shown to the customer."}
+            </p>
+
+            <div className="space-y-6">
+              {[
+                { key:"cancellation_policy", keyEn:"cancellation_policy_en", titleEs:"Cancelaciones", titleEn:"Cancellations", placeholderEs:"Ejemplo: Las cancelaciones deben realizarse con al menos 24 horas de anticipación.", placeholderEn:"Example: Cancellations must be made at least 24 hours in advance." },
+                { key:"late_policy", keyEn:"late_policy_en", titleEs:"Llegadas tarde", titleEn:"Late arrivals", placeholderEs:"Ejemplo: Después de 15 minutos de retraso, la cita puede necesitar ser reprogramada.", placeholderEn:"Example: After 15 minutes late, the appointment may need to be rescheduled." },
+                { key:"payment_policy", keyEn:"payment_policy_en", titleEs:"Pagos y depósitos", titleEn:"Payments and deposits", placeholderEs:"Ejemplo: Algunos servicios pueden requerir un depósito para confirmar la cita.", placeholderEn:"Example: Some services may require a deposit to confirm the appointment." },
+                { key:"general_policy", keyEn:"general_policy_en", titleEs:"Reglas generales", titleEn:"General rules", placeholderEs:"Agrega cualquier otra regla o información importante para tus clientes.", placeholderEn:"Add any other important rule or information for your customers." },
+              ].map((policy) => (
+                <div key={policy.key} className="border border-gray-200 rounded-xl p-4 bg-white">
+                  <h4 className="font-semibold text-gray-900 mb-4">
+                    {lang === "es" ? policy.titleEs : policy.titleEn}
+                  </h4>
+                  <div className="grid lg:grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex justify-between gap-4 mb-2">
+                        <label className="text-sm font-semibold text-gray-800">🇪🇸 Español</label>
+                        <span className="text-xs text-gray-400">{profile[policy.key].length}/1000</span>
+                      </div>
+                      <textarea
+                        value={profile[policy.key]}
+                        onChange={(event) => {
+                          if (event.target.value.length <= 1000) updateProfile(policy.key, event.target.value);
+                        }}
+                        placeholder={policy.placeholderEs}
+                        rows={4}
+                        className="w-full border border-gray-300 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between gap-4 mb-2">
+                        <label className="text-sm font-semibold text-gray-800">🇺🇸 English</label>
+                        <span className="text-xs text-gray-400">{profile[policy.keyEn].length}/1000</span>
+                      </div>
+                      <textarea
+                        value={profile[policy.keyEn]}
+                        onChange={(event) => {
+                          if (event.target.value.length <= 1000) updateProfile(policy.keyEn, event.target.value);
+                        }}
+                        placeholder={policy.placeholderEn}
+                        rows={4}
+                        className="w-full border border-gray-300 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-gray-500 mt-4">
+              {lang === "es"
+                ? "Si el texto en inglés queda vacío, la página podrá usar el texto en español como respaldo."
+                : "If the English text is empty, the page can fall back to the Spanish text."}
+            </p>
+
+            <div className="flex justify-end mt-5 pt-5 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={savePolicies}
+                disabled={savingPolicies}
+                className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingPolicies
+                  ? lang === "es"
+                    ? "Guardando políticas..."
+                    : "Saving policies..."
+                  : lang === "es"
+                  ? "Guardar políticas"
+                  : "Save policies"}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* SERVICE TRANSLATIONS */}
         <div>
           <div className="mb-4">
@@ -1829,6 +2094,7 @@ async function removeGalleryImage(item) {
                   team: lang === "es" ? "Profesionales" : "Professionals",
                   gallery: lang === "es" ? "Galería" : "Gallery",
                   reviews: lang === "es" ? "Opiniones" : "Reviews",
+                  policies: lang === "es" ? "Políticas" : "Policies",
                   location: lang === "es" ? "Ubicación" : "Location",
                 };
 

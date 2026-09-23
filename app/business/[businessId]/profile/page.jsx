@@ -385,6 +385,7 @@ export default function BusinessProfilePage() {
     "team",
     "gallery",
     "reviews",
+    "policies",
     "location",
   ];
 
@@ -825,6 +826,112 @@ export default function BusinessProfilePage() {
             )}
           </div>
         );
+      case "policies": {
+        const policyItems = [
+          {
+            key: "cancellation",
+            title:
+              lang === "es"
+                ? "Cancelaciones"
+                : "Cancellations",
+            text:
+              lang === "en" && profile?.cancellation_policy_en?.trim()
+                ? profile.cancellation_policy_en.trim()
+                : profile?.cancellation_policy?.trim(),
+          },
+          {
+            key: "late",
+            title:
+              lang === "es"
+                ? "Llegadas tarde"
+                : "Late arrivals",
+            text:
+              lang === "en" && profile?.late_policy_en?.trim()
+                ? profile.late_policy_en.trim()
+                : profile?.late_policy?.trim(),
+          },
+          {
+            key: "payment",
+            title:
+              lang === "es"
+                ? "Pagos y depósitos"
+                : "Payments and deposits",
+            text:
+              lang === "en" && profile?.payment_policy_en?.trim()
+                ? profile.payment_policy_en.trim()
+                : profile?.payment_policy?.trim(),
+          },
+          {
+            key: "general",
+            title:
+              lang === "es"
+                ? "Reglas generales"
+                : "General rules",
+            text:
+              lang === "en" && profile?.general_policy_en?.trim()
+                ? profile.general_policy_en.trim()
+                : profile?.general_policy?.trim(),
+          },
+        ].filter((item) => item.text);
+
+        return (
+          <div key="policies">
+            {profile?.show_policies && policyItems.length > 0 && (
+              <section className={themeStyles.altSection}>
+                <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
+                  <SectionLabel
+                    text={
+                      lang === "es"
+                        ? "Información importante"
+                        : "Important information"
+                    }
+                    brandColor={brandColor}
+                  />
+
+                  <h2
+                    className={`text-3xl sm:text-4xl text-gray-900 mb-3 ${themeStyles.heading}`}
+                  >
+                    {lang === "es"
+                      ? "Políticas del negocio"
+                      : "Business policies"}
+                  </h2>
+
+                  <p className="text-gray-500 leading-7 mb-9 max-w-3xl">
+                    {lang === "es"
+                      ? "Consulta la información importante antes de reservar tu cita."
+                      : "Review this important information before booking your appointment."}
+                  </p>
+
+                  <div className="grid md:grid-cols-2 gap-5">
+                    {policyItems.map((item) => (
+                      <article
+                        key={item.key}
+                        className={`bg-white border border-gray-100 p-6 ${themeStyles.card}`}
+                      >
+                        <div
+                          className="w-10 h-1 rounded-full mb-5"
+                          style={{ backgroundColor: brandColor }}
+                        />
+
+                        <h3
+                          className={`text-xl text-gray-900 ${themeStyles.cardTitle}`}
+                        >
+                          {item.title}
+                        </h3>
+
+                        <p className="mt-3 text-gray-600 leading-7 whitespace-pre-line">
+                          {item.text}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+          </div>
+        );
+      }
+
       case "location":
         return (
           <div key="location">

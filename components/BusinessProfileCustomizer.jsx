@@ -29,6 +29,11 @@ const DEFAULT_PROFILE = {
   general_policy: "",
   general_policy_en: "",
   show_policies: false,
+  instagram_url: "",
+  tiktok_url: "",
+  facebook_url: "",
+  website_url: "",
+  whatsapp_number: "",
   show_services: true,
   show_team: true,
   show_gallery: true,
@@ -48,6 +53,7 @@ export default function BusinessProfileCustomizer({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingPolicies, setSavingPolicies] = useState(false);
+  const [savingSocialLinks, setSavingSocialLinks] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -215,6 +221,11 @@ const MAX_GALLERY_IMAGES = 10;
             general_policy,
             general_policy_en,
             show_policies,
+            instagram_url,
+            tiktok_url,
+            facebook_url,
+            website_url,
+            whatsapp_number,
             show_services,
             show_team,
             show_gallery,
@@ -254,6 +265,11 @@ const MAX_GALLERY_IMAGES = 10;
         general_policy: data.general_policy || "",
         general_policy_en: data.general_policy_en || "",
         show_policies: data.show_policies ?? false,
+        instagram_url: data.instagram_url || "",
+        tiktok_url: data.tiktok_url || "",
+        facebook_url: data.facebook_url || "",
+        website_url: data.website_url || "",
+        whatsapp_number: data.whatsapp_number || "",
         show_services: data.show_services ?? true,
         show_team: data.show_team ?? true,
         show_gallery: data.show_gallery ?? true,
@@ -519,6 +535,11 @@ const MAX_GALLERY_IMAGES = 10;
         general_policy: profile.general_policy.trim() || null,
         general_policy_en: profile.general_policy_en.trim() || null,
         show_policies: profile.show_policies,
+        instagram_url: profile.instagram_url.trim() || null,
+        tiktok_url: profile.tiktok_url.trim() || null,
+        facebook_url: profile.facebook_url.trim() || null,
+        website_url: profile.website_url.trim() || null,
+        whatsapp_number: profile.whatsapp_number.trim() || null,
         show_services: profile.show_services,
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
@@ -1076,6 +1097,89 @@ async function removeGalleryImage(item) {
   }
 
 
+  async function saveSocialLinks() {
+    if (!businessId || savingSocialLinks) return;
+
+    setSavingSocialLinks(true);
+
+    try {
+      const payload = {
+        business_id: businessId,
+        instagram_url: profile.instagram_url.trim() || null,
+        tiktok_url: profile.tiktok_url.trim() || null,
+        facebook_url: profile.facebook_url.trim() || null,
+        website_url: profile.website_url.trim() || null,
+        whatsapp_number: profile.whatsapp_number.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      let result;
+
+      if (profileId) {
+        result = await supabase
+          .from("business_profile_settings")
+          .update(payload)
+          .eq("id", profileId)
+          .eq("business_id", businessId)
+          .select("id")
+          .single();
+      } else {
+        result = await supabase
+          .from("business_profile_settings")
+          .insert({
+            ...payload,
+            theme: profile.theme,
+            brand_color: profile.brand_color,
+            about: profile.about.trim() || null,
+            about_en: profile.about_en.trim() || null,
+            cancellation_policy: profile.cancellation_policy.trim() || null,
+            cancellation_policy_en:
+              profile.cancellation_policy_en.trim() || null,
+            late_policy: profile.late_policy.trim() || null,
+            late_policy_en: profile.late_policy_en.trim() || null,
+            payment_policy: profile.payment_policy.trim() || null,
+            payment_policy_en: profile.payment_policy_en.trim() || null,
+            general_policy: profile.general_policy.trim() || null,
+            general_policy_en: profile.general_policy_en.trim() || null,
+            show_policies: profile.show_policies,
+            show_services: profile.show_services,
+            show_team: profile.show_team,
+            show_gallery: profile.show_gallery,
+            show_location: profile.show_location,
+            section_order: profile.section_order,
+            published: false,
+          })
+          .select("id")
+          .single();
+      }
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      if (!profileId && result.data?.id) {
+        setProfileId(result.data.id);
+      }
+
+      showToast?.(
+        lang === "es"
+          ? "Redes sociales y contacto guardados correctamente."
+          : "Social links and contact information saved successfully."
+      );
+    } catch (error) {
+      console.error("Business social links save error:", error);
+
+      showToast?.(
+        lang === "es"
+          ? "No se pudieron guardar las redes sociales y el contacto."
+          : "Could not save social links and contact information."
+      );
+    } finally {
+      setSavingSocialLinks(false);
+    }
+  }
+
+
   async function saveProfile() {
     if (!businessId || saving) return;
 
@@ -1099,6 +1203,11 @@ async function removeGalleryImage(item) {
         general_policy: profile.general_policy.trim() || null,
         general_policy_en: profile.general_policy_en.trim() || null,
         show_policies: profile.show_policies,
+        instagram_url: profile.instagram_url.trim() || null,
+        tiktok_url: profile.tiktok_url.trim() || null,
+        facebook_url: profile.facebook_url.trim() || null,
+        website_url: profile.website_url.trim() || null,
+        whatsapp_number: profile.whatsapp_number.trim() || null,
         show_services: profile.show_services,
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
@@ -1216,6 +1325,11 @@ async function removeGalleryImage(item) {
         general_policy: profile.general_policy.trim() || null,
         general_policy_en: profile.general_policy_en.trim() || null,
         show_policies: profile.show_policies,
+        instagram_url: profile.instagram_url.trim() || null,
+        tiktok_url: profile.tiktok_url.trim() || null,
+        facebook_url: profile.facebook_url.trim() || null,
+        website_url: profile.website_url.trim() || null,
+        whatsapp_number: profile.whatsapp_number.trim() || null,
         show_services: profile.show_services,
         show_team: profile.show_team,
         show_gallery: profile.show_gallery,
@@ -1820,6 +1934,86 @@ async function removeGalleryImage(item) {
           </div>
         </div>
 
+        {/* SOCIAL LINKS & CONTACT */}
+        <div>
+          <div className="mb-4">
+            <h3 className="font-bold text-gray-900">
+              {lang === "es"
+                ? "Redes sociales y contacto"
+                : "Social links and contact"}
+            </h3>
+
+            <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+              {lang === "es"
+                ? "Agrega solo las redes que uses. Los campos vacíos no se mostrarán en tu página. WhatsApp se usará para preguntas y contacto; las citas continúan realizándose por FlowPayDR."
+                : "Add only the platforms you use. Empty fields will not appear on your page. WhatsApp is for questions and contact; appointments continue to be booked through FlowPayDR."}
+            </p>
+          </div>
+
+          <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50/50">
+            <div className="grid md:grid-cols-2 gap-4">
+              <SocialLinkField
+                label="Instagram"
+                value={profile.instagram_url}
+                onChange={(value) => updateProfile("instagram_url", value)}
+                placeholder="https://instagram.com/tu_negocio"
+              />
+
+              <SocialLinkField
+                label="TikTok"
+                value={profile.tiktok_url}
+                onChange={(value) => updateProfile("tiktok_url", value)}
+                placeholder="https://tiktok.com/@tu_negocio"
+              />
+
+              <SocialLinkField
+                label="Facebook"
+                value={profile.facebook_url}
+                onChange={(value) => updateProfile("facebook_url", value)}
+                placeholder="https://facebook.com/tu_negocio"
+              />
+
+              <SocialLinkField
+                label={lang === "es" ? "Sitio web" : "Website"}
+                value={profile.website_url}
+                onChange={(value) => updateProfile("website_url", value)}
+                placeholder="https://tusitio.com"
+              />
+
+              <div className="md:col-span-2">
+                <SocialLinkField
+                  label="WhatsApp"
+                  value={profile.whatsapp_number}
+                  onChange={(value) => updateProfile("whatsapp_number", value)}
+                  placeholder="+1 809 555 1234"
+                  help={
+                    lang === "es"
+                      ? "Usa el número con código de país. Ejemplo: +1 809 555 1234."
+                      : "Use the number with country code. Example: +1 809 555 1234."
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={saveSocialLinks}
+                disabled={savingSocialLinks}
+                className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingSocialLinks
+                  ? lang === "es"
+                    ? "Guardando..."
+                    : "Saving..."
+                  : lang === "es"
+                  ? "Guardar redes y contacto"
+                  : "Save social links and contact"}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* BUSINESS POLICIES */}
         <div>
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
@@ -2312,6 +2506,37 @@ async function removeGalleryImage(item) {
     </section>
   );
 }
+
+function SocialLinkField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  help,
+}) {
+  return (
+    <div>
+      <label className="text-sm font-semibold text-gray-800">
+        {label}
+      </label>
+
+      <input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="mt-2 w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+
+      {help && (
+        <p className="text-xs text-gray-500 mt-2">
+          {help}
+        </p>
+      )}
+    </div>
+  );
+}
+
 
 function ToggleOption({
   label,

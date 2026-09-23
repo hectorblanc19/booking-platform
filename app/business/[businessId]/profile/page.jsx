@@ -1007,6 +1007,81 @@ export default function BusinessProfilePage() {
                         />
                       </div>
                     )}
+
+                    {(profile?.instagram_url ||
+                      profile?.tiktok_url ||
+                      profile?.facebook_url ||
+                      profile?.website_url ||
+                      profile?.whatsapp_number) && (
+                      <div className="md:col-span-2 pt-6 border-t border-gray-100">
+                        <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
+                          {lang === "es"
+                            ? "Redes sociales y contacto"
+                            : "Social links and contact"}
+                        </p>
+
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          {profile?.instagram_url && (
+                            <SocialLink
+                              href={normalizeExternalUrl(profile.instagram_url)}
+                              label="Instagram"
+                            />
+                          )}
+
+                          {profile?.tiktok_url && (
+                            <SocialLink
+                              href={normalizeExternalUrl(profile.tiktok_url)}
+                              label="TikTok"
+                            />
+                          )}
+
+                          {profile?.facebook_url && (
+                            <SocialLink
+                              href={normalizeExternalUrl(profile.facebook_url)}
+                              label="Facebook"
+                            />
+                          )}
+
+                          {profile?.website_url && (
+                            <SocialLink
+                              href={normalizeExternalUrl(profile.website_url)}
+                              label={lang === "es" ? "Sitio web" : "Website"}
+                            />
+                          )}
+                        </div>
+
+                        {profile?.whatsapp_number && (
+                          <div className="mt-6">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {lang === "es"
+                                ? "¿Tienes una pregunta antes de reservar?"
+                                : "Have a question before booking?"}
+                            </p>
+
+                            <p className="text-sm text-gray-500 mt-1">
+                              {lang === "es"
+                                ? "Puedes contactar al negocio por WhatsApp. Para reservar una cita, utiliza el botón de reserva de FlowPayDR."
+                                : "You can contact the business on WhatsApp. To book an appointment, use the FlowPayDR booking button."}
+                            </p>
+
+                            <a
+                              href={getWhatsAppUrl(
+                                profile.whatsapp_number,
+                                lang
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`inline-flex items-center gap-2 mt-4 px-5 py-3 border border-gray-200 bg-white font-semibold text-gray-900 hover:bg-gray-50 transition ${themeStyles.smallButton}`}
+                            >
+                              <span aria-hidden="true">💬</span>
+                              {lang === "es"
+                                ? "Contactar por WhatsApp"
+                                : "Contact on WhatsApp"}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
@@ -1375,6 +1450,43 @@ function timeToMinutes(time) {
   const [hour, minute] = time.slice(0, 5).split(":").map(Number);
   return hour * 60 + minute;
 }
+
+function normalizeExternalUrl(value) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) return "#";
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
+function getWhatsAppUrl(number, lang) {
+  const digits = String(number || "").replace(/\D/g, "");
+
+  const message =
+    lang === "es"
+      ? "Hola, vi su página en FlowPayDR. Tengo una pregunta antes de realizar mi reserva."
+      : "Hello, I saw your page on FlowPayDR. I have a question before making my booking.";
+
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
+function SocialLink({ href, label }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 transition"
+    >
+      {label}
+    </a>
+  );
+}
+
 
 function SectionLabel({ text, brandColor }) {
   return (

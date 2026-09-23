@@ -13,6 +13,7 @@ export default function BusinessProfilePage() {
   const [services, setServices] = useState([]);
   const [providers, setProviders] = useState([]);
   const [gallery, setGallery] = useState([]);
+  const [businessHours, setBusinessHours] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
@@ -181,6 +182,28 @@ export default function BusinessProfilePage() {
       }
 
       setGallery(galleryData || []);
+
+      // ==================================================
+      // 6. BUSINESS / STORE HOURS
+      // These are separate from each professional's hours.
+      // ==================================================
+      const {
+        data: businessHoursData,
+        error: businessHoursError,
+      } = await supabase
+        .from("business_hours")
+        .select("day_of_week, open_time, close_time, is_open")
+        .eq("business_id", businessId)
+        .order("day_of_week", { ascending: true });
+
+      if (businessHoursError) {
+        console.error(
+          "Public business hours load error:",
+          businessHoursError
+        );
+      }
+
+      setBusinessHours(businessHoursData || []);
       setAuthorized(true);
     } catch (error) {
       console.error("Public profile load error:", error);
@@ -816,6 +839,16 @@ export default function BusinessProfilePage() {
                     </p>
                   </div>
                 )}
+
+                {businessHours.length > 0 && (
+                  <div className="md:col-span-2 pt-6 border-t border-gray-100">
+                    <BusinessHoursStatus
+                      hours={businessHours}
+                      lang={lang}
+                      brandColor={brandColor}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -899,6 +932,130 @@ export default function BusinessProfilePage() {
       </footer>
     </div>
   );
+}
+
+function BusinessHoursStatus({ hours, lang, brandColor }) {
+  const now = getDominicanDateParts();
+  const today = hours.find((item) => Number(item.day_of_week) === now.dayOfWeek);
+  const tomorrowDay = (now.dayOfWeek + 1) % 7;
+  const tomorrow = hours.find((item) => Number(item.day_of_week) === tomorrowDay);
+
+  const isOpenNow = isBusinessOpenNow(today, now.minutes);
+
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
+        {lang === "es" ? "Horario del negocio" : "Business hours"}
+      </p>
+
+      <div className="mt-3 flex items-center gap-2">
+        <span
+          className={`w-2.5 h-2.5 rounded-full ${
+            isOpenNow ? "bg-green-500" : "bg-red-500"
+          }`}
+        />
+        <span
+          className="font-bold"
+          style={{ color: isOpenNow ? brandColor : "#DC2626" }}
+        >
+          {isOpenNow
+            ? lang === "es"
+              ? "Abierto ahora"
+              : "Open now"
+            : lang === "es"
+            ? "Cerrado ahora"
+            : "Closed now"}
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-1 text-sm text-gray-600">
+        <p>
+          <span className="font-semibold text-gray-800">
+            {lang === "es" ? "Horario de hoy:" : "Today's hours:"}
+          </span>{" "}
+          {formatBusinessHours(today, lang)}
+        </p>
+
+        <p>
+          <span className="font-semibold text-gray-800">
+            {lang === "es" ? "Mañana:" : "Tomorrow:"}
+          </span>{" "}
+          {formatBusinessHours(tomorrow, lang)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function getDominicanDateParts() {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santo_Domingo",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const weekday = parts.find((part) => part.type === "weekday")?.value;
+  const hour = Number(parts.find((part) => part.type === "hour")?.value || 0) % 24;
+  const minute = Number(parts.find((part) => part.type === "minute")?.value || 0);
+
+  const dayMap = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+  return {
+    dayOfWeek: dayMap[weekday] ?? 0,
+    minutes: hour * 60 + minute,
+  };
+}
+
+function isBusinessOpenNow(day, currentMinutes) {
+  if (!day?.is_open || !day.open_time || !day.close_time) {
+    return false;
+  }
+
+  const openMinutes = timeToMinutes(day.open_time);
+  const closeMinutes = timeToMinutes(day.close_time);
+
+  return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+}
+
+function formatBusinessHours(day, lang) {
+  if (!day || !day.is_open || !day.open_time || !day.close_time) {
+    return lang === "es" ? "Cerrado" : "Closed";
+  }
+
+  return `${formatBusinessTime(day.open_time)} – ${formatBusinessTime(
+    day.close_time
+  )}`;
+}
+
+function formatBusinessTime(time) {
+  if (!time) return "";
+
+  const [hourString, minute = "00"] = time.slice(0, 5).split(":");
+  let hour = Number(hourString);
+  const period = hour >= 12 ? "PM" : "AM";
+
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+
+  return `${hour}:${minute} ${period}`;
+}
+
+function timeToMinutes(time) {
+  if (!time) return 0;
+
+  const [hour, minute] = time.slice(0, 5).split(":").map(Number);
+  return hour * 60 + minute;
 }
 
 function SectionLabel({ text, brandColor }) {

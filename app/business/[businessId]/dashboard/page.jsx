@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import ProviderList from "@/components/business/ProviderList";
 import ProviderAvailability from "@/components/business/ProviderAvailability";
+import BusinessHours from "@/components/business/BusinessHours";
 import ProviderBlockingPanel from "@/components/ProviderBlockingPanel";
 import BusinessServices from "@/components/business/BusinessServices";
 import ManualAppointment from "@/components/business/ManualAppointment";
@@ -2052,6 +2053,15 @@ if (!accessGranted) {
       showToast={showToast}
     />
   </div>
+)}
+
+{/* BUSINESS STORE HOURS */}
+{!isBarberBusiness && !isTourBusiness && (
+  <BusinessHours
+    businessId={businessId}
+    lang={lang}
+    showToast={showToast}
+  />
 )}
 
 {/* TOUR RESERVATION OR NORMAL APPOINTMENT */}

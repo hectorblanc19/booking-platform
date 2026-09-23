@@ -315,15 +315,46 @@ function getDominicanNow() {
         return;
       }
 
-      // NORMAL PROVIDERS KEEP THE EXISTING WORKING-HOURS / 30-MINUTE LOGIC.
-      const selectedDate = new Date(`${date}T00:00:00`);
-      const dayOfWeek = selectedDate.getDay();
+     // NORMAL PROVIDERS:
+// BUSINESS HOURS + PROFESSIONAL HOURS + BLOCKS + APPOINTMENTS
+const selectedDate = new Date(`${date}T00:00:00`);
+const dayOfWeek = selectedDate.getDay();
 
-      const {
-        data: availability,
-        error: availabilityError,
-      } = await supabase
-        .from("provider_availability")
+// 1. CHECK IF THE BUSINESS IS OPEN THIS DAY
+const {
+  data: businessHours,
+  error: businessHoursError,
+} = await supabase
+  .from("business_hours")
+  .select("open_time, close_time, is_open")
+  .eq("business_id", businessId)
+  .eq("day_of_week", dayOfWeek)
+  .maybeSingle();
+
+if (businessHoursError) {
+  console.error(
+    "Error loading business hours:",
+    businessHoursError
+  );
+
+  setAvailableTimes([]);
+  return;
+}
+
+// If business hours have been configured and this day is closed,
+// no professional can receive appointments.
+if (businessHours && !businessHours.is_open) {
+  setDayClosed(true);
+  setAvailableTimes([]);
+  return;
+}
+
+// 2. CHECK PROFESSIONAL AVAILABILITY
+const {
+  data: availability,
+  error: availabilityError,
+} = await supabase       
+ .from("provider_availability")
         .select("*")
         .eq("provider_id", provider.id)
         .eq("day_of_week", dayOfWeek)
@@ -381,12 +412,46 @@ if (blocksError) {
 
 const existingBlocks = providerBlocks || [];
 
-const startMinutes = timeToMinutes(availability.start_time);
-const endMinutes = timeToMinutes(availability.end_time);
-const slots = [];
-        
 
-        for (
+const providerStartMinutes = timeToMinutes(
+  availability.start_time
+);
+
+const providerEndMinutes = timeToMinutes(
+  availability.end_time
+);
+
+// Appointments must stay inside BOTH:
+// 1. Business/store hours
+// 2. Professional hours
+const businessStartMinutes =
+  businessHours?.is_open && businessHours?.open_time
+    ? timeToMinutes(businessHours.open_time)
+    : providerStartMinutes;
+
+const businessEndMinutes =
+  businessHours?.is_open && businessHours?.close_time
+    ? timeToMinutes(businessHours.close_time)
+    : providerEndMinutes;
+
+const startMinutes = Math.max(
+  providerStartMinutes,
+  businessStartMinutes
+);
+
+const endMinutes = Math.min(
+  providerEndMinutes,
+  businessEndMinutes
+);
+
+const slots = [];
+
+if (endMinutes <= startMinutes) {
+  setDayClosed(true);
+  setAvailableTimes([]);
+  return;
+}
+         for (
         let current = startMinutes;
         current + serviceDuration <= endMinutes;
         current += SLOT_INTERVAL
@@ -564,10 +629,107 @@ if (!hasAppointmentConflict && !hasBlockConflict) {
       }
 
 
-    } else {
+} else {
   // FINAL CHECK BEFORE SAVING A NORMAL PROVIDER APPOINTMENT
 
-  // 1. CHECK EXISTING APPOINTMENTS
+  // 1. CHECK BUSINESS HOURS AGAIN
+  // This protects against the business hours changing
+  // after the customer already opened the booking page.
+  const selectedDateForSave = new Date(
+    `${appointmentDate}T00:00:00`
+  );
+
+  const dayOfWeekForSave =
+    selectedDateForSave.getDay();
+
+  const {
+    data: currentBusinessHours,
+    error: businessHoursCheckError,
+  } = await supabase
+    .from("business_hours")
+    .select("open_time, close_time, is_open")
+    .eq("business_id", businessId)
+    .eq("day_of_week", dayOfWeekForSave)
+    .maybeSingle();
+
+  if (businessHoursCheckError) {
+    console.error(
+      "Error checking business hours:",
+      businessHoursCheckError
+    );
+
+    alert(
+      lang === "es"
+        ? "No se pudo verificar el horario del negocio. Intenta otra vez."
+        : "Could not verify the business hours. Please try again."
+    );
+
+    return;
+  }
+
+  // If business hours exist and the business is now closed,
+  // do not allow the appointment to be saved.
+  if (
+    currentBusinessHours &&
+    !currentBusinessHours.is_open
+  ) {
+    alert(
+      lang === "es"
+        ? "El negocio está cerrado este día. Selecciona otra fecha."
+        : "The business is closed on this day. Please select another date."
+    );
+
+    setAppointmentTime("");
+
+    await loadAvailableTimes(
+      appointmentDate,
+      selectedService
+    );
+
+    return;
+  }
+
+  // Make sure the appointment still fits completely
+  // inside the current business/store hours.
+  if (
+    currentBusinessHours?.is_open &&
+    currentBusinessHours?.open_time &&
+    currentBusinessHours?.close_time
+  ) {
+    const businessOpenMinutes =
+      timeToMinutes(currentBusinessHours.open_time);
+
+    const businessCloseMinutes =
+      timeToMinutes(currentBusinessHours.close_time);
+
+    const selectedStartMinutes =
+      timeToMinutes(appointmentTime);
+
+    const selectedEndMinutes =
+      selectedStartMinutes + selectedDuration;
+
+    if (
+      selectedStartMinutes < businessOpenMinutes ||
+      selectedEndMinutes > businessCloseMinutes
+    ) {
+      alert(
+        lang === "es"
+          ? "Este horario ya no está dentro del horario del negocio. Selecciona otra hora."
+          : "This time is no longer within the business hours. Please select another time."
+      );
+
+      setAppointmentTime("");
+
+      await loadAvailableTimes(
+        appointmentDate,
+        selectedService
+      );
+
+      return;
+    }
+  }
+
+  // 2. CHECK EXISTING APPOINTMENTS
   const {
     data: currentAppointments,
     error: checkError,
@@ -615,7 +777,7 @@ if (!hasAppointmentConflict && !hasBlockConflict) {
     return;
   }
 
-  // 2. CHECK PROVIDER BLOCKS AGAIN
+  // 3. CHECK PROVIDER BLOCKS AGAIN
   // This protects against a block being created after
   // the customer already opened the booking page.
   const {

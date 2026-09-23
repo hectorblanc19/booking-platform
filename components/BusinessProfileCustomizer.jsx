@@ -51,6 +51,7 @@ export default function BusinessProfileCustomizer({
   const [profileId, setProfileId] = useState(null);
 
   const [loading, setLoading] = useState(true);
+  const [openCustomizerSection, setOpenCustomizerSection] = useState("identity");
   const [saving, setSaving] = useState(false);
   const [savingPolicies, setSavingPolicies] = useState(false);
   const [savingSocialLinks, setSavingSocialLinks] = useState(false);
@@ -1462,11 +1463,105 @@ async function removeGalleryImage(item) {
               ? text.published
               : text.draft}
           </div>
+
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                window.open(
+                  `/business/${businessId}/profile-preview`,
+                  "_blank",
+                  "noopener,noreferrer"
+                );
+              }}
+              disabled={
+                saving ||
+                publishing ||
+                uploadingLogo ||
+                uploadingCover ||
+                uploadingGallery
+              }
+              className="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              👁️ {lang === "es" ? "Vista previa" : "Preview"}
+            </button>
+
+            {profile.published && (
+              <button
+                type="button"
+                onClick={openPublicProfile}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition"
+              >
+                🌐 {lang === "es" ? "Ver página pública" : "View public page"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="p-6 space-y-8">
+        {/* QUICK CUSTOMIZATION GUIDE */}
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 sm:p-5">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">
+                {lang === "es" ? "Diseña tu página" : "Design your page"}
+              </p>
+              <h3 className="mt-1 text-lg font-bold text-gray-900">
+                {lang === "es"
+                  ? "Personaliza tu negocio paso a paso"
+                  : "Customize your business step by step"}
+              </h3>
+              <p className="mt-1 text-sm text-gray-600 max-w-2xl">
+                {lang === "es"
+                  ? "Usa estas secciones para completar tu página. Puedes guardar y abrir la vista previa antes de publicarla."
+                  : "Use these sections to complete your page. You can save and preview it before publishing."}
+              </p>
+            </div>
 
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 lg:min-w-[430px]">
+              {[
+                ["identity", lang === "es" ? "1. Identidad" : "1. Identity"],
+                ["information", lang === "es" ? "2. Información" : "2. Information"],
+                ["content", lang === "es" ? "3. Contenido" : "3. Content"],
+                ["organize", lang === "es" ? "4. Organizar" : "4. Organize"],
+                ["contact", lang === "es" ? "5. Contacto" : "5. Contact"],
+                ["policies", lang === "es" ? "6. Políticas" : "6. Policies"],
+              ].map(([target, label]) => (
+                <button
+                  key={target}
+                  type="button"
+                  onClick={() => {
+                    setOpenCustomizerSection(target);
+                    requestAnimationFrame(() => {
+                      document
+                        .getElementById(`profile-${target}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    });
+                  }}
+                  className="rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-left text-xs sm:text-sm font-semibold text-gray-800 hover:border-blue-300 hover:bg-blue-50 transition"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div id="profile-identity" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenCustomizerSection(openCustomizerSection === "identity" ? "" : "identity")}
+            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">1</span>
+              <span className="font-bold text-gray-900">{lang === "es" ? "Identidad y apariencia" : "Identity and appearance"}</span>
+            </div>
+            <span className="text-xl text-gray-500">{openCustomizerSection === "identity" ? "−" : "+"}</span>
+          </button>
+          {openCustomizerSection === "identity" && (
+            <div className="p-4 sm:p-5 space-y-8">
         {/* VISUAL IDENTITY */}
         <div>
           <h3 className="font-bold text-gray-900 mb-4">
@@ -1635,7 +1730,7 @@ async function removeGalleryImage(item) {
         </div>
 
 {/* GALLERY */}
-<div>
+<div id="profile-content" className="scroll-mt-6">
   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
     <div>
       <h3 className="font-bold text-gray-900">
@@ -1871,6 +1966,25 @@ async function removeGalleryImage(item) {
           </div>
         </div>
 
+
+            </div>
+          )}
+        </div>
+
+        <div id="profile-information" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenCustomizerSection(openCustomizerSection === "information" ? "" : "information")}
+            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">2</span>
+              <span className="font-bold text-gray-900">{lang === "es" ? "Información de tu página" : "Page information"}</span>
+            </div>
+            <span className="text-xl text-gray-500">{openCustomizerSection === "information" ? "−" : "+"}</span>
+          </button>
+          {openCustomizerSection === "information" && (
+            <div className="p-4 sm:p-5 space-y-8">
         {/* ABOUT — BILINGUAL */}
         <div>
           <h3 className="font-bold text-gray-900 mb-4">
@@ -1934,6 +2048,25 @@ async function removeGalleryImage(item) {
           </div>
         </div>
 
+
+            </div>
+          )}
+        </div>
+
+        <div id="profile-contact" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenCustomizerSection(openCustomizerSection === "contact" ? "" : "contact")}
+            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">5</span>
+              <span className="font-bold text-gray-900">{lang === "es" ? "Redes sociales y contacto" : "Social links and contact"}</span>
+            </div>
+            <span className="text-xl text-gray-500">{openCustomizerSection === "contact" ? "−" : "+"}</span>
+          </button>
+          {openCustomizerSection === "contact" && (
+            <div className="p-4 sm:p-5 space-y-8">
         {/* SOCIAL LINKS & CONTACT */}
         <div>
           <div className="mb-4">
@@ -2012,6 +2145,25 @@ async function removeGalleryImage(item) {
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="profile-policies" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenCustomizerSection(openCustomizerSection === "policies" ? "" : "policies")}
+            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">6</span>
+              <span className="font-bold text-gray-900">{lang === "es" ? "Políticas" : "Policies"}</span>
+            </div>
+            <span className="text-xl text-gray-500">{openCustomizerSection === "policies" ? "−" : "+"}</span>
+          </button>
+          {openCustomizerSection === "policies" && (
+            <div className="p-4 sm:p-5 space-y-8">
+
+            </div>
+          )}
         </div>
 
         {/* BUSINESS POLICIES */}
@@ -2113,6 +2265,25 @@ async function removeGalleryImage(item) {
           </div>
         </div>
 
+
+            </div>
+          )}
+        </div>
+
+        <div id="profile-content" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenCustomizerSection(openCustomizerSection === "content" ? "" : "content")}
+            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">3</span>
+              <span className="font-bold text-gray-900">{lang === "es" ? "Contenido y servicios" : "Content and services"}</span>
+            </div>
+            <span className="text-xl text-gray-500">{openCustomizerSection === "content" ? "−" : "+"}</span>
+          </button>
+          {openCustomizerSection === "content" && (
+            <div className="p-4 sm:p-5 space-y-8">
         {/* SERVICE TRANSLATIONS */}
         <div>
           <div className="mb-4">
@@ -2263,6 +2434,25 @@ async function removeGalleryImage(item) {
           )}
         </div>
 
+
+            </div>
+          )}
+        </div>
+
+        <div id="profile-organize" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenCustomizerSection(openCustomizerSection === "organize" ? "" : "organize")}
+            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">4</span>
+              <span className="font-bold text-gray-900">{lang === "es" ? "Organiza tu página" : "Organize your page"}</span>
+            </div>
+            <span className="text-xl text-gray-500">{openCustomizerSection === "organize" ? "−" : "+"}</span>
+          </button>
+          {openCustomizerSection === "organize" && (
+            <div className="p-4 sm:p-5 space-y-8">
         {/* SECTION ORDER */}
         <div>
           <div className="mb-4">
@@ -2400,6 +2590,11 @@ async function removeGalleryImage(item) {
               }
             />
           </div>
+        </div>
+
+
+            </div>
+          )}
         </div>
 
         {/* SAVE + PREVIEW + PUBLISH */}

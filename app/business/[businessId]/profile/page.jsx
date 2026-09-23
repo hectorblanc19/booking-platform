@@ -14,6 +14,7 @@ export default function BusinessProfilePage() {
   const [providers, setProviders] = useState([]);
   const [gallery, setGallery] = useState([]);
   const [businessHours, setBusinessHours] = useState([]);
+  const [reviews, setReviews] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
@@ -204,6 +205,41 @@ export default function BusinessProfilePage() {
       }
 
       setBusinessHours(businessHoursData || []);
+
+      // ==================================================
+      // 7. VERIFIED CUSTOMER REVIEWS
+      // Reviews are tied to real FlowPayDR appointments.
+      // ==================================================
+      const {
+        data: ratingData,
+        error: ratingError,
+      } = await supabase
+        .from("ratings")
+        .select(
+          `
+            id,
+            rating,
+            review_text,
+            created_at,
+            appointment_id,
+            appointments (
+              customer_name,
+              service,
+              date
+            )
+          `
+        )
+        .eq("business_id", businessId)
+        .order("created_at", { ascending: false });
+
+      if (ratingError) {
+        console.error(
+          "Public reviews load error:",
+          ratingError
+        );
+      }
+
+      setReviews(ratingData || []);
       setAuthorized(true);
     } catch (error) {
       console.error("Public profile load error:", error);
@@ -776,6 +812,105 @@ export default function BusinessProfilePage() {
             </section>
           )}
 
+        {/* CUSTOMER REVIEWS */}
+        {reviews.length > 0 && (
+          <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
+            <SectionLabel
+              text={
+                lang === "es"
+                  ? "Lo que dicen nuestros clientes"
+                  : "What our customers say"
+              }
+              brandColor={brandColor}
+            />
+
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-9">
+              <div>
+                <h2
+                  className={`text-3xl sm:text-4xl text-gray-900 ${themeStyles.heading}`}
+                >
+                  {lang === "es"
+                    ? "Opiniones de clientes"
+                    : "Customer reviews"}
+                </h2>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                  <span className="text-yellow-400 text-lg tracking-tight">
+                    {renderStars(getAverageRating(reviews))}
+                  </span>
+                  <span className="font-bold text-gray-900">
+                    {getAverageRating(reviews).toFixed(1)}
+                  </span>
+                  <span>·</span>
+                  <span>
+                    {reviews.length}{" "}
+                    {reviews.length === 1
+                      ? lang === "es"
+                        ? "reseña"
+                        : "review"
+                      : lang === "es"
+                      ? "reseñas"
+                      : "reviews"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {reviews.map((review) => {
+                const appointment = Array.isArray(review.appointments)
+                  ? review.appointments[0]
+                  : review.appointments;
+
+                const customerName =
+                  appointment?.customer_name?.trim() ||
+                  (lang === "es" ? "Cliente" : "Customer");
+
+                return (
+                  <article
+                    key={review.id}
+                    className={`bg-white border border-gray-100 p-6 ${themeStyles.card}`}
+                  >
+                    <div
+                      className="text-yellow-400 text-lg tracking-tight"
+                      aria-label={`${review.rating} / 5`}
+                    >
+                      {renderStars(review.rating)}
+                    </div>
+
+                    {review.review_text?.trim() && (
+                      <p className="mt-4 text-gray-700 leading-7">
+                        “{review.review_text.trim()}”
+                      </p>
+                    )}
+
+                    <div className="mt-6 pt-5 border-t border-gray-100">
+                      <p className="font-bold text-gray-900">
+                        {customerName}
+                      </p>
+
+                      <p
+                        className="mt-1 text-xs font-semibold"
+                        style={{ color: brandColor }}
+                      >
+                        ✓ {lang === "es"
+                          ? "Cliente verificado"
+                          : "Verified customer"}
+                      </p>
+
+                      {appointment?.service && (
+                        <p className="mt-2 text-xs text-gray-500">
+                          {appointment.service}
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* LOCATION */}
         {profile?.show_location && (
           <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-20">
@@ -932,6 +1067,25 @@ export default function BusinessProfilePage() {
       </footer>
     </div>
   );
+}
+
+function getAverageRating(reviews) {
+  if (!reviews?.length) return 0;
+
+  const total = reviews.reduce(
+    (sum, review) => sum + Number(review.rating || 0),
+    0
+  );
+
+  return total / reviews.length;
+}
+
+function renderStars(value) {
+  const rating = Math.round(Number(value) || 0);
+
+  return [1, 2, 3, 4, 5]
+    .map((star) => (star <= rating ? "★" : "☆"))
+    .join("");
 }
 
 function BusinessHoursStatus({ hours, lang, brandColor }) {

@@ -608,28 +608,31 @@ export default function BusinessProfilePage() {
                         : "See our work"}
                     </h2>
             
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
-                      {gallery.map(
-                        (image, index) => (
-                          <div
-                            key={image.id}
-                            className={`overflow-hidden bg-gray-100 ${themeStyles.galleryImage} ${
-                              index === 0 &&
-                              gallery.length >= 3
-                                ? "md:col-span-2 md:row-span-2"
-                                : ""
-                            }`}
-                          >
-                            <img
-                              src={image.image_url}
-                              alt={`${business.name} gallery ${
-                                index + 1
-                              }`}
-                              className="w-full h-full object-cover hover:scale-105 transition duration-500"
-                            />
-                          </div>
-                        )
-                      )}
+                    <div
+                      className={
+                        gallery.length === 1
+                          ? "grid grid-cols-1"
+                          : "grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5"
+                      }
+                    >
+                      {gallery.map((image, index) => (
+                        <div
+                          key={image.id}
+                          className={`overflow-hidden bg-gray-100 ${themeStyles.galleryImage} ${
+                            gallery.length === 1
+                              ? "w-full aspect-[16/10] sm:aspect-[16/9]"
+                              : index === 0 && gallery.length >= 3
+                              ? "md:col-span-2 md:row-span-2 aspect-square"
+                              : "aspect-square"
+                          }`}
+                        >
+                          <img
+                            src={image.image_url}
+                            alt={`${business.name} gallery ${index + 1}`}
+                            className="w-full h-full object-cover hover:scale-105 transition duration-500"
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </section>
@@ -1485,7 +1488,7 @@ function getThemeStyles(theme) {
         smallButton: "rounded-full",
         logo: "w-24 h-24 rounded-full",
         galleryImage:
-          "rounded-3xl aspect-square",
+          "rounded-3xl",
       };
 
     case "minimal":
@@ -1502,7 +1505,7 @@ function getThemeStyles(theme) {
         smallButton: "rounded-none",
         logo: "w-24 h-24 rounded-none",
         galleryImage:
-          "rounded-none aspect-square",
+          "rounded-none",
       };
 
     case "vibrant":
@@ -1519,7 +1522,7 @@ function getThemeStyles(theme) {
         smallButton: "rounded-xl",
         logo: "w-24 h-24 rounded-3xl",
         galleryImage:
-          "rounded-3xl aspect-square",
+          "rounded-3xl",
       };
 
     case "modern":
@@ -1536,7 +1539,7 @@ function getThemeStyles(theme) {
         smallButton: "rounded-lg",
         logo: "w-24 h-24 rounded-2xl",
         galleryImage:
-          "rounded-2xl aspect-square",
+          "rounded-2xl",
       };
   }
 }

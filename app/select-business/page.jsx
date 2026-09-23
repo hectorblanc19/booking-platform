@@ -8,6 +8,8 @@ export default function WelcomePage() {
   const [lang, setLang] = useState("es");
   const [businesses, setBusinesses] = useState([]);
   const [independentBarbers, setIndependentBarbers] = useState([]);
+  const [publishedProfileBusinessIds, setPublishedProfileBusinessIds] =
+    useState(new Set());
   const [loading, setLoading] = useState(true);
 
   // NEW: SEARCH + CATEGORY FILTER
@@ -116,23 +118,32 @@ export default function WelcomePage() {
          * 3. Ratings
          */
 
-        const [businessResult, barberResult, ratingResult] =
-          await Promise.all([
-            supabase
-              .from("businesses")
-              .select("id, name, address, map_url, category")
-              .limit(20),
+        const [
+          businessResult,
+          barberResult,
+          ratingResult,
+          publishedProfileResult,
+        ] = await Promise.all([
+          supabase
+            .from("businesses")
+            .select("id, name, address, map_url, category")
+            .limit(20),
 
-            supabase
-              .from("barbers")
-              .select("id, name, phone, working_days")
-              .is("business_id", null)
-              .eq("active", true),
+          supabase
+            .from("barbers")
+            .select("id, name, phone, working_days")
+            .is("business_id", null)
+            .eq("active", true),
 
-            supabase
-              .from("ratings")
-              .select("barber_id, business_id, rating"),
-          ]);
+          supabase
+            .from("ratings")
+            .select("barber_id, business_id, rating"),
+
+          supabase
+            .from("business_profile_settings")
+            .select("business_id")
+            .eq("published", true),
+        ]);
 
         /*
          * CHECK ERRORS
@@ -159,9 +170,22 @@ export default function WelcomePage() {
           );
         }
 
+        if (publishedProfileResult.error) {
+          console.error(
+            "Error loading published business profiles:",
+            publishedProfileResult.error
+          );
+        }
+
         const businessData = businessResult.data || [];
         const barberData = barberResult.data || [];
         const ratingData = ratingResult.data || [];
+
+        const publishedBusinessIds = new Set(
+          (publishedProfileResult.data || []).map(function (profile) {
+            return profile.business_id;
+          })
+        );
 
         /*
          * ---------------------------------------------------
@@ -247,6 +271,7 @@ export default function WelcomePage() {
 
         setBusinesses(businessesWithRatings);
         setIndependentBarbers(barbersWithRatings);
+        setPublishedProfileBusinessIds(publishedBusinessIds);
       } catch (error) {
         console.error(
           "Error loading booking directory:",
@@ -255,6 +280,7 @@ export default function WelcomePage() {
 
         setBusinesses([]);
         setIndependentBarbers([]);
+        setPublishedProfileBusinessIds(new Set());
       } finally {
         setLoading(false);
       }
@@ -822,9 +848,16 @@ export default function WelcomePage() {
                             "barbero"
                           );
 
+                        const hasPublishedProfile =
+                          publishedProfileBusinessIds.has(
+                            business.id
+                          );
+
                         const bookingHref =
                           isBarberBusiness
                             ? `/select-barber/${business.id}`
+                            : hasPublishedProfile
+                            ? `/business/${business.id}/profile`
                             : `/business/${business.id}/booking`;
 
                         const categoryKey =

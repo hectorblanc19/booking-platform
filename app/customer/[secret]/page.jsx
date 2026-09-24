@@ -711,25 +711,24 @@ export default function CustomerSecretPage() {
         )}
 
         <button
-          className="mt-4 bg-black text-white px-5 py-3 rounded-xl w-full"
-          onClick={() => {
-            if (
-              appointment.provider_id &&
-              appointment.business_id
-            ) {
-              window.location.href =
-                `/business/${appointment.business_id}/booking`;
-            } else {
-              window.location.href =
-                "/";
-            }
-          }}
-        >
-          {lang === "es"
-            ? "Volver al Inicio"
-            : "Back Home"}
-        </button>
-
+  className="mt-4 bg-black text-white px-5 py-3 rounded-xl w-full"
+  onClick={() => {
+    if (
+      appointment.provider_id &&
+      appointment.business_id
+    ) {
+      window.location.href =
+        `/business/${appointment.business_id}/profile`;
+    } else {
+      window.location.href =
+        "/";
+    }
+  }}
+>
+  {lang === "es"
+    ? "Volver al Inicio"
+    : "Back Home"}
+</button>
         {appointment.status ===
           "confirmed" && (
           <button

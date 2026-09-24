@@ -15,6 +15,7 @@ export default function BusinessProfilePage() {
   const [gallery, setGallery] = useState([]);
   const [businessHours, setBusinessHours] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
@@ -685,16 +686,17 @@ export default function BusinessProfilePage() {
                   </div>
                 </div>
             
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {reviews.map((review) => {
-                    const appointment = Array.isArray(review.appointments)
-                      ? review.appointments[0]
-                      : review.appointments;
-            
-                    const customerName =
-                      appointment?.customer_name?.trim() ||
-                      (lang === "es" ? "Cliente" : "Customer");
-            
+               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+  {reviews
+    .slice(0, showAllReviews ? reviews.length : 3)
+    .map((review) => {
+      const appointment = Array.isArray(review.appointments)
+        ? review.appointments[0]
+        : review.appointments;
+
+      const customerName =
+        appointment?.customer_name?.trim() ||
+        (lang === "es" ? "Cliente" : "Customer");            
                     return (
                       <article
                         key={review.id}
@@ -733,15 +735,34 @@ export default function BusinessProfilePage() {
                             </p>
                           )}
                         </div>
-                      </article>
+                       </article>
                     );
                   })}
                 </div>
+
+                {reviews.length > 3 && (
+                  <div className="mt-8 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllReviews((current) => !current)}
+                      className={`px-6 py-3 border border-gray-200 bg-white font-semibold text-gray-900 hover:bg-gray-50 transition ${themeStyles.smallButton}`}
+                    >
+                      {showAllReviews
+                        ? lang === "es"
+                          ? "Mostrar menos"
+                          : "Show less"
+                        : lang === "es"
+                        ? `Ver todas las reseñas (${reviews.length})`
+                        : `View all reviews (${reviews.length})`}
+                    </button>
+                  </div>
+                )}
               </section>
             )}
           </div>
-        );
-      case "policies": {
+        );              
+
+       case "policies": {
         const policyItems = [
           {
             key: "cancellation",
@@ -1543,3 +1564,6 @@ function getThemeStyles(theme) {
       };
   }
 }
+
+
+

@@ -893,15 +893,56 @@ export default function BusinessProfilePage() {
                 <div
                   className={`bg-white border border-gray-100 overflow-hidden ${themeStyles.card}`}
                 >
-                  {business.address && (
+                  {business.latitude != null && business.longitude != null ? (
                     <iframe
                       title="Business location"
                       className="w-full h-72 sm:h-96 border-0"
                       src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                        business.address
-                      )}&z=15&output=embed`}
+                        `${business.latitude},${business.longitude}`
+                      )}&z=17&output=embed`}
                       loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
                     />
+                  ) : business.address ? (
+                    <div className="p-6 sm:p-8 border-b border-gray-100 bg-gray-50">
+                      <p className="text-sm text-gray-600">
+                        {lang === "es"
+                          ? "El mapa exacto todavía no está configurado para este negocio."
+                          : "The exact map location has not been configured for this business yet."}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {business.map_url && (
+                    <div className="p-6 sm:p-8 border-b border-gray-100">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
+                            {lang === "es"
+                              ? "Ubicación en Google Maps"
+                              : "Location on Google Maps"}
+                          </p>
+
+                          <p className="mt-2 text-sm text-gray-600">
+                            {lang === "es"
+                              ? "Abre la ubicación exacta del negocio para obtener direcciones."
+                              : "Open the exact business location to get directions."}
+                          </p>
+                        </div>
+
+                        <a
+                          href={normalizeExternalUrl(business.map_url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center justify-center gap-2 px-5 py-3 font-semibold transition hover:bg-gray-50 border border-gray-200 bg-white text-gray-900 ${themeStyles.smallButton}`}
+                        >
+                          <span aria-hidden="true">📍</span>
+                          {lang === "es"
+                            ? "Abrir en Google Maps"
+                            : "Open in Google Maps"}
+                        </a>
+                      </div>
+                    </div>
                   )}
             
                   <div className="p-6 sm:p-8 grid md:grid-cols-2 gap-6">

@@ -126,7 +126,7 @@ export default function WelcomePage() {
         ] = await Promise.all([
           supabase
             .from("businesses")
-            .select("id, name, address, map_url, category")
+            .select("id, name, address, map_url, category, booking_system")
             .limit(20),
 
           supabase
@@ -853,8 +853,11 @@ export default function WelcomePage() {
                             business.id
                           );
 
+                        const isProviderBusiness =
+                          business.booking_system === "provider";
+
                         const bookingHref =
-                          isBarberBusiness
+                          isBarberBusiness && !isProviderBusiness
                             ? `/select-barber/${business.id}`
                             : hasPublishedProfile
                             ? `/business/${business.id}/profile`

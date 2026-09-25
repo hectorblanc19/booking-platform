@@ -49,20 +49,25 @@ const [businessPhotoPreview, setBusinessPhotoPreview] = useState(null);
 const [businessMapUrl, setBusinessMapUrl] = useState("");
 const [savingBusinessMapUrl, setSavingBusinessMapUrl] = useState(false);
 
-// Detect whether this business is a barber business
+// Detect business category
 const normalizedCategory = business?.category?.trim().toLowerCase() || "";
 
-const isBarberBusiness =
+const isBarberCategory =
   normalizedCategory.includes("barber") ||
   normalizedCategory.includes("barbero") ||
   normalizedCategory.includes("barbería") ||
   normalizedCategory.includes("barberia");
 
+// Legacy barber system:
+// Existing barber businesses with NULL booking_system keep their old behavior.
+// New barber businesses with booking_system = "provider" use the new provider system.
+const isBarberBusiness =
+  isBarberCategory && business?.booking_system !== "provider";
+
 const isTourBusiness =
   normalizedCategory.includes("tour") ||
   normalizedCategory.includes("excursion") ||
   normalizedCategory.includes("excursión");
-
   const [newBarberName, setNewBarberName] = useState("");
   const [newBarberEmail, setNewBarberEmail] = useState("");
 
@@ -2834,5 +2839,4 @@ if (!accessGranted) {
 }
 
  
-
 

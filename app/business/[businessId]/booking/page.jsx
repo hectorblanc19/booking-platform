@@ -62,19 +62,24 @@ export default function BusinessBookingPage() {
   const tr = t[lang];
 
   const normalizedCategory =
-    business?.category?.trim().toLowerCase() || "";
+  business?.category?.trim().toLowerCase() || "";
 
-  const isBarberBusiness =
-    normalizedCategory.includes("barber") ||
-    normalizedCategory.includes("barbero") ||
-    normalizedCategory.includes("barbería") ||
-    normalizedCategory.includes("barberia");
+const isBarberCategory =
+  normalizedCategory.includes("barber") ||
+  normalizedCategory.includes("barbero") ||
+  normalizedCategory.includes("barbería") ||
+  normalizedCategory.includes("barberia");
 
-  const isTourBusiness =
-    normalizedCategory.includes("tour") ||
-    normalizedCategory.includes("excursion") ||
-    normalizedCategory.includes("excursión");
+// Legacy barber businesses keep the old booking flow.
+// New barber businesses with booking_system = "provider"
+// use the new provider booking flow.
+const isBarberBusiness =
+  isBarberCategory && business?.booking_system !== "provider";
 
+const isTourBusiness =
+  normalizedCategory.includes("tour") ||
+  normalizedCategory.includes("excursion") ||
+  normalizedCategory.includes("excursión");
   const baseUrl =
     typeof window !== "undefined"
       ? window.location.origin

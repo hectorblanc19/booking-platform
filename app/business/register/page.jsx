@@ -316,27 +316,27 @@ export default function BusinessRegisterPage() {
       // 4. USER HAS NO BUSINESS
       // Create a new business under this Auth user
       // --------------------------------------------------
-      const {
-        data: business,
-        error: businessError,
-      } = await supabase
-        .from("businesses")
-        .insert({
-          name: form.businessName.trim(),
-          phone: form.phone.trim() || null,
-          address: form.address.trim() || null,
-          category: form.category.trim() || null,
-          open_time: form.openTime || null,
-          close_time: form.closeTime || null,
-          owner_id: userId,
-        })
-        .select()
-        .single();
+     const {
+  data: business,
+  error: businessError,
+} = await supabase
+  .from("businesses")
+  .insert({
+    name: form.businessName.trim(),
+    phone: form.phone.trim() || null,
+    address: form.address.trim() || null,
+    category: form.category.trim() || null,
+    booking_system: "provider",
+    open_time: form.openTime || null,
+    close_time: form.closeTime || null,
+    owner_id: userId,
+  })
+  .select()
+  .single();
 
-      if (businessError) {
-        throw businessError;
-      }
-
+if (businessError) {
+  throw businessError;
+}
       // --------------------------------------------------
       // 5. EXISTING USER WHO RE-REGISTERED
       // Already has a valid session, so go straight to dashboard

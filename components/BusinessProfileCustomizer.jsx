@@ -2053,223 +2053,6 @@ async function removeGalleryImage(item) {
           )}
         </div>
 
-        <div id="profile-contact" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setOpenCustomizerSection(openCustomizerSection === "contact" ? "" : "contact")}
-            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
-          >
-            <div className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">5</span>
-              <span className="font-bold text-gray-900">{lang === "es" ? "Redes sociales y contacto" : "Social links and contact"}</span>
-            </div>
-            <span className="text-xl text-gray-500">{openCustomizerSection === "contact" ? "−" : "+"}</span>
-          </button>
-          {openCustomizerSection === "contact" && (
-            <div className="p-4 sm:p-5 space-y-8">
-        {/* SOCIAL LINKS & CONTACT */}
-        <div>
-          <div className="mb-4">
-            <h3 className="font-bold text-gray-900">
-              {lang === "es"
-                ? "Redes sociales y contacto"
-                : "Social links and contact"}
-            </h3>
-
-            <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-              {lang === "es"
-                ? "Agrega solo las redes que uses. Los campos vacíos no se mostrarán en tu página. WhatsApp se usará para preguntas y contacto; las citas continúan realizándose por FlowPayDR."
-                : "Add only the platforms you use. Empty fields will not appear on your page. WhatsApp is for questions and contact; appointments continue to be booked through FlowPayDR."}
-            </p>
-          </div>
-
-          <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50/50">
-            <div className="grid md:grid-cols-2 gap-4">
-              <SocialLinkField
-                label="Instagram"
-                value={profile.instagram_url}
-                onChange={(value) => updateProfile("instagram_url", value)}
-                placeholder="https://instagram.com/tu_negocio"
-              />
-
-              <SocialLinkField
-                label="TikTok"
-                value={profile.tiktok_url}
-                onChange={(value) => updateProfile("tiktok_url", value)}
-                placeholder="https://tiktok.com/@tu_negocio"
-              />
-
-              <SocialLinkField
-                label="Facebook"
-                value={profile.facebook_url}
-                onChange={(value) => updateProfile("facebook_url", value)}
-                placeholder="https://facebook.com/tu_negocio"
-              />
-
-              <SocialLinkField
-                label={lang === "es" ? "Sitio web" : "Website"}
-                value={profile.website_url}
-                onChange={(value) => updateProfile("website_url", value)}
-                placeholder="https://tusitio.com"
-              />
-
-              <div className="md:col-span-2">
-                <SocialLinkField
-                  label="WhatsApp"
-                  value={profile.whatsapp_number}
-                  onChange={(value) => updateProfile("whatsapp_number", value)}
-                  placeholder="+1 809 555 1234"
-                  help={
-                    lang === "es"
-                      ? "Usa el número con código de país. Ejemplo: +1 809 555 1234."
-                      : "Use the number with country code. Example: +1 809 555 1234."
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={saveSocialLinks}
-                disabled={savingSocialLinks}
-                className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {savingSocialLinks
-                  ? lang === "es"
-                    ? "Guardando..."
-                    : "Saving..."
-                  : lang === "es"
-                  ? "Guardar redes y contacto"
-                  : "Save social links and contact"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div id="profile-policies" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setOpenCustomizerSection(openCustomizerSection === "policies" ? "" : "policies")}
-            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
-          >
-            <div className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">6</span>
-              <span className="font-bold text-gray-900">{lang === "es" ? "Políticas" : "Policies"}</span>
-            </div>
-            <span className="text-xl text-gray-500">{openCustomizerSection === "policies" ? "−" : "+"}</span>
-          </button>
-          {openCustomizerSection === "policies" && (
-            <div className="p-4 sm:p-5 space-y-8">
-
-            </div>
-          )}
-        </div>
-
-        {/* BUSINESS POLICIES */}
-        <div>
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-            <div>
-              <h3 className="font-bold text-gray-900">
-                {lang === "es" ? "Políticas del negocio" : "Business policies"}
-              </h3>
-              <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-                {lang === "es"
-                  ? "Esta sección es opcional. Actívala solo si quieres mostrar tus políticas a los clientes."
-                  : "This section is optional. Turn it on only if you want to show your policies to customers."}
-              </p>
-            </div>
-            <ToggleOption
-              label={lang === "es" ? "Mostrar políticas en mi página" : "Show policies on my page"}
-              checked={profile.show_policies}
-              onChange={setPoliciesVisibility}
-            />
-          </div>
-
-          <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50/50">
-            <p className="text-xs text-gray-500 mb-5">
-              {lang === "es"
-                ? "Puedes completar solo las políticas que apliquen a tu negocio. Si una está vacía, no se mostrará al cliente."
-                : "Complete only the policies that apply to your business. If a policy is empty, it will not be shown to the customer."}
-            </p>
-
-            <div className="space-y-6">
-              {[
-                { key:"cancellation_policy", keyEn:"cancellation_policy_en", titleEs:"Cancelaciones", titleEn:"Cancellations", placeholderEs:"Ejemplo: Las cancelaciones deben realizarse con al menos 24 horas de anticipación.", placeholderEn:"Example: Cancellations must be made at least 24 hours in advance." },
-                { key:"late_policy", keyEn:"late_policy_en", titleEs:"Llegadas tarde", titleEn:"Late arrivals", placeholderEs:"Ejemplo: Después de 15 minutos de retraso, la cita puede necesitar ser reprogramada.", placeholderEn:"Example: After 15 minutes late, the appointment may need to be rescheduled." },
-                { key:"payment_policy", keyEn:"payment_policy_en", titleEs:"Pagos y depósitos", titleEn:"Payments and deposits", placeholderEs:"Ejemplo: Algunos servicios pueden requerir un depósito para confirmar la cita.", placeholderEn:"Example: Some services may require a deposit to confirm the appointment." },
-                { key:"general_policy", keyEn:"general_policy_en", titleEs:"Reglas generales", titleEn:"General rules", placeholderEs:"Agrega cualquier otra regla o información importante para tus clientes.", placeholderEn:"Add any other important rule or information for your customers." },
-              ].map((policy) => (
-                <div key={policy.key} className="border border-gray-200 rounded-xl p-4 bg-white">
-                  <h4 className="font-semibold text-gray-900 mb-4">
-                    {lang === "es" ? policy.titleEs : policy.titleEn}
-                  </h4>
-                  <div className="grid lg:grid-cols-2 gap-4">
-                    <div>
-                      <div className="flex justify-between gap-4 mb-2">
-                        <label className="text-sm font-semibold text-gray-800">🇪🇸 Español</label>
-                        <span className="text-xs text-gray-400">{profile[policy.key].length}/1000</span>
-                      </div>
-                      <textarea
-                        value={profile[policy.key]}
-                        onChange={(event) => {
-                          if (event.target.value.length <= 1000) updateProfile(policy.key, event.target.value);
-                        }}
-                        placeholder={policy.placeholderEs}
-                        rows={4}
-                        className="w-full border border-gray-300 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between gap-4 mb-2">
-                        <label className="text-sm font-semibold text-gray-800">🇺🇸 English</label>
-                        <span className="text-xs text-gray-400">{profile[policy.keyEn].length}/1000</span>
-                      </div>
-                      <textarea
-                        value={profile[policy.keyEn]}
-                        onChange={(event) => {
-                          if (event.target.value.length <= 1000) updateProfile(policy.keyEn, event.target.value);
-                        }}
-                        placeholder={policy.placeholderEn}
-                        rows={4}
-                        className="w-full border border-gray-300 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-xs text-gray-500 mt-4">
-              {lang === "es"
-                ? "Si el texto en inglés queda vacío, la página podrá usar el texto en español como respaldo."
-                : "If the English text is empty, the page can fall back to the Spanish text."}
-            </p>
-
-            <div className="flex justify-end mt-5 pt-5 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={savePolicies}
-                disabled={savingPolicies}
-                className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {savingPolicies
-                  ? lang === "es"
-                    ? "Guardando políticas..."
-                    : "Saving policies..."
-                  : lang === "es"
-                  ? "Guardar políticas"
-                  : "Save policies"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-
-            </div>
-          )}
-        </div>
-
         <div id="profile-content" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
           <button
             type="button"
@@ -2593,6 +2376,308 @@ async function removeGalleryImage(item) {
         </div>
 
 
+            </div>
+          )}
+        </div>
+
+        <div id="profile-contact" className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setOpenCustomizerSection(openCustomizerSection === "contact" ? "" : "contact")}
+            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">5</span>
+              <span className="font-bold text-gray-900">{lang === "es" ? "Redes sociales y contacto" : "Social links and contact"}</span>
+            </div>
+            <span className="text-xl text-gray-500">{openCustomizerSection === "contact" ? "−" : "+"}</span>
+          </button>
+          {openCustomizerSection === "contact" && (
+            <div className="p-4 sm:p-5 space-y-8">
+        {/* SOCIAL LINKS & CONTACT */}
+        <div>
+          <div className="mb-4">
+            <h3 className="font-bold text-gray-900">
+              {lang === "es"
+                ? "Redes sociales y contacto"
+                : "Social links and contact"}
+            </h3>
+
+            <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+              {lang === "es"
+                ? "Agrega solo las redes que uses. Los campos vacíos no se mostrarán en tu página. WhatsApp se usará para preguntas y contacto; las citas continúan realizándose por FlowPayDR."
+                : "Add only the platforms you use. Empty fields will not appear on your page. WhatsApp is for questions and contact; appointments continue to be booked through FlowPayDR."}
+            </p>
+          </div>
+
+          <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50/50">
+            <div className="grid md:grid-cols-2 gap-4">
+              <SocialLinkField
+                label="Instagram"
+                value={profile.instagram_url}
+                onChange={(value) => updateProfile("instagram_url", value)}
+                placeholder="https://instagram.com/tu_negocio"
+              />
+
+              <SocialLinkField
+                label="TikTok"
+                value={profile.tiktok_url}
+                onChange={(value) => updateProfile("tiktok_url", value)}
+                placeholder="https://tiktok.com/@tu_negocio"
+              />
+
+              <SocialLinkField
+                label="Facebook"
+                value={profile.facebook_url}
+                onChange={(value) => updateProfile("facebook_url", value)}
+                placeholder="https://facebook.com/tu_negocio"
+              />
+
+              <SocialLinkField
+                label={lang === "es" ? "Sitio web" : "Website"}
+                value={profile.website_url}
+                onChange={(value) => updateProfile("website_url", value)}
+                placeholder="https://tusitio.com"
+              />
+
+              <div className="md:col-span-2">
+                <SocialLinkField
+                  label="WhatsApp"
+                  value={profile.whatsapp_number}
+                  onChange={(value) => updateProfile("whatsapp_number", value)}
+                  placeholder="+1 809 555 1234"
+                  help={
+                    lang === "es"
+                      ? "Usa el número con código de país. Ejemplo: +1 809 555 1234."
+                      : "Use the number with country code. Example: +1 809 555 1234."
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={saveSocialLinks}
+                disabled={savingSocialLinks}
+                className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingSocialLinks
+                  ? lang === "es"
+                    ? "Guardando..."
+                    : "Saving..."
+                  : lang === "es"
+                  ? "Guardar redes y contacto"
+                  : "Save social links and contact"}
+              </button>
+                        </div>
+          </div>
+        </div>
+
+            </div>
+          )}
+        </div>
+
+        <div
+          id="profile-policies"         
+ className="scroll-mt-6 rounded-2xl border border-gray-200 overflow-hidden" >
+          <button
+            type="button"
+            onClick={() =>
+              setOpenCustomizerSection(
+                openCustomizerSection === "policies" ? "" : "policies"
+              )
+            }
+            className="w-full flex items-center justify-between gap-4 px-4 sm:px-5 py-4 bg-gray-50 hover:bg-gray-100 transition text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-bold">
+                6
+              </span>
+
+              <span className="font-bold text-gray-900">
+                {lang === "es" ? "Políticas" : "Policies"}
+              </span>
+            </div>
+
+            <span className="text-xl text-gray-500">
+              {openCustomizerSection === "policies" ? "−" : "+"}
+            </span>
+          </button>
+
+          {openCustomizerSection === "policies" && (
+            <div className="p-4 sm:p-5 space-y-8">
+              {/* BUSINESS POLICIES */}
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                  <div>
+                    <h3 className="font-bold text-gray-900">
+                      {lang === "es"
+                        ? "Políticas del negocio"
+                        : "Business policies"}
+                    </h3>
+
+                    <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+                      {lang === "es"
+                        ? "Esta sección es opcional. Actívala solo si quieres mostrar tus políticas a los clientes."
+                        : "This section is optional. Turn it on only if you want to show your policies to customers."}
+                    </p>
+                  </div>
+
+                  <ToggleOption
+                    label={
+                      lang === "es"
+                        ? "Mostrar políticas en mi página"
+                        : "Show policies on my page"
+                    }
+                    checked={profile.show_policies}
+                    onChange={setPoliciesVisibility}
+                  />
+                </div>
+
+                <div className="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50/50">
+                  <p className="text-xs text-gray-500 mb-5">
+                    {lang === "es"
+                      ? "Puedes completar solo las políticas que apliquen a tu negocio. Si una está vacía, no se mostrará al cliente."
+                      : "Complete only the policies that apply to your business. If a policy is empty, it will not be shown to the customer."}
+                  </p>
+
+                  <div className="space-y-6">
+                    {[
+                      {
+                        key: "cancellation_policy",
+                        keyEn: "cancellation_policy_en",
+                        titleEs: "Cancelaciones",
+                        titleEn: "Cancellations",
+                        placeholderEs:
+                          "Ejemplo: Las cancelaciones deben realizarse con al menos 24 horas de anticipación.",
+                        placeholderEn:
+                          "Example: Cancellations must be made at least 24 hours in advance.",
+                      },
+                      {
+                        key: "late_policy",
+                        keyEn: "late_policy_en",
+                        titleEs: "Llegadas tarde",
+                        titleEn: "Late arrivals",
+                        placeholderEs:
+                          "Ejemplo: Después de 15 minutos de retraso, la cita puede necesitar ser reprogramada.",
+                        placeholderEn:
+                          "Example: After 15 minutes late, the appointment may need to be rescheduled.",
+                      },
+                      {
+                        key: "payment_policy",
+                        keyEn: "payment_policy_en",
+                        titleEs: "Pagos y depósitos",
+                        titleEn: "Payments and deposits",
+                        placeholderEs:
+                          "Ejemplo: Algunos servicios pueden requerir un depósito para confirmar la cita.",
+                        placeholderEn:
+                          "Example: Some services may require a deposit to confirm the appointment.",
+                      },
+                      {
+                        key: "general_policy",
+                        keyEn: "general_policy_en",
+                        titleEs: "Reglas generales",
+                        titleEn: "General rules",
+                        placeholderEs:
+                          "Agrega cualquier otra regla o información importante para tus clientes.",
+                        placeholderEn:
+                          "Add any other important rule or information for your customers.",
+                      },
+                    ].map((policy) => (
+                      <div
+                        key={policy.key}
+                        className="border border-gray-200 rounded-xl p-4 bg-white"
+                      >
+                        <h4 className="font-semibold text-gray-900 mb-4">
+                          {lang === "es"
+                            ? policy.titleEs
+                            : policy.titleEn}
+                        </h4>
+
+                        <div className="grid lg:grid-cols-2 gap-4">
+                          <div>
+                            <div className="flex justify-between gap-4 mb-2">
+                              <label className="text-sm font-semibold text-gray-800">
+                                🇪🇸 Español
+                              </label>
+
+                              <span className="text-xs text-gray-400">
+                                {profile[policy.key].length}/1000
+                              </span>
+                            </div>
+
+                            <textarea
+                              value={profile[policy.key]}
+                              onChange={(event) => {
+                                if (event.target.value.length <= 1000) {
+                                  updateProfile(
+                                    policy.key,
+                                    event.target.value
+                                  );
+                                }
+                              }}
+                              placeholder={policy.placeholderEs}
+                              rows={4}
+                              className="w-full border border-gray-300 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between gap-4 mb-2">
+                              <label className="text-sm font-semibold text-gray-800">
+                                🇺🇸 English
+                              </label>
+
+                              <span className="text-xs text-gray-400">
+                                {profile[policy.keyEn].length}/1000
+                              </span>
+                            </div>
+
+                            <textarea
+                              value={profile[policy.keyEn]}
+                              onChange={(event) => {
+                                if (event.target.value.length <= 1000) {
+                                  updateProfile(
+                                    policy.keyEn,
+                                    event.target.value
+                                  );
+                                }
+                              }}
+                              placeholder={policy.placeholderEn}
+                              rows={4}
+                              className="w-full border border-gray-300 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-4">
+                    {lang === "es"
+                      ? "Si el texto en inglés queda vacío, la página podrá usar el texto en español como respaldo."
+                      : "If the English text is empty, the page can fall back to the Spanish text."}
+                  </p>
+
+                  <div className="flex justify-end mt-5 pt-5 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={savePolicies}
+                      disabled={savingPolicies}
+                      className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {savingPolicies
+                        ? lang === "es"
+                          ? "Guardando políticas..."
+                          : "Saving policies..."
+                        : lang === "es"
+                        ? "Guardar políticas"
+                        : "Save policies"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -41,10 +41,6 @@ const [appointments, setAppointments] = useState([]);
 const [customers, setCustomers] = useState([]);
 const [loading, setLoading] = useState(true);
 
-// BUSINESS PHOTO
-const [uploadingBusinessPhoto, setUploadingBusinessPhoto] = useState(false);
-const [businessPhotoPreview, setBusinessPhotoPreview] = useState(null);
-
 // BUSINESS GOOGLE MAPS PIN
 const [businessMapUrl, setBusinessMapUrl] = useState("");
 const [savingBusinessMapUrl, setSavingBusinessMapUrl] = useState(false);
@@ -285,79 +281,6 @@ checkingAvailability: "Verificando disponibilidad...",
  },
   };
 
-// BUSINESS PHOTO UPLOAD
-async function uploadBusinessPhoto(file) {
-  if (!file) return;
-
-  if (!file.type.startsWith("image/")) {
-    showToast(
-      lang === "es"
-        ? "Selecciona una imagen válida."
-        : "Select a valid image."
-    );
-    return;
-  }
-
-  setUploadingBusinessPhoto(true);
-
-  try {
-    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const safeId = Math.random().toString(36).substring(2);
-
-    const fileName =
-      `businesses/${businessId}/${safeId}-${Date.now()}.${extension}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("barber-photos")
-      .upload(fileName, file);
-
-    if (uploadError) {
-      console.error("Business photo upload error:", uploadError);
-
-      showToast(
-        lang === "es"
-          ? "No se pudo subir la foto."
-          : "Could not upload photo."
-      );
-
-      return;
-    }
-
-    const photoUrl =
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/barber-photos/${fileName}`;
-
-    const { error: updateError } = await supabase
-      .from("businesses")
-      .update({
-        photo_url: photoUrl,
-      })
-      .eq("id", businessId);
-
-    if (updateError) {
-      console.error("Business photo database error:", updateError);
-
-      showToast(
-        lang === "es"
-          ? "La foto subió, pero no se pudo guardar."
-          : "Photo uploaded, but could not be saved."
-      );
-
-      return;
-    }
-
-    setBusinessPhotoPreview(photoUrl);
-
-    await loadDashboard();
-
-    showToast(
-      lang === "es"
-        ? "Foto actualizada correctamente."
-        : "Photo updated successfully."
-    );
-  } finally {
-    setUploadingBusinessPhoto(false);
-  }
-}
 
 // SAVE BUSINESS GOOGLE MAPS PIN
 async function saveBusinessMapUrl() {
@@ -1993,58 +1916,7 @@ if (!accessGranted) {
         </div>
       </div>
 
-      {/* BUSINESS PHOTO */}
-      <div className="pt-4 border-t">
-      <p className="font-semibold mb-3">
-        {lang === "es" ? "Foto del negocio" : "Business Photo"}
-      </p>
-
-      {(businessPhotoPreview || business?.photo_url) && (
-        <img
-          src={businessPhotoPreview || business.photo_url}
-          alt={business?.name || "Business"}
-          className="w-40 h-40 object-cover rounded-lg border mb-3"
-        />
-      )}
-
-      <label
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded cursor-pointer ${
-          uploadingBusinessPhoto
-            ? "bg-gray-300 text-gray-600"
-            : "bg-blue-600 text-white"
-        }`}
-      >
-        📸{" "}
-        {uploadingBusinessPhoto
-          ? lang === "es"
-            ? "Subiendo..."
-            : "Uploading..."
-          : business?.photo_url
-          ? lang === "es"
-            ? "Cambiar Foto"
-            : "Change Photo"
-          : lang === "es"
-          ? "Subir Foto"
-          : "Upload Photo"}
-
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          disabled={uploadingBusinessPhoto}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-
-            if (file) {
-              uploadBusinessPhoto(file);
-            }
-
-            e.target.value = "";
-          }}
-        />
-      </label>
-      </div>
-    </div>
+         </div>
   )}
 </div>  
 </section>

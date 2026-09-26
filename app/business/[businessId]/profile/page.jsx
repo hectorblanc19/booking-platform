@@ -1145,7 +1145,7 @@ export default function BusinessProfilePage() {
               <div className="max-w-3xl text-white">
                 {logoImage && (
                   <div
-                    className={`mb-5 bg-white overflow-hidden flex items-center justify-center shadow-xl ${themeStyles.logo}`}
+                    className={`hidden sm:flex mb-5 bg-white overflow-hidden items-center justify-center shadow-xl ${themeStyles.logo}`}
                   >
                     <img
                       src={logoImage}
@@ -1199,6 +1199,24 @@ export default function BusinessProfilePage() {
             </div>
           </div>
         </section>
+
+        {/* MOBILE BUSINESS IDENTITY
+            Keep the logo visible on mobile without covering the portada. */}
+        {logoImage && (
+          <section className="sm:hidden bg-white border-b border-gray-100">
+            <div className="px-5 py-3 flex items-center justify-center">
+              <div
+                className={`bg-white overflow-hidden flex items-center justify-center border border-gray-100 shadow-md ${themeStyles.logo}`}
+              >
+                <img
+                  src={logoImage}
+                  alt={`${business.name} logo`}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* CUSTOMIZABLE CONTENT SECTIONS */}
         {sectionOrder.map((sectionKey) =>

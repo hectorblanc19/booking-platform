@@ -6,55 +6,63 @@ function extractCoordinates(url) {
   const decodedUrl = decodeURIComponent(url);
 
   /*
-   * IMPORTANT:
-   * Google Maps place URLs can contain TWO coordinate pairs:
+   * Google Maps URLs may contain multiple coordinate pairs.
    *
-   * @19.2048567,-69.6285334
-   * = map camera/view position
-   *
-   * !3d19.2064919!4d-69.332054
-   * = actual place/business position
-   *
-   * Always prefer the !3d / !4d coordinates.
+   * Priority:
+   * 1. !3d / !4d = actual Google place/business coordinates
+   * 2. @lat,lng = map or Street View coordinates
+   * 3. q/query/ll = fallback coordinates
    */
 
+  // 1. Actual Google place/business coordinates.
   let match = decodedUrl.match(
     /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/
   );
 
   if (match) {
-    return {
-      latitude: Number(match[1]),
-      longitude: Number(match[2]),
-    };
+    const latitude = Number(match[1]);
+    const longitude = Number(match[2]);
+
+    if (!(latitude === 0 && longitude === 0)) {
+      return {
+        latitude,
+        longitude,
+      };
+    }
   }
 
-  // Query formats:
-  // ?q=40.7112958,-73.9577406
-  // ?query=40.7112958,-73.9577406
-  // ?ll=40.7112958,-73.9577406
-  match = decodedUrl.match(
-    /[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/
-  );
-
-  if (match) {
-    return {
-      latitude: Number(match[1]),
-      longitude: Number(match[2]),
-    };
-  }
-
-  // Fallback for regular Google Maps URLs.
-  // This is often the map camera position, so use it last.
+  // 2. Google Maps / Street View coordinates.
   match = decodedUrl.match(
     /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/
   );
 
   if (match) {
-    return {
-      latitude: Number(match[1]),
-      longitude: Number(match[2]),
-    };
+    const latitude = Number(match[1]);
+    const longitude = Number(match[2]);
+
+    if (!(latitude === 0 && longitude === 0)) {
+      return {
+        latitude,
+        longitude,
+      };
+    }
+  }
+
+  // 3. Query-coordinate fallback.
+  match = decodedUrl.match(
+    /[?&](?:q|query|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/
+  );
+
+  if (match) {
+    const latitude = Number(match[1]);
+    const longitude = Number(match[2]);
+
+    if (!(latitude === 0 && longitude === 0)) {
+      return {
+        latitude,
+        longitude,
+      };
+    }
   }
 
   return null;
@@ -67,7 +75,8 @@ function isValidCoordinate(latitude, longitude) {
     latitude >= -90 &&
     latitude <= 90 &&
     longitude >= -180 &&
-    longitude <= 180
+    longitude <= 180 &&
+    !(latitude === 0 && longitude === 0)
   );
 }
 
@@ -163,7 +172,7 @@ export async function POST(request) {
         {
           success: false,
           error:
-            "Could not find coordinates in this Google Maps link.",
+            "Could not find valid coordinates in this Google Maps link.",
         },
         { status: 422 }
       );

@@ -286,30 +286,69 @@ checkingAvailability: "Verificando disponibilidad...",
 async function saveBusinessMapUrl() {
   const cleanUrl = businessMapUrl.trim();
 
-  if (cleanUrl) {
-    try {
-      const parsedUrl = new URL(cleanUrl);
+  if (!cleanUrl) {
+    showToast(
+      lang === "es"
+        ? "Pega el enlace de tu negocio o ubicación en Google Maps."
+        : "Paste your business or location Google Maps link."
+    );
+    return;
+  }
 
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        throw new Error("Invalid protocol");
-      }
-    } catch {
-      showToast(
-        lang === "es"
-          ? "Escribe un enlace válido de Google Maps."
-          : "Enter a valid Google Maps link."
-      );
-      return;
+  try {
+    const parsedUrl = new URL(cleanUrl);
+
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      throw new Error("Invalid protocol");
     }
+  } catch {
+    showToast(
+      lang === "es"
+        ? "Escribe un enlace válido de Google Maps."
+        : "Enter a valid Google Maps link."
+    );
+    return;
   }
 
   setSavingBusinessMapUrl(true);
 
   try {
+    // Get the exact coordinates from the Google Maps link
+    const response = await fetch("/api/business/map-location", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        mapUrl: cleanUrl,
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (
+      !response.ok ||
+      !result?.success ||
+      typeof result?.latitude !== "number" ||
+      typeof result?.longitude !== "number"
+    ) {
+      console.error("Google Maps location error:", result);
+
+      showToast(
+        lang === "es"
+          ? "No pudimos obtener la ubicación exacta. Abre Google Maps, busca tu negocio, presiona Compartir → Copiar enlace y vuelve a intentarlo."
+          : "We could not get the exact location. Open Google Maps, find your business, press Share → Copy link and try again."
+      );
+      return;
+    }
+
+    // Save the original Google Maps link + exact coordinates
     const { error } = await supabase
       .from("businesses")
       .update({
-        map_url: cleanUrl || null,
+        map_url: cleanUrl,
+        latitude: result.latitude,
+        longitude: result.longitude,
       })
       .eq("id", businessId);
 
@@ -328,15 +367,23 @@ async function saveBusinessMapUrl() {
 
     showToast(
       lang === "es"
-        ? "Ubicación de Google Maps guardada."
-        : "Google Maps location saved."
+        ? "Ubicación guardada correctamente."
+        : "Location saved successfully."
+    );
+  } catch (error) {
+    console.error("Business location save error:", error);
+
+    showToast(
+      lang === "es"
+        ? "No se pudo procesar la ubicación."
+        : "Could not process the location."
     );
   } finally {
     setSavingBusinessMapUrl(false);
   }
 }
-
-  async function loadDashboard() {
+  
+async function loadDashboard() {
     setLoading(true);
 
     const { data: biz } = await supabase
@@ -1869,9 +1916,9 @@ if (!accessGranted) {
 
         <p className="text-sm text-gray-500 mb-2">
           {lang === "es"
-            ? "Pega aquí el enlace del pin de tu negocio en Google Maps."
-            : "Paste your business Google Maps pin link here."}
-        </p>
+            ? "Busca tu negocio o ubicación en Google Maps, presiona Compartir → Copiar enlace y pégalo aquí."
+             : "Find your business or location in Google Maps, press Share → Copy link, and paste it here."}       
+            </p>
 
         <input
           type="url"

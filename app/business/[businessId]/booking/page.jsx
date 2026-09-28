@@ -14,6 +14,7 @@ export default function BusinessBookingPage() {
   const startBooking = searchParams.get("start") === "true";
 
   const [business, setBusiness] = useState(null);
+  const [profileSettings, setProfileSettings] = useState(null);
   const [barbers, setBarbers] = useState([]);
   const [providers, setProviders] = useState([]);
   const [provider, setProvider] = useState(null);
@@ -1032,15 +1033,28 @@ router.push(`/customer/${createdAppointment.id}`);
   async function loadData() {
     setLoading(true);
 
-    const { data: biz } = await supabase
-      .from("businesses")
-      .select("*")
-      .eq("id", businessId)
-      .single();
+   const { data: biz } = await supabase
+  .from("businesses")
+  .select("*")
+  .eq("id", businessId)
+  .single();
 
-    setBusiness(biz || null);
+setBusiness(biz || null);
 
-    const { data: bar } = await supabase
+// LOAD CUSTOM BUSINESS PROFILE SETTINGS
+const { data: settings, error: settingsError } = await supabase
+  .from("business_profile_settings")
+  .select("logo_url")
+  .eq("business_id", businessId)
+  .maybeSingle();
+
+if (settingsError) {
+  console.error("Business profile settings loading error:", settingsError);
+}
+
+setProfileSettings(settings || null);
+
+const { data: bar } = await supabase
       .from("barbers")
       .select("*")
       .eq("business_id", businessId);
@@ -1126,16 +1140,15 @@ router.push(`/customer/${createdAppointment.id}`);
       </div>
 
       {/* BUSINESS PHOTO / LOGO */}
-      {business?.photo_url && (
-        <div className="flex justify-center mb-4">
-          <img
-            src={business.photo_url}
-            alt={business?.name || "Business"}
-            className="w-28 h-28 rounded-2xl object-cover bg-white border border-gray-200 shadow-sm"
-          />
-        </div>
-      )}
-
+{(profileSettings?.logo_url || business?.photo_url) && (
+  <div className="flex justify-center mb-4">
+    <img
+      src={profileSettings?.logo_url || business?.photo_url}
+      alt={business?.name || "Business"}
+      className="w-28 h-28 rounded-2xl object-cover bg-white border border-gray-200 shadow-sm"
+    />
+  </div>
+)}
       {/* BUSINESS NAME */}
       <h1 className="text-3xl font-bold mb-4 text-center">
         {tr.bookAt} {business?.name}

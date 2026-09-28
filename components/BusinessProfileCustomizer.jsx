@@ -16,6 +16,8 @@ const DEFAULT_SECTION_ORDER = [
 const DEFAULT_PROFILE = {
   logo_url: null,
   cover_url: null,
+  show_hero_logo: true,
+  show_hero_name: true,
   theme: "modern",
   brand_color: "#2563EB",
   about: "",
@@ -41,7 +43,6 @@ const DEFAULT_PROFILE = {
   section_order: DEFAULT_SECTION_ORDER,
   published: false,
 };
-
 export default function BusinessProfileCustomizer({
   businessId,
   lang = "es",
@@ -205,13 +206,15 @@ const MAX_GALLERY_IMAGES = 10;
       const { data, error } = await supabase
         .from("business_profile_settings")
         .select(
-          `
-            id,
-            logo_url,
-            cover_url,
+  `
+          id,
+          logo_url,
+          cover_url,
+          show_hero_logo,
+          show_hero_name,
             theme,
-            brand_color,
-            about,
+             brand_color,            
+             about,
             about_en,
             cancellation_policy,
             cancellation_policy_en,
@@ -249,12 +252,13 @@ const MAX_GALLERY_IMAGES = 10;
         setProfileId(null);
         return;
       }
-
-      setProfile({
-        logo_url: data.logo_url || null,
-        cover_url: data.cover_url || null,
-        theme: data.theme || "modern",
-        brand_color: data.brand_color || "#2563EB",
+setProfile({
+  logo_url: data.logo_url || null,
+  cover_url: data.cover_url || null,
+  show_hero_logo: data.show_hero_logo ?? true,
+  show_hero_name: data.show_hero_name ?? true,
+  theme: data.theme || "modern",
+  brand_color: data.brand_color || "#2563EB",
         about: data.about || "",
         about_en: data.about_en || "",
         cancellation_policy: data.cancellation_policy || "",
@@ -519,15 +523,17 @@ const MAX_GALLERY_IMAGES = 10;
       return profileId;
     }
 
-    const { data, error } = await supabase
-      .from("business_profile_settings")
-      .insert({
-        business_id: businessId,
-        theme: profile.theme,
-        brand_color: profile.brand_color,
-        about: profile.about.trim() || null,
-        about_en: profile.about_en.trim() || null,
-        cancellation_policy: profile.cancellation_policy.trim() || null,
+   const { data, error } = await supabase
+  .from("business_profile_settings")
+  .insert({
+    business_id: businessId,
+    show_hero_logo: profile.show_hero_logo,
+    show_hero_name: profile.show_hero_name,
+    theme: profile.theme,
+    brand_color: profile.brand_color,
+    about: profile.about.trim() || null,
+    about_en: profile.about_en.trim() || null,        
+    cancellation_policy: profile.cancellation_policy.trim() || null,
         cancellation_policy_en: profile.cancellation_policy_en.trim() || null,
         late_policy: profile.late_policy.trim() || null,
         late_policy_en: profile.late_policy_en.trim() || null,
@@ -1188,11 +1194,13 @@ async function removeGalleryImage(item) {
 
     try {
       const payload = {
-        business_id: businessId,
-        logo_url: profile.logo_url,
-        cover_url: profile.cover_url,
-        theme: profile.theme,
-        brand_color: profile.brand_color,
+  business_id: businessId,
+  logo_url: profile.logo_url,
+  cover_url: profile.cover_url,
+  show_hero_logo: profile.show_hero_logo,
+  show_hero_name: profile.show_hero_name,
+  theme: profile.theme,
+  brand_color: profile.brand_color,
         about: profile.about.trim() || null,
         about_en: profile.about_en.trim() || null,
         cancellation_policy: profile.cancellation_policy.trim() || null,
@@ -1310,11 +1318,13 @@ async function removeGalleryImage(item) {
       const newPublishedState = !profile.published;
 
       const payload = {
-        business_id: businessId,
-        logo_url: profile.logo_url,
-        cover_url: profile.cover_url,
-        theme: profile.theme,
-        brand_color: profile.brand_color,
+  business_id: businessId,
+  logo_url: profile.logo_url,
+  cover_url: profile.cover_url,
+  show_hero_logo: profile.show_hero_logo,
+  show_hero_name: profile.show_hero_name,
+  theme: profile.theme,
+  brand_color: profile.brand_color,
         about: profile.about.trim() || null,
         about_en: profile.about_en.trim() || null,
         cancellation_policy: profile.cancellation_policy.trim() || null,
@@ -1562,7 +1572,8 @@ async function removeGalleryImage(item) {
           </button>
           {openCustomizerSection === "identity" && (
             <div className="p-4 sm:p-5 space-y-8">
-        {/* VISUAL IDENTITY */}
+        
+         {/* VISUAL IDENTITY */}
         <div>
           <h3 className="font-bold text-gray-900 mb-4">
             {text.images}
@@ -1720,11 +1731,55 @@ async function removeGalleryImage(item) {
                     }
                     disabled={uploadingCover}
                     className="px-4 py-2 rounded-lg text-sm font-semibold border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                  >
+                  
+                        >
                     {text.remove}
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* HERO DISPLAY OPTIONS */}
+          <div className="mt-5 border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+            <div className="mb-4">
+              <p className="font-semibold text-gray-900">
+                {lang === "es"
+                  ? "Contenido sobre la portada"
+                  : "Cover display"}
+              </p>
+
+              <p className="text-xs text-gray-500 mt-1">
+                {lang === "es"
+                  ? "Elige qué elementos quieres mostrar sobre la portada de tu negocio."
+                  : "Choose which elements you want to display on your business cover."}
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-3">
+              <ToggleOption
+                label={
+                  lang === "es"
+                    ? "Mostrar logo sobre la portada"
+                    : "Show logo on the cover"
+                }
+                checked={profile.show_hero_logo}
+                onChange={(checked) =>
+                  updateProfile("show_hero_logo", checked)
+                }
+              />
+
+              <ToggleOption
+                label={
+                  lang === "es"
+                    ? "Mostrar nombre del negocio sobre la portada"
+                    : "Show business name on the cover"
+                }
+                checked={profile.show_hero_name}
+                onChange={(checked) =>
+                  updateProfile("show_hero_name", checked)
+                }
+              />
             </div>
           </div>
         </div>

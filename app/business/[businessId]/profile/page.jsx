@@ -1143,7 +1143,7 @@ export default function BusinessProfilePage() {
 
             <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-8 h-full flex items-end pb-10 sm:pb-14">
               <div className="max-w-3xl text-white">
-                {logoImage && (
+                {profile?.show_hero_logo !== false && logoImage && (
                   <div
                     className={`hidden sm:flex mb-5 bg-white overflow-hidden items-center justify-center shadow-xl ${themeStyles.logo}`}
                   >
@@ -1165,11 +1165,13 @@ export default function BusinessProfilePage() {
                       : "Business")}
                 </p>
 
-                <h1
-                  className={`text-4xl sm:text-6xl leading-tight ${themeStyles.heroTitle}`}
-                >
-                  {business.name}
-                </h1>
+                {profile?.show_hero_name !== false && (
+                  <h1
+                    className={`text-4xl sm:text-6xl leading-tight ${themeStyles.heroTitle}`}
+                  >
+                    {business.name}
+                  </h1>
+                )}
 
                 {business.address && (
                   <p className="mt-4 text-white/90 text-sm sm:text-base">

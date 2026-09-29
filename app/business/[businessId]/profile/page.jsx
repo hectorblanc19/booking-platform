@@ -1118,7 +1118,7 @@ export default function BusinessProfilePage() {
             <img
               src={coverImage}
               alt={business.name}
-              className="absolute inset-0 w-full h-full object-cover object-center"
+              className="absolute inset-0 w-full h-full object-contain sm:object-cover object-center"
             />
 
             {/* Softer horizontal overlay.

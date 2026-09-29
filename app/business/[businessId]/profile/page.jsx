@@ -1083,7 +1083,7 @@ export default function BusinessProfilePage() {
       <main>
         {/* HERO */}
         <section className="relative">
-          <div className="relative h-[300px] sm:h-[440px] lg:h-[520px] overflow-hidden bg-gray-900">
+          <div className="relative bg-gray-900 overflow-hidden sm:h-[440px] lg:h-[520px]">
             {/* PUBLIC LANGUAGE SWITCHER */}
             <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30">
               <div className="flex items-center rounded-full bg-black/55 backdrop-blur-sm border border-white/25 p-1 shadow-lg">
@@ -1115,17 +1115,19 @@ export default function BusinessProfilePage() {
               </div>
             </div>
 
+            {/* Mobile: keep the entire portada visible without cropping.
+                Desktop/tablet: preserve the existing full hero treatment. */}
             <img
               src={coverImage}
               alt={business.name}
-              className="absolute inset-0 w-full h-full object-cover object-center"
+              className="relative sm:absolute sm:inset-0 w-full h-auto sm:h-full object-contain sm:object-cover object-center block"
             />
 
             {/* Softer horizontal overlay.
                 Darker behind the text on the left,
                 much lighter over the business photo on the right. */}
             <div
-              className="absolute inset-0"
+              className="absolute inset-0 hidden sm:block"
               style={{
                 background:
                   "linear-gradient(90deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.28) 42%, rgba(0,0,0,0.06) 75%, rgba(0,0,0,0.02) 100%)",
@@ -1134,14 +1136,14 @@ export default function BusinessProfilePage() {
 
             {/* Small bottom gradient for depth */}
             <div
-              className="absolute inset-0"
+              className="absolute inset-0 hidden sm:block"
               style={{
                 background:
                   "linear-gradient(to top, rgba(0,0,0,0.22) 0%, transparent 45%)",
               }}
             />
 
-            <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-8 h-full flex items-end pb-10 sm:pb-14">
+            <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-8 py-7 sm:py-0 sm:h-full flex items-end sm:pb-14">
               <div className="max-w-3xl text-white">
                 {profile?.show_hero_logo !== false && logoImage && (
                   <div

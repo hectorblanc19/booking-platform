@@ -1083,7 +1083,7 @@ export default function BusinessProfilePage() {
       <main>
         {/* HERO */}
         <section className="relative">
-          <div className="relative h-[360px] sm:h-[440px] lg:h-[520px] overflow-hidden bg-gray-900">
+          <div className="relative h-[300px] sm:h-[440px] lg:h-[520px] overflow-hidden bg-gray-900">
             {/* PUBLIC LANGUAGE SWITCHER */}
             <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-30">
               <div className="flex items-center rounded-full bg-black/55 backdrop-blur-sm border border-white/25 p-1 shadow-lg">
@@ -1118,7 +1118,7 @@ export default function BusinessProfilePage() {
             <img
               src={coverImage}
               alt={business.name}
-              className="absolute inset-0 w-full h-full object-contain sm:object-cover object-center"
+              className="absolute inset-0 w-full h-full object-cover object-center"
             />
 
             {/* Softer horizontal overlay.

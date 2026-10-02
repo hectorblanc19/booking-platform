@@ -1,210 +1,361 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
 import { useParams } from "next/navigation";
+
 import { supabase } from "@/lib/supabaseClient";
 
 // ⭐ FIX: Add this function right here
+
 function getDayNameFromDate(dateString) {
+
   // Prevent timezone shift by forcing midnight local time
+
   const date = new Date(dateString + "T00:00:00");
+
   return date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+
 }
 
 function formatTime(timeStr) {
+
   if (!timeStr) return "";
 
   const [hoursString, minutes] = timeStr.split(":");
+
   let hours = Number(hoursString);
 
   if (Number.isNaN(hours)) return timeStr;
 
   const ampm = hours >= 12 ? "PM" : "AM";
+
   hours = hours % 12 || 12;
 
   return `${hours}:${minutes} ${ampm}`;
+
 }
 
 // ⭐ Visual Time Slot Component
+
 function TimeSlot({ time, selected, onSelect }) {
+
   return (
+
     <button
+
       onClick={() => onSelect(time)}
+
       className={`px-4 py-2 rounded-xl border text-center
+
         ${selected === time ? "bg-black text-white" : "bg-white text-black"}
+
       `}
+
     >
+
       {formatTime(time)}
+
     </button>
+
   );
+
 }
+
 // Bilingual dictionary
+
 const t = {
+
   en: {
+
     title: "Book with",
+
     business: "Business",
+
     service: "Service",
+
     date: "Date",
+
     time: "Time",
+
     name: "Your Name",
+
     phone: "Phone",
+
     email: "Email",
+
     notes: "Notes",
+
     book: "Book Appointment",
+
     lang: "Language",
+
     selectService: "Select a service",
+
     describeService: "Describe the service",
+
     writeHere: "Write the service here...",
+
     fillAll: "Please fill all fields",
+
     error: "Error creating appointment",
+
     slotTaken: "This time is already booked. Please choose another time.",
+
     selectTime: "Select a time",
+
     blockedDay: "The barber has blocked this day and is not available.",
+
   },
+
   es: {
+
     title: "Reservar con",
+
     business: "Negocio",
+
     service: "Servicio",
+
     date: "Fecha",
+
     time: "Hora",
+
     name: "Tu Nombre",
+
     phone: "Teléfono",
+
     email: "Correo",
+
     notes: "Notas",
+
     book: "Reservar Cita",
+
     lang: "Idioma",
+
     selectService: "Seleccione un servicio",
+
     describeService: "Describa el servicio",
+
     writeHere: "Escriba el servicio aquí...",
+
     fillAll: "Por favor complete todos los campos",
+
     error: "Error creando la cita",
+
     slotTaken: "Esta hora ya está reservada. Por favor elija otra hora.",
+
     selectTime: "Seleccione una hora",
+
     blockedDay: "El barbero ha bloqueado este día y no está disponible.",
+
   },
+
 };
 
 // Service dropdown options
+
 const SERVICE_OPTIONS = [
+
   { value: "Haircut", es: "Corte", duration: 30 },
+
   { value: "Beard", es: "Barba", duration: 20 },
+
   { value: "Haircut + Beard", es: "Corte + Barba", duration: 45 },
+
   { value: "Fade", es: "Fade", duration: 40 },
+
   { value: "Other", es: "Otro", duration: 0 },
+
 ];
 
 export default function BookingPage() {
+
   const { barberId } = useParams();
+
 console.log("barberId:", barberId);
 
  // ⭐ Language from URL first, browser fallback
+
 const [lang, setLang] = useState("es");
 
 useEffect(() => {
+
   const params = new URLSearchParams(
+
     window.location.search
+
   );
 
   const urlLang = params.get("lang");
 
   if (urlLang === "es" || urlLang === "en") {
+
     setLang(urlLang);
+
     return;
+
   }
 
   const browserLang =
+
     navigator.language
+
       ?.toLowerCase()
+
       .startsWith("es")
+
       ? "es"
+
       : "en";
 
   setLang(browserLang);
+
 }, []);
+
 const tr = t[lang];
 
 const [barber, setBarber] = useState(null);
+
 const [service, setService] = useState("");
+
 const [date, setDate] = useState("");
+
 const [time, setTime] = useState("");
+
 const [availableTimes, setAvailableTimes] = useState([]);
 
 const [customerName, setCustomerName] = useState("");
+
 const [customerPhone, setCustomerPhone] = useState("");
+
 const [customerEmail, setCustomerEmail] = useState("");
+
 const [notes, setNotes] = useState("");
+
 const [loading, setLoading] = useState(true);
 
 const [loadingTimes, setLoadingTimes] = useState(false);
+const [booking, setBooking] = useState(false);
+const bookingLockRef = useRef(false);
 
   // ⭐ Reviews state
+
 const [reviews, setReviews] = useState([]);
+
 const [showReviews, setShowReviews] = useState(false);   // ⭐ ADD THIS LINE
 
 useEffect(() => {
+
   if (barberId) {
+
     loadBarber();
+
   }
+
 }, [barberId]);
 
 // ⭐ Load reviews AFTER barberId is available
+
 useEffect(() => {
+
   if (barberId) {
+
     loadReviews();
+
   }
+
 }, [barberId]);
 
  async function loadBarber() {
+
   const { data, error } = await supabase
+
     .from("barbers")
+
     .select(`
+
       id,
+
       name,
+
       email,
+
       phone,
+
       address,
+
       map_url,
+
       business_id,
+
       photo_url,
+
       payment_status,
+
       working_days,
+
       haircut_price,
+
       beard_price,
+
       combo_price,
+
       businesses(*)
+
     `)
+
     .eq("id", barberId)
+
     .single();
 
   if (!error) {
+
   setBarber({
+
     ...data,
+
     haircut_price: Number(data.haircut_price),
+
     beard_price: Number(data.beard_price),
+
     combo_price: Number(data.combo_price)
+
   });
+
 }
 
 setLoading(false);
 
 if (data?.payment_status === "unpaid") {
+
   setBarber(prev => ({ ...prev, blocked: true }));
+
 }
+
 }
 
   // ⭐ Load reviews
+
   async function loadReviews() {
+
     const { data, error } = await supabase
+
       .from("ratings")
+
       .select("rating, review_text, created_at")
+
       .eq("barber_id", barberId)
+
       .order("created_at", { ascending: false });
 
     if (!error) setReviews(data || []);
+
   }
 
   // ⭐ Available times logic (unchanged)
+
   async function loadAvailableTimes(selectedDate) {
+
     if (!selectedDate) return;
 
     setLoadingTimes(true);
@@ -212,112 +363,175 @@ if (data?.payment_status === "unpaid") {
    const dayOfWeek = getDayNameFromDate(selectedDate);
 
     const { data: availability } = await supabase
+
       .from("barber_availability")
+
       .select("*")
+
       .eq("barber_id", barberId)
+
       .eq("day_of_week", dayOfWeek)
+
       .single();
 
     if (!availability || availability.is_closed) {
+
       setAvailableTimes([]);
+
       setLoadingTimes(false);
+
       return;
+
     }
 
     let slots = [];
 
     let current = new Date(`${selectedDate}T${availability.start_time}`);
+
     const end = new Date(`${selectedDate}T${availability.end_time}`);
 
     const selectedDuration =
+
       SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60;
 
    while (true) {
+
   const slotEnd = new Date(current.getTime() + selectedDuration * 60 * 1000);
 
   // ⭐ Only allow slots that END before closing time
+
   if (slotEnd > end) break;
 
   const slotStr = current.toLocaleTimeString("en-US", {
+
     hour: "2-digit",
+
     minute: "2-digit",
+
     hour12: false,
+
   });
 
   slots.push(slotStr);
 
   current = slotEnd;
+
 }
 
     // ⭐ Load existing appointments
+
 const { data: appointments } = await supabase
+
   .from("appointments")
+
   .select("*")
+
   .eq("barber_id", barberId)
+
   .eq("date", selectedDate)
+
   .eq("status", "confirmed");
 
 // ⭐ FIX: Remove slots that partially overlap with existing appointments
+
 if (appointments && appointments.length > 0) {
+
   slots = slots.filter(slot => {
+
     const [slotHour, slotMin] = slot.split(":");
+
     const slotStart = new Date(`${selectedDate}T${slotHour}:${slotMin}:00`);
 
     const slotEnd = new Date(
+
       slotStart.getTime() +
+
         (SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60) *
+
           60 *
+
           1000
+
     );
 
     for (const appt of appointments) {
+
       const existingStart = new Date(`${appt.date}T${appt.time}`);
+
       const existingEnd = new Date(
+
         existingStart.getTime() + (appt.duration || 60) * 60 * 1000
+
       );
 
       // ⭐ TRUE overlap logic
+
       if (existingStart < slotEnd && existingEnd > slotStart) {
+
         return false; // remove this slot
+
       }
+
     }
 
     return true; // keep slot
+
   });
+
 }
 
 // ⭐ Blocked hours
+
 const { data: blocks } = await supabase
+
   .from("barber_blocks")
+
   .select("*")
+
   .eq("barber_id", barberId)
+
   .eq("date", selectedDate);
 
 if (blocks && blocks.length > 0) {
+
   blocks.forEach(block => {
+
     const blockStart = block.start_time.slice(0, 5);
+
     const blockEnd = block.end_time.slice(0, 5);
 
     slots = slots.filter(t => !(t >= blockStart && t < blockEnd));
+
   });
+
 }
 
 // ⭐ Remove past times if booking today
+
 const today = new Date().toLocaleDateString("en-CA");
 
 if (selectedDate === today) {
+
   const now = new Date();
+
   const currentTime = now.toLocaleTimeString("en-US", {
+
     hour: "2-digit",
+
     minute: "2-digit",
+
     hour12: false,
+
   });
 
   slots = slots.filter(slot => slot >= currentTime);
+
 }
 
 setAvailableTimes(slots);
+
 setLoadingTimes(false);
+
   }
 
   async function createAppointment() {
@@ -326,383 +540,588 @@ setLoadingTimes(false);
     return;
   }
 
-  // ⭐ CLEAN CUSTOMER PHONE NUMBER
-  // Removes spaces, dashes, parentheses, backticks, +, etc.
-  const cleanCustomerPhone = String(customerPhone).replace(/\D/g, "");
+  // Immediate synchronous lock: blocks rapid double/triple taps before React state updates.
+  if (bookingLockRef.current) return;
+  bookingLockRef.current = true;
+  setBooking(true);
 
-  // ⭐ PRICE MUST BE CALCULATED HERE (AFTER barber is loaded)
-  const selectedPrice =
-    service === "Haircut"
-      ? barber.haircut_price
-      : service === "Beard"
-      ? barber.beard_price
-      : service === "Haircut + Beard"
-      ? barber.combo_price
-      : 0;
+  try {
+    const cleanCustomerPhone = String(customerPhone).replace(/\D/g, "");
+    const selectedPrice = service === "Haircut" ? barber.haircut_price : service === "Beard" ? barber.beard_price : service === "Haircut + Beard" ? barber.combo_price : 0;
+    const formattedTime = time + ":00";
+    const selectedDuration = SERVICE_OPTIONS.find((s) => s.value === service)?.duration || 60;
+    const newStart = new Date(`${date}T${formattedTime}`);
+    const newEnd = new Date(newStart.getTime() + selectedDuration * 60 * 1000);
 
-  const formattedTime = time + ":00";
+    const { data: existing, error: existingError } = await supabase
+      .from("appointments")
+      .select("date, time, duration")
+      .eq("barber_id", barberId)
+      .eq("date", date)
+      .eq("status", "confirmed");
 
-  const newStart = new Date(`${date}T${formattedTime}`);
+    if (existingError) throw existingError;
 
-  const selectedDuration =
-    SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60;
-
-  const newEnd = new Date(newStart.getTime() + selectedDuration * 60 * 1000);
-
-  const { data: existing } = await supabase
-    .from("appointments")
-    .select("*")
-    .eq("barber_id", barberId)
-    .eq("date", date)
-    .eq("status", "confirmed");
-
-  if (existing && existing.length > 0) {
-    for (const appt of existing) {
+    for (const appt of existing || []) {
       const existingStart = new Date(`${appt.date}T${appt.time}`);
-
-      const existingEnd = new Date(
-        existingStart.getTime() + (appt.duration || 60) * 60 * 1000
-      );
-
+      const existingEnd = new Date(existingStart.getTime() + (appt.duration || 60) * 60 * 1000);
       if (existingStart < newEnd && existingEnd > newStart) {
         alert(tr.slotTaken);
+        setTime("");
+        await loadAvailableTimes(date);
         return;
       }
     }
-  }
+
     const secret = crypto.randomUUID();
+    const { error: insertError } = await supabase.from("appointments").insert({
+      business_id: barber.business_id,
+      barber_id: barberId,
+      service,
+      date,
+      time: formattedTime,
+      duration: selectedDuration,
+      customer_name: customerName,
+      customer_phone: cleanCustomerPhone,
+      customer_email: customerEmail,
+      notes,
+      status: "confirmed",
+      lang,
+      secret_link: secret,
+      price: selectedPrice,
+    });
 
-   await supabase.from("appointments").insert({
-  business_id: barber.business_id,
-  barber_id: barberId,
-  service,
-  date,
-  time: formattedTime,
-  duration: SERVICE_OPTIONS.find(s => s.value === service)?.duration || 60,
-  customer_name: customerName,
-  customer_phone: cleanCustomerPhone,
-  customer_email: customerEmail,
-  notes,
-  status: "confirmed",
-  lang,
-  secret_link: secret,
-  price: selectedPrice // ⭐ ADDED
-});
-   await fetch("/api/send-confirmation", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    customer_email: customerEmail,
-    customer_name: customerName,
-    service,
-    barber_id: barberId,
-    business_id: barber.business_id,
-    date,
-    time: formattedTime,
-    secret_link: `https://flowpaydr.com/customer/${secret}`,
-    lang,
-    price: selectedPrice   // ⭐ ADDED
-  }),
-});
+    if (insertError) {
+      if (insertError.code === "23505") {
+        alert(tr.slotTaken);
+        setTime("");
+        await loadAvailableTimes(date);
+        return;
+      }
+      console.error("Appointment insert failed:", insertError);
+      alert(tr.error);
+      return;
+    }
 
-    await fetch("/api/send-barber-notification", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    barber_email: barber.email,
-    barber_name: barber.name,
-    customer_name: customerName,
-    customer_phone: cleanCustomerPhone,
-    customer_email: customerEmail,
-    service,
-    date,
-    time: formattedTime,
-    notes,
-    dashboard_link: `https://flowpaydr.com/barber/${barberId}`,
-    lang,
-  }),
-});
-   setTimeout(() => {
-  window.location.href = `/customer/${secret}?lang=${lang}`;
-}, 300);
+    // The appointment is already booked. Notification failures must not make it look unsuccessful.
+    try {
+      const response = await fetch("/api/send-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customer_email: customerEmail, customer_name: customerName, service, barber_id: barberId, business_id: barber.business_id, date, time: formattedTime, secret_link: `https://flowpaydr.com/customer/${secret}`, lang, price: selectedPrice }),
+      });
+      if (!response.ok) console.error("Customer confirmation notification failed");
+    } catch (error) {
+      console.error("Customer confirmation notification failed:", error);
+    }
+
+    try {
+      const response = await fetch("/api/send-barber-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ barber_email: barber.email, barber_name: barber.name, customer_name: customerName, customer_phone: cleanCustomerPhone, customer_email: customerEmail, service, date, time: formattedTime, notes, dashboard_link: `https://flowpaydr.com/barber/${barberId}`, lang }),
+      });
+      if (!response.ok) console.error("Barber notification failed");
+    } catch (error) {
+      console.error("Barber notification failed:", error);
+    }
+
+    window.location.href = `/customer/${secret}?lang=${lang}`;
+  } catch (error) {
+    console.error("Unexpected booking error:", error);
+    alert(tr.error);
+  } finally {
+    bookingLockRef.current = false;
+    setBooking(false);
+  }
 }
+
   if (loading) return <p className="p-6">Loading...</p>;
+
   if (!barber) return <p className="p-6">Barber not found.</p>;
 
   if (barber?.payment_status === "unpaid" || barber?.blocked) {
+
     return (
+
       <div className="p-6 text-center">
+
         <h1 className="text-2xl font-bold text-red-600">Barber Unavailable</h1>
+
         <p>This barber is currently blocked by the administrator.</p>
+
       </div>
+
     );
+
   }
 
   return (
+
     <div className="max-w-xl mx-auto p-6">
 
       {/* ⭐ Language Switch */}
+
       <div className="flex justify-end gap-2 mb-4">
+
         <span className="text-sm">{tr.lang}:</span>
+
         <button
+
           className={`px-2 py-1 rounded ${lang === "es" ? "bg-black text-white" : "bg-gray-200"}`}
+
           onClick={() => setLang("es")}
+
         >
+
           ES
+
         </button>
+
         <button
+
           className={`px-2 py-1 rounded ${lang === "en" ? "bg-black text-white" : "bg-gray-200"}`}
+
           onClick={() => setLang("en")}
+
         >
+
           EN
+
         </button>
+
       </div>
 
       {/* ⭐ Barber Header */}
+
 <div className="flex items-center gap-4 mb-6 mt-2 p-4 bg-white rounded-xl shadow-sm">
+
   <img
+
     src={barber.photo_url || "/default-barber.png"}
+
     alt={barber.name}
+
     className="w-20 h-20 rounded-full object-cover border shadow"
+
   />
 
   <div>
+
     <h1 className="text-2xl font-bold">
+
       {tr.title} {barber.name}
+
     </h1>
 
     {/* ⭐ Business Barber */}
+
     {barber.businesses ? (
+
       <>
+
         <p className="text-gray-500">
+
           {tr.business}: {barber.businesses.name}
+
         </p>
 
         {barber.businesses.address && (
+
           <p className="text-sm text-gray-500">📍 {barber.businesses.address}</p>
+
         )}
 
         {barber.businesses.phone && (
+
           <p className="text-sm text-gray-500">📞 {barber.businesses.phone}</p>
+
         )}
 
         {/* ⭐ Google Maps URL (Business) */}
+
         {barber.map_url && (
+
           <a
+
             href={barber.map_url}
+
             target="_blank"
+
             rel="noopener noreferrer"
+
             className="text-blue-600 underline text-sm mt-1 inline-block"
+
           >
+
             {lang === "es"
+
               ? "Ver ubicación exacta en Google Maps"
+
               : "Open exact location in Google Maps"}
+
           </a>
+
         )}
+
       </>
+
     ) : (
+
       /* ⭐ Independent Barber */
+
       <>
+
         <p className="text-gray-500">
+
           {tr.business}: Independent Barber
+
         </p>
 
         {barber.address && (
+
           <p className="text-sm text-gray-500">📍 {barber.address}</p>
+
         )}
 
         {barber.phone && (
+
           <p className="text-sm text-gray-500">📞 {barber.phone}</p>
+
         )}
 
         {/* ⭐ Google Maps URL (Independent Barber) */}
+
         {barber.map_url && (
+
           <a
+
             href={barber.map_url}
+
             target="_blank"
+
             rel="noopener noreferrer"
+
             className="text-blue-600 underline text-sm mt-1 inline-block"
+
           >
+
             {lang === "es"
+
               ? "Ver ubicación exacta en Google Maps"
+
               : "Open exact location in Google Maps"}
+
           </a>
+
         )}
+
       </>
+
     )}
+
   </div>
+
 </div>
 
 {/* ⭐ Barber Rating Summary (compact + toggle) */}
+
 <div className="mb-6 p-4 bg-white rounded-xl shadow">
+
   <h2 className="text-xl font-bold mb-2">
+
     {lang === "en" ? "Barber Rating" : "Calificación del Barbero"}
+
   </h2>
 
   {reviews.length > 0 ? (
+
     <>
+
       <p className="text-lg font-semibold">
+
         ⭐ {(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)} / 5
+
       </p>
 
       <p className="text-gray-600 text-sm">
+
         {reviews.length} {lang === "en" ? "reviews" : "reseñas"}
+
       </p>
 
       <button
+
         className="mt-2 text-blue-600 underline text-sm"
+
         onClick={() => setShowReviews(!showReviews)}
+
       >
+
         {showReviews
+
           ? lang === "en" ? "Hide Reviews" : "Ocultar Reseñas"
+
           : lang === "en" ? "Show Reviews" : "Mostrar Reseñas"}
+
       </button>
+
     </>
+
   ) : (
+
     <p className="text-gray-500 text-sm">
+
       {lang === "en" ? "No reviews yet" : "No hay reseñas todavía"}
+
     </p>
+
   )}
+
 </div>
 
 {/* ⭐ Reviews Section (hidden by default, limited to 5) */}
+
 {showReviews && (
+
   <div className="mb-6 p-4 bg-white rounded-xl shadow">
+
     <h2 className="text-xl font-bold mb-3">
+
       {lang === "en" ? "Reviews" : "Reseñas"}
+
     </h2>
 
     {reviews.slice(0, 5).map((rev, index) => (
+
       <div key={index} className="mb-4 border-b pb-3">
+
         <p className="text-yellow-500 font-bold">
+
           ⭐ {rev.rating} / 5
+
         </p>
 
        <p className="text-gray-700 mt-1 text-sm">
+
   “{rev.review_text || (lang === "en" ? "No comment" : "Sin comentario")}”
+
 </p>
 
         <p className="text-gray-400 text-xs mt-1">
+
           {new Date(rev.created_at).toLocaleDateString()}
+
         </p>
+
       </div>
+
     ))}
+
   </div>
+
 )}
 
       {/* ⭐ Service */}
+
       <div className="mt-4">
+
         <label className="block mb-1">{tr.service}</label>
 
         <select
+
           className="w-full p-3 border rounded-xl"
+
           onChange={(e) => setService(e.target.value)}
+
         >
+
           <option value="">{tr.selectService}</option>
 
           {SERVICE_OPTIONS.map((opt) => (
+
             <option key={opt.value} value={opt.value}>
+
               {lang === "en"
+
                 ? `${opt.value} — ${opt.duration} min`
+
                 : `${opt.es} — ${opt.duration} min`}
+
             </option>
+
           ))}
+
         </select>
+
       </div>
 
       {service === "Other" && (
+
         <div className="mt-4">
+
           <label className="block mb-1">{tr.describeService}</label>
+
           <textarea
+
             className="w-full p-3 border rounded-xl"
+
             placeholder={tr.writeHere}
+
             onChange={(e) => setNotes(e.target.value)}
+
           />
+
         </div>
+
       )}
 
       {/* ⭐ Date */}
+
       <div className="mt-4">
+
         <label className="block mb-1">{tr.date}</label>
+
         <input
+
           type="date"
+
           className="w-full p-3 border rounded-xl"
+
           min={new Date().toLocaleDateString("en-CA")}
+
           onChange={(e) => {
+
             const raw = e.target.value;
+
             const normalized = new Date(raw + "T00:00:00").toLocaleDateString("en-CA");
+
             setDate(normalized);
+
             loadAvailableTimes(normalized);
+
           }}
+
         />
+
       </div>
 
       {date && availableTimes.length === 0 && !loadingTimes && (
+
         <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-xl text-red-700">
+
           <p>{tr.blockedDay}</p>
+
         </div>
+
       )}
 
       {/* ⭐ Time Slots */}
+
       {!loadingTimes && availableTimes.length > 0 && (
+
         <div className="grid grid-cols-3 gap-3 mt-4">
+
           {availableTimes.map((t) => (
+
             <TimeSlot
+
               key={t}
+
               time={t}
+
               selected={time}
+
               onSelect={setTime}
+
             />
+
           ))}
+
         </div>
+
       )}
 
       {/* ⭐ Customer Info */}
+
       <div className="mt-4">
+
         <label className="block mb-1">{tr.name}</label>
+
         <input
+
           type="text"
+
           className="w-full p-3 border rounded-xl"
+
           onChange={(e) => setCustomerName(e.target.value)}
+
         />
+
       </div>
 
       <div className="mt-4">
+
         <label className="block mb-1">{tr.phone}</label>
+
         <input
+
           type="tel"
+
           className="w-full p-3 border rounded-xl"
+
           onChange={(e) => setCustomerPhone(e.target.value)}
+
         />
+
       </div>
 
       <div className="mt-4">
+
         <label className="block mb-1">{tr.email}</label>
+
         <input
+
           type="email"
+
           className="w-full p-3 border rounded-xl"
+
           onChange={(e) => setCustomerEmail(e.target.value)}
+
         />
+
       </div>
 
       {service !== "Other" && (
+
         <div className="mt-4">
+
           <label className="block mb-1">{tr.notes}</label>
+
           <textarea
+
             className="w-full p-3 border rounded-xl"
+
             onChange={(e) => setNotes(e.target.value)}
+
           />
+
         </div>
+
       )}
 
       {/* ⭐ Book Button */}
+
       <button
-        className="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl"
-        onClick={createAppointment}
-      >
-        {tr.book}
-      </button>
+          className={`mt-6 w-full text-white py-3 rounded-xl ${booking ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600"}`}
+          onClick={createAppointment}
+          disabled={booking}
+        >
+          {booking ? (lang === "es" ? "Reservando..." : "Booking...") : tr.book}
+        </button>
 
     </div>
+
   );
+
 }

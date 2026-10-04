@@ -1,3 +1,4 @@
+   
 "use client";
 
 import { useEffect, useState } from "react";
@@ -147,16 +148,19 @@ const [savingTourSettings, setSavingTourSettings] = useState(false);
     setTimeout(() => setToast(null), 2000);
   }
 
-  // BUSINESS OWNER AUTHENTICATION
+  // BUSINESS OWNER OR FLOWPAYDR ADMIN AUTHENTICATION
 const [accessGranted, setAccessGranted] = useState(false);
 const [checkingAuth, setCheckingAuth] = useState(true);
+const [isFlowPayAdmin, setIsFlowPayAdmin] = useState(false);
 
 useEffect(() => {
-  checkBusinessOwner();
-}, []);
+  checkBusinessAccess();
+}, [businessId]);
 
-async function checkBusinessOwner() {
+async function checkBusinessAccess() {
   setCheckingAuth(true);
+  setAccessGranted(false);
+  setIsFlowPayAdmin(false);
 
   const {
     data: { user },
@@ -164,30 +168,64 @@ async function checkBusinessOwner() {
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    setAccessGranted(false);
     setCheckingAuth(false);
     return;
   }
 
-  const { data: biz, error: businessError } = await supabase
+  // --------------------------------------------------
+  // 1. CHECK FLOWPAYDR ADMIN FIRST
+  // --------------------------------------------------
+  const { data: adminRecord, error: adminError } = await supabase
+    .from("admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (adminError) {
+    console.error("Admin access check error:", adminError);
+  }
+
+  if (adminRecord) {
+    console.log("FlowPayDR admin access granted:", user.id);
+
+    setIsFlowPayAdmin(true);
+    setAccessGranted(true);
+    setCheckingAuth(false);
+
+    await loadDashboard();
+    return;
+  }
+
+  // --------------------------------------------------
+  // 2. NOT ADMIN — CHECK BUSINESS OWNER
+  // --------------------------------------------------
+  const { data: ownedBusiness, error: ownerError } = await supabase
     .from("businesses")
-    .select("*")
+    .select("id")
     .eq("id", businessId)
     .eq("owner_id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (businessError || !biz) {
-    setAccessGranted(false);
+  if (ownerError) {
+    console.error("Business owner access check error:", ownerError);
+  }
+
+  if (ownedBusiness) {
+    setIsFlowPayAdmin(false);
+    setAccessGranted(true);
     setCheckingAuth(false);
+
+    await loadDashboard();
     return;
   }
 
-  setAccessGranted(true);
+  // --------------------------------------------------
+  // 3. NEITHER ADMIN NOR OWNER
+  // --------------------------------------------------
+  setAccessGranted(false);
   setCheckingAuth(false);
-
-  await loadDashboard();
 }
-  /* ⭐ NEW STATE FOR FILTERS + GROUPING + PAGINATION ⭐ */
+/* ⭐ NEW STATE FOR FILTERS + GROUPING + PAGINATION ⭐ */
   const [filterBarberId, setFilterBarberId] = useState("all");
   const [filterDate, setFilterDate] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");

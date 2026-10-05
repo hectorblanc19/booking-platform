@@ -10,13 +10,42 @@ function json(body, status = 200) {
   return NextResponse.json(body, { status });
 }
 
+function timeToMinutes(value) {
+  if (!value) return 0;
+
+  const [hours, minutes] = String(value)
+    .slice(0, 5)
+    .split(":")
+    .map(Number);
+
+  return hours * 60 + minutes;
+}
+
+function overlaps(startA, durationA, startB, durationB) {
+  const aStart = timeToMinutes(startA);
+  const aEnd = aStart + Number(durationA || 60);
+
+  const bStart = timeToMinutes(startB);
+  const bEnd = bStart + Number(durationB || 60);
+
+  return aStart < bEnd && aEnd > bStart;
+}
+
 export async function POST(req) {
   try {
     const body = await req.json();
 
     const {
-      business,
+      // Legacy system
       barber,
+
+      // New business/provider system
+      business,
+      business_id,
+      provider_id,
+      service_id,
+
+      // Common fields
       service,
       date,
       time,
@@ -30,13 +59,26 @@ export async function POST(req) {
       booking_request_id,
     } = body;
 
+    const resolvedBusinessId =
+      business_id || business || null;
+
+    const isProviderBooking = Boolean(
+      resolvedBusinessId &&
+      provider_id &&
+      service_id
+    );
+
+    const isLegacyBarberBooking = Boolean(barber);
+
+    // =========================================================
+    // 1. REQUIRED FIELDS
+    // =========================================================
+
     if (
-      !barber ||
-      !service ||
+      (!isProviderBooking && !isLegacyBarberBooking) ||
       !date ||
       !time ||
       !customer_name ||
-      !customer_email ||
       !customer_phone ||
       !booking_request_id
     ) {
@@ -50,20 +92,31 @@ export async function POST(req) {
       );
     }
 
-    const cleanCustomerPhone = String(customer_phone).replace(/\D/g, "");
+    if (
+      isLegacyBarberBooking &&
+      (!service || !customer_email)
+    ) {
+      return json(
+        {
+          success: false,
+          code: "MISSING_FIELDS",
+          error: "Missing required fields",
+        },
+        400
+      );
+    }
 
-    const selectedDuration =
-      Number(duration) > 0 ? Number(duration) : 60;
+    const cleanCustomerPhone = String(
+      customer_phone
+    ).replace(/\D/g, "");
 
     const formattedTime =
-      String(time).length === 5 ? `${time}:00` : String(time);
+      String(time).length === 5
+        ? `${time}:00`
+        : String(time);
 
     // =========================================================
-    // 1. IDEMPOTENCY CHECK
-    // =========================================================
-    // If this exact booking request already created an
-    // appointment, return that appointment instead of treating
-    // its own time as unavailable.
+    // 2. IDEMPOTENCY CHECK
     // =========================================================
 
     const {
@@ -72,11 +125,17 @@ export async function POST(req) {
     } = await supabase
       .from("appointments")
       .select("*")
-      .eq("booking_request_id", booking_request_id)
+      .eq(
+        "booking_request_id",
+        booking_request_id
+      )
       .maybeSingle();
 
     if (priorError) {
-      console.error("Idempotency lookup failed:", priorError);
+      console.error(
+        "Idempotency lookup failed:",
+        priorError
+      );
 
       return json(
         {
@@ -98,58 +157,268 @@ export async function POST(req) {
     }
 
     // =========================================================
-    // 2. CHECK BARBER AVAILABILITY USING DURATION OVERLAP
+    // 3. VALUES USED FOR INSERT
     // =========================================================
 
-    const {
-      data: existingAppointments,
-      error: existingError,
-    } = await supabase
-      .from("appointments")
-      .select("id, date, time, duration")
-      .eq("barber_id", barber)
-      .eq("date", date)
-      .eq("status", "confirmed");
+    let finalService = service || "";
 
-    if (existingError) {
-      console.error("Availability lookup failed:", existingError);
+    let finalDuration =
+      Number(duration) > 0 ? Number(duration) : 60;
 
-      return json(
-        {
-          success: false,
-          code: "DATABASE_ERROR",
-          error: "Could not check availability",
-        },
-        500
+    let finalPrice = price ?? 0;
+
+    let providerInfo = null;
+
+    // =========================================================
+    // 4. NEW BUSINESS / PROVIDER BOOKING
+    // =========================================================
+
+    if (isProviderBooking) {
+      // Verify business exists
+      const {
+        data: businessInfo,
+        error: businessError,
+      } = await supabase
+        .from("businesses")
+        .select("id, name")
+        .eq("id", resolvedBusinessId)
+        .maybeSingle();
+
+      if (businessError || !businessInfo) {
+        console.error(
+          "Business lookup failed:",
+          businessError
+        );
+
+        return json(
+          {
+            success: false,
+            code: "BUSINESS_NOT_FOUND",
+            error: "Business not found",
+          },
+          404
+        );
+      }
+
+      // Verify provider belongs to this business
+      const {
+        data: foundProvider,
+        error: providerError,
+      } = await supabase
+        .from("providers")
+        .select("id, name, email, business_id")
+        .eq("id", provider_id)
+        .eq("business_id", resolvedBusinessId)
+        .maybeSingle();
+
+      if (providerError || !foundProvider) {
+        console.error(
+          "Provider lookup failed:",
+          providerError
+        );
+
+        return json(
+          {
+            success: false,
+            code: "PROVIDER_NOT_FOUND",
+            error: "Provider not found",
+          },
+          404
+        );
+      }
+
+      providerInfo = foundProvider;
+
+      // Verify service belongs to business + provider
+      const {
+        data: serviceInfo,
+        error: serviceError,
+      } = await supabase
+        .from("business_services")
+        .select(
+          "id, business_id, provider_id, name, price, duration, is_active"
+        )
+        .eq("id", service_id)
+        .eq("business_id", resolvedBusinessId)
+        .eq("provider_id", provider_id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (serviceError || !serviceInfo) {
+        console.error(
+          "Service lookup failed:",
+          serviceError
+        );
+
+        return json(
+          {
+            success: false,
+            code: "SERVICE_NOT_FOUND",
+            error: "Service not found or unavailable",
+          },
+          404
+        );
+      }
+
+      // Trust database values instead of browser values.
+      finalService = serviceInfo.name;
+
+      finalDuration =
+        Number(serviceInfo.duration) > 0
+          ? Number(serviceInfo.duration)
+          : finalDuration;
+
+      finalPrice =
+        serviceInfo.price !== null &&
+        serviceInfo.price !== undefined
+          ? Number(serviceInfo.price)
+          : finalPrice;
+
+      // Check existing confirmed appointments
+      const {
+        data: existingAppointments,
+        error: existingError,
+      } = await supabase
+        .from("appointments")
+        .select("id, time, duration")
+        .eq("provider_id", provider_id)
+        .eq("date", date)
+        .eq("status", "confirmed");
+
+      if (existingError) {
+        console.error(
+          "Provider appointment lookup failed:",
+          existingError
+        );
+
+        return json(
+          {
+            success: false,
+            code: "DATABASE_ERROR",
+            error: "Could not check availability",
+          },
+          500
+        );
+      }
+
+      const appointmentConflict = (
+        existingAppointments || []
+      ).some((appointment) =>
+        overlaps(
+          formattedTime,
+          finalDuration,
+          appointment.time,
+          Number(appointment.duration) || 60
+        )
       );
+
+      if (appointmentConflict) {
+        return json(
+          {
+            success: false,
+            code: "SLOT_TAKEN",
+            error: "Time slot already taken",
+          },
+          409
+        );
+      }
+
+      // Check provider blocks
+      const {
+        data: providerBlocks,
+        error: blocksError,
+      } = await supabase
+        .from("provider_blocks")
+        .select("start_time, end_time")
+        .eq("provider_id", provider_id)
+        .eq("date", date);
+
+      if (blocksError) {
+        console.error(
+          "Provider block lookup failed:",
+          blocksError
+        );
+
+        return json(
+          {
+            success: false,
+            code: "DATABASE_ERROR",
+            error: "Could not check provider blocks",
+          },
+          500
+        );
+      }
+
+      const blocked = (providerBlocks || []).some(
+        (block) => {
+          const blockDuration =
+            timeToMinutes(block.end_time) -
+            timeToMinutes(block.start_time);
+
+          return overlaps(
+            formattedTime,
+            finalDuration,
+            block.start_time,
+            blockDuration
+          );
+        }
+      );
+
+      if (blocked) {
+        return json(
+          {
+            success: false,
+            code: "PROVIDER_BLOCKED",
+            error: "Provider unavailable at this time",
+          },
+          409
+        );
+      }
     }
 
-    const newStart = new Date(`${date}T${formattedTime}`);
+    // =========================================================
+    // 5. LEGACY BARBER BOOKING
+    // =========================================================
 
-    const newEnd = new Date(
-      newStart.getTime() +
-        selectedDuration * 60 * 1000
-    );
+    if (isLegacyBarberBooking) {
+      const {
+        data: existingAppointments,
+        error: existingError,
+      } = await supabase
+        .from("appointments")
+        .select("id, date, time, duration")
+        .eq("barber_id", barber)
+        .eq("date", date)
+        .eq("status", "confirmed");
 
-    for (const appt of existingAppointments || []) {
-      const existingStart = new Date(
-        `${appt.date}T${appt.time}`
+      if (existingError) {
+        console.error(
+          "Barber availability lookup failed:",
+          existingError
+        );
+
+        return json(
+          {
+            success: false,
+            code: "DATABASE_ERROR",
+            error: "Could not check availability",
+          },
+          500
+        );
+      }
+
+      const appointmentConflict = (
+        existingAppointments || []
+      ).some((appointment) =>
+        overlaps(
+          formattedTime,
+          finalDuration,
+          appointment.time,
+          Number(appointment.duration) || 60
+        )
       );
 
-      const existingDuration =
-        Number(appt.duration) > 0
-          ? Number(appt.duration)
-          : 60;
-
-      const existingEnd = new Date(
-        existingStart.getTime() +
-          existingDuration * 60 * 1000
-      );
-
-      if (
-        existingStart < newEnd &&
-        existingEnd > newStart
-      ) {
+      if (appointmentConflict) {
         return json(
           {
             success: false,
@@ -162,46 +431,81 @@ export async function POST(req) {
     }
 
     // =========================================================
-    // 3. CREATE APPOINTMENT
+    // 6. CREATE CUSTOMER SECRET
     // =========================================================
 
     const secret_link = crypto.randomUUID();
     const customer_id = secret_link;
+
+    // =========================================================
+    // 7. CREATE APPOINTMENT
+    // =========================================================
+
+    const appointmentPayload = isProviderBooking
+      ? {
+          business_id: resolvedBusinessId,
+          barber_id: null,
+          provider_id,
+          service_id,
+
+          service: finalService,
+          date,
+          time: formattedTime,
+          duration: finalDuration,
+
+          customer_name,
+          customer_email: customer_email || null,
+          customer_phone: cleanCustomerPhone,
+          notes: notes || "",
+
+          customer_id,
+          status: "confirmed",
+          secret_link,
+
+          lang: lang || "es",
+          price: finalPrice,
+
+          booking_request_id,
+        }
+      : {
+          business_id: resolvedBusinessId,
+          barber_id: barber,
+
+          service: finalService,
+          date,
+          time: formattedTime,
+          duration: finalDuration,
+
+          customer_name,
+          customer_email,
+          customer_phone: cleanCustomerPhone,
+          notes: notes || "",
+
+          customer_id,
+          status: "confirmed",
+          secret_link,
+
+          lang: lang || "es",
+          price: finalPrice,
+
+          booking_request_id,
+        };
 
     const {
       data: appointment,
       error: insertError,
     } = await supabase
       .from("appointments")
-      .insert({
-        business_id: business || null,
-        barber_id: barber,
-        service,
-        date,
-        time: formattedTime,
-        duration: selectedDuration,
-        customer_name,
-        customer_email,
-        customer_phone: cleanCustomerPhone,
-        notes: notes || "",
-        customer_id,
-        status: "confirmed",
-        secret_link,
-        lang: lang || "es",
-        price: price ?? 0,
-        booking_request_id,
-      })
+      .insert(appointmentPayload)
       .select()
       .single();
 
     // =========================================================
-    // 4. DATABASE CONCURRENCY PROTECTION
+    // 8. IDEMPOTENCY / UNIQUE-CONSTRAINT HANDLING
     // =========================================================
 
     if (insertError) {
       if (insertError.code === "23505") {
-        // Another copy of THIS SAME request may have
-        // successfully created the appointment first.
         const { data: sameRequest } = await supabase
           .from("appointments")
           .select("*")
@@ -220,8 +524,6 @@ export async function POST(req) {
           });
         }
 
-        // Otherwise a genuinely different booking took
-        // the requested time.
         return json(
           {
             success: false,
@@ -233,7 +535,7 @@ export async function POST(req) {
       }
 
       console.error(
-        "Supabase insert error:",
+        "Appointment insert failed:",
         insertError
       );
 
@@ -248,90 +550,148 @@ export async function POST(req) {
     }
 
     // =========================================================
-    // 5. NOTIFICATIONS
+    // 9. NOTIFICATIONS
     // =========================================================
-    // The appointment is already safely stored.
-    // Notification failures must NOT make the customer think
-    // the booking failed.
+    // Appointment is already stored. Notification failures
+    // must never make the customer think booking failed.
     // =========================================================
 
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL ||
       "https://www.flowpaydr.com";
 
-    Promise.allSettled([
-      fetch(`${baseUrl}/api/send-confirmation`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          customer_email,
-          customer_name,
-          service,
-          barber_id: barber,
-          business_id: business || null,
-          date,
-          time: formattedTime,
-          secret_link,
-          lang: lang || "es",
-          customer_id,
-          price: price ?? 0,
-        }),
-      }),
+    const notificationJobs = [];
 
-      (async () => {
-        const { data: barberInfo } =
-          await supabase
-            .from("barbers")
-            .select("name, email")
-            .eq("id", barber)
-            .maybeSingle();
+    // Customer confirmation
+    if (customer_email) {
+      notificationJobs.push(
+        fetch(`${baseUrl}/api/send-confirmation`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            customer_email,
+            customer_name,
 
-        if (!barberInfo?.email) {
-          return null;
-        }
+            service: finalService,
 
-        return fetch(
+            barber_id: isLegacyBarberBooking
+              ? barber
+              : null,
+
+            provider_id: isProviderBooking
+              ? provider_id
+              : null,
+
+            business_id: resolvedBusinessId,
+
+            date,
+            time: formattedTime,
+
+            // Send a complete URL to the email template.
+            secret_link: `${baseUrl}/customer/${secret_link}`,
+            customer_id,
+
+            lang: lang || "es",
+            price: finalPrice,
+          }),
+        })
+      );
+    }
+
+    // New provider notification
+    if (
+      isProviderBooking &&
+      providerInfo?.email
+    ) {
+      notificationJobs.push(
+        fetch(
           `${baseUrl}/api/send-barber-notification`,
           {
             method: "POST",
             headers: {
-              "Content-Type":
-                "application/json",
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              barber_email: barberInfo.email,
-              barber_name: barberInfo.name,
-              barber_id: barber,
+              provider_email: providerInfo.email,
+              provider_name: providerInfo.name,
+              provider_id,
+
+              business_id: resolvedBusinessId,
 
               customer_name,
-              customer_phone:
-                cleanCustomerPhone,
-              customer_email,
+              customer_phone: cleanCustomerPhone,
+              customer_email: customer_email || null,
 
-              service,
+              service: finalService,
               date,
               time: formattedTime,
               notes: notes || "",
 
               dashboard_link:
-                `${baseUrl}/barber/${barber}/dashboard`,
+                `${baseUrl}/business/${resolvedBusinessId}/dashboard`,
 
               lang: lang || "es",
             }),
           }
-        );
-      })(),
-    ]).catch((error) => {
-      console.error(
-        "Notification processing error:",
-        error
+        )
       );
-    });
+    }
+
+    // Legacy barber notification
+    if (isLegacyBarberBooking) {
+      const { data: barberInfo } = await supabase
+        .from("barbers")
+        .select("name, email")
+        .eq("id", barber)
+        .maybeSingle();
+
+      if (barberInfo?.email) {
+        notificationJobs.push(
+          fetch(
+            `${baseUrl}/api/send-barber-notification`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                barber_email: barberInfo.email,
+                barber_name: barberInfo.name,
+                barber_id: barber,
+
+                customer_name,
+                customer_phone: cleanCustomerPhone,
+                customer_email,
+
+                service: finalService,
+                date,
+                time: formattedTime,
+                notes: notes || "",
+
+                dashboard_link:
+                  `${baseUrl}/barber/${barber}/dashboard`,
+
+                lang: lang || "es",
+              }),
+            }
+          )
+        );
+      }
+    }
+
+    Promise.allSettled(notificationJobs).catch(
+      (error) => {
+        console.error(
+          "Notification processing error:",
+          error
+        );
+      }
+    );
 
     // =========================================================
-    // 6. SUCCESS
+    // 10. SUCCESS
     // =========================================================
 
     return json({

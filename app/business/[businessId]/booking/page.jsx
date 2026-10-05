@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import QRCode from "react-qr-code";
@@ -34,6 +34,7 @@ export default function BusinessBookingPage() {
   const [guestCount, setGuestCount] = useState("");
   const [pickupLocation, setPickupLocation] = useState("");
   const [savingAppointment, setSavingAppointment] = useState(false);
+  const bookingLockRef = useRef(false);
 
   // PROVIDER AVAILABILITY
   const [availableTimes, setAvailableTimes] = useState([]);
@@ -514,15 +515,20 @@ if (!hasAppointmentConflict && !hasBlockConflict) {
     }
   }
 
-  async function saveAppointment() {
+ async function saveAppointment() {
+    // Prevent multiple rapid clicks from creating duplicate bookings
+    if (bookingLockRef.current) {
+      return;
+    }
+
     if (
       !customerName ||
       !customerPhone ||
       !selectedService ||
       !appointmentDate ||
       !appointmentTime
-    ) {
-      alert(
+    ) {      
+     alert(
         lang === "es"
           ? "Completa los campos requeridos"
           : "Please complete the required fields"
@@ -554,8 +560,9 @@ if (!hasAppointmentConflict && !hasBlockConflict) {
       return;
     }
 
-    // RECHECK AVAILABILITY / CAPACITY IMMEDIATELY BEFORE SAVING
-    const selectedDuration = Number(selectedService.duration) || 60;
+
+// RECHECK AVAILABILITY / CAPACITY IMMEDIATELY BEFORE SAVING
+const selectedDuration = Number(selectedService.duration) || 60;
 
     if (isTourBusiness) {
       const maxGuests = Number(selectedService.max_guests_per_departure) || 0;
@@ -850,171 +857,242 @@ if (!hasAppointmentConflict && !hasBlockConflict) {
 }
 
 
-    setSavingAppointment(true);
+   setSavingAppointment(true);
+
+// Lock only when we are actually ready to create the appointment.
+bookingLockRef.current = true;
 
 try {
-  const { data: createdAppointment, error } = await supabase
-    .from("appointments")
-    .insert({
-      business_id: businessId,
-      barber_id: null,
-      provider_id: provider.id,
-      service_id: selectedService.id,
-      is_group_booking: isTourBusiness,
-      service: selectedService.name,
-      date: appointmentDate,
-      time: appointmentTime,
-      duration: selectedDuration,
-      price:
-        selectedService.price !== null
-          ? Number(selectedService.price)
-          : null,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      customer_email: customerEmail || null,
-      guest_count: isTourBusiness ? Number(guestCount) : null,
-      pickup_location: isTourBusiness ? pickupLocation.trim() : null,
-      status: "confirmed",
-      lang: lang,
-    })
-    .select("id")
-    .single();
-      if (error) {
-        console.error(
-          "Error creating appointment:",
-          error
-        );
+  let createdAppointment = null;
 
-        if (error.code === "23505" && !isTourBusiness) {
-          alert(
-            lang === "es"
-              ? "Ese horario acaba de ser reservado. Selecciona otra hora."
-              : "That time was just booked. Please select another time."
-          );
+  // =========================================================
+  // TOURS
+  // Keep the existing tour booking system unchanged.
+  // =========================================================
+  if (isTourBusiness) {
+    const { data, error } = await supabase
+      .from("appointments")
+      .insert({
+        business_id: businessId,
+        barber_id: null,
+        provider_id: provider.id,
+        service_id: selectedService.id,
+        is_group_booking: true,
+        service: selectedService.name,
+        date: appointmentDate,
+        time: appointmentTime,
+        duration: selectedDuration,
+        price:
+          selectedService.price !== null
+            ? Number(selectedService.price)
+            : null,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerEmail || null,
+        guest_count: Number(guestCount),
+        pickup_location: pickupLocation.trim(),
+        status: "confirmed",
+        lang: lang,
+      })
+      .select("id")
+      .single();
 
-          await loadAvailableTimes(
-            appointmentDate,
-            selectedService
-          );
-        } else {
-          alert(
-            lang === "es"
-              ? "Error creando la cita"
-              : "Error creating appointment"
-          );
-        }
+    if (error) {
+      console.error("Error creating tour appointment:", error);
 
-        return;
-      }
+      alert(
+        lang === "es"
+          ? "Error creando la cita"
+          : "Error creating appointment"
+      );
 
-     
-// SEND CONFIRMATION EMAIL TO CUSTOMER
-if (customerEmail) {
-  try {
-    const confirmationResponse = await fetch("/api/send-confirmation", {
+      return;
+    }
+
+    createdAppointment = data;
+  } else {
+    // =========================================================
+    // NORMAL PROVIDER BOOKING
+    // Use the protected server API for all current and future
+    // provider-based businesses.
+    // =========================================================
+
+    const bookingRequestId = crypto.randomUUID();
+
+    const response = await fetch("/api/book", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-
       body: JSON.stringify({
-  customer_email: customerEmail,
-  customer_name: customerName,
-  service: selectedService.name,
-  barber_id: null,
-  provider_id: provider.id,
-  business_id: businessId,
-  date: appointmentDate,
-  time: appointmentTime,
-  secret_link: `${baseUrl}/customer/${createdAppointment.id}`,
-  lang: lang,
+        business_id: businessId,
+        provider_id: provider.id,
+        service_id: selectedService.id,
 
-  guest_count: isTourBusiness
-    ? Number(guestCount)
-    : null,
+        service: selectedService.name,
+        date: appointmentDate,
+        time: appointmentTime,
+        duration: selectedDuration,
 
-  pickup_location: isTourBusiness
-    ? pickupLocation.trim()
-    : null,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerEmail || null,
 
-  is_group_booking:
-    isTourBusiness,
+        notes: "",
+        lang: lang,
 
-}),   
+        price:
+          selectedService.price !== null
+            ? Number(selectedService.price)
+            : 0,
 
- });
+        booking_request_id: bookingRequestId,
+      }),
+    });
 
-    const confirmationData = await confirmationResponse.json();
+    const result = await response.json();
 
-    if (!confirmationData.success) {
-      console.error(
-        "Confirmation email error:",
-        confirmationData
-      );
-    }
-  } catch (emailError) {
-    console.error(
-      "Confirmation email request failed:",
-      emailError
-    );
-  }
-}
+    if (!response.ok || !result.success) {
+      console.error("Booking API error:", result);
 
-// SEND NEW APPOINTMENT EMAIL TO PROVIDER
-if (provider?.email) {
-  try {
-    const providerResponse = await fetch(
-      "/api/send-barber-notification",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      if (
+        result.code === "SLOT_TAKEN" ||
+        result.code === "PROVIDER_BLOCKED"
+      ) {
+        alert(
+          lang === "es"
+            ? "Ese horario acaba de ser reservado o ya no está disponible. Selecciona otra hora."
+            : "That time was just booked or is no longer available. Please select another time."
+        );
 
-        body: JSON.stringify({
-          provider_email: provider.email,
-          provider_name: provider.name,
-          provider_id: provider.id,
-
-          customer_name: customerName,
-          customer_phone: customerPhone,
-          customer_email: customerEmail || null,
-
-          service: selectedService.name,
-          date: appointmentDate,
-          time: appointmentTime,
-          notes: null,
-
-          dashboard_link: null,
-          lang: lang,
-
-          // TOUR / GROUP BOOKING DATA
-          guest_count: isTourBusiness
-            ? Number(guestCount)
-            : null,
-
-          pickup_location: isTourBusiness
-            ? pickupLocation.trim()
-            : null,
-
-          is_group_booking: isTourBusiness,
-        }),
+        await loadAvailableTimes(
+          appointmentDate,
+          selectedService
+        );
+      } else {
+        alert(
+          lang === "es"
+            ? "No se pudo crear la cita. Intenta otra vez."
+            : "Could not create the appointment. Please try again."
+        );
       }
-    );
 
-    const providerData = await providerResponse.json();
+      return;
+    }
 
-    if (!providerData.success) {
+    createdAppointment = result.appointment;
+  }
+     
+
+// =========================================================
+// TOUR NOTIFICATIONS
+// Normal provider bookings already send notifications
+// through /api/book, so only tours use the old notification
+// code here.
+// =========================================================
+if (isTourBusiness) {
+  // SEND CONFIRMATION EMAIL TO CUSTOMER
+  if (customerEmail) {
+    try {
+      const confirmationResponse = await fetch(
+        "/api/send-confirmation",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            customer_email: customerEmail,
+            customer_name: customerName,
+
+            service: selectedService.name,
+
+            barber_id: null,
+            provider_id: provider.id,
+            business_id: businessId,
+
+            date: appointmentDate,
+            time: appointmentTime,
+
+            secret_link: `${baseUrl}/customer/${createdAppointment.id}`,
+
+            lang: lang,
+
+            guest_count: Number(guestCount),
+            pickup_location: pickupLocation.trim(),
+            is_group_booking: true,
+          }),
+        }
+      );
+
+      const confirmationData =
+        await confirmationResponse.json();
+
+      if (!confirmationData.success) {
+        console.error(
+          "Confirmation email error:",
+          confirmationData
+        );
+      }
+    } catch (emailError) {
       console.error(
-        "Provider notification email error:",
-        providerData
+        "Confirmation email request failed:",
+        emailError
       );
     }
-  } catch (providerEmailError) {
-    console.error(
-      "Provider notification email request failed:",
-      providerEmailError
-    );
+  }
+
+  // SEND NEW APPOINTMENT EMAIL TO PROVIDER
+  if (provider?.email) {
+    try {
+      const providerResponse = await fetch(
+        "/api/send-barber-notification",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            provider_email: provider.email,
+            provider_name: provider.name,
+            provider_id: provider.id,
+
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            customer_email: customerEmail || null,
+
+            service: selectedService.name,
+            date: appointmentDate,
+            time: appointmentTime,
+            notes: null,
+
+            dashboard_link: null,
+            lang: lang,
+
+            guest_count: Number(guestCount),
+            pickup_location: pickupLocation.trim(),
+            is_group_booking: true,
+          }),
+        }
+      );
+
+      const providerData =
+        await providerResponse.json();
+
+      if (!providerData.success) {
+        console.error(
+          "Provider notification email error:",
+          providerData
+        );
+      }
+    } catch (providerEmailError) {
+      console.error(
+        "Provider notification email request failed:",
+        providerEmailError
+      );
+    }
   }
 }
 
@@ -1024,8 +1102,28 @@ alert(
     : "Appointment created successfully"
 );
 
-router.push(`/customer/${createdAppointment.id}`);
+// /api/book creates a real secret_link for normal provider
+// appointments. Tours still use the appointment id.
+if (!isTourBusiness && createdAppointment?.secret_link) {
+  router.push(
+    `/customer/${createdAppointment.secret_link}`
+  );
+} else {
+  router.push(`/customer/${createdAppointment.id}`);
+}
+} catch (error) {
+  console.error(
+    "Unexpected appointment creation error:",
+    error
+  );
+
+  alert(
+    lang === "es"
+      ? "No se pudo crear la cita. Intenta otra vez."
+      : "Could not create the appointment. Please try again."
+  );
 } finally {
+  bookingLockRef.current = false;
   setSavingAppointment(false);
 }
 }

@@ -673,15 +673,22 @@ async function addProvider() {
     return;
   }
 
-  const { error } = await supabase.from("providers").insert({
-    business_id: businessId,
-    name: newProviderName,
-    email: newProviderEmail || null,
-    phone: newProviderPhone || null,
-    specialty: newProviderSpecialty || null,
-  });
+  // --------------------------------------------------
+  // CREATE PROVIDER
+  // --------------------------------------------------
+  const { data: newProvider, error } = await supabase
+    .from("providers")
+    .insert({
+      business_id: businessId,
+      name: newProviderName,
+      email: newProviderEmail || null,
+      phone: newProviderPhone || null,
+      specialty: newProviderSpecialty || null,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !newProvider) {
     console.error("Error adding provider:", error);
 
     showToast(
@@ -693,42 +700,59 @@ async function addProvider() {
     return;
   }
 
-// --------------------------------------------------
-// FLOWPAYDR ADMIN ALERT — NEW PROVIDER
-// --------------------------------------------------
-try {
-  const adminAlertResponse = await fetch("/api/admin/notify", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      type: "new_provider",
-      business_name: business?.name || "Negocio sin nombre",
-      provider_name: newProviderName,
-      provider_email: newProviderEmail || null,
-      provider_phone: newProviderPhone || null,
-      provider_specialty: newProviderSpecialty || null,
-    }),
-  });
+  // --------------------------------------------------
+  // FLOWPAYDR ADMIN ALERT — NEW PROVIDER
+  // --------------------------------------------------
+  try {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-  if (!adminAlertResponse.ok) {
-    const adminAlertError = await adminAlertResponse
-      .json()
-      .catch(() => ({}));
+    if (sessionError) {
+      console.error(
+        "FlowPayDR provider alert session error:",
+        sessionError
+      );
+    } else if (!session?.access_token) {
+      console.error(
+        "FlowPayDR provider alert: no authenticated session"
+      );
+    } else {
+      const adminAlertResponse = await fetch("/api/admin/notify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          type: "new_provider",
+          business_id: businessId,
+          provider_id: newProvider.id,
+        }),
+      });
 
+      if (!adminAlertResponse.ok) {
+        const adminAlertError = await adminAlertResponse
+          .json()
+          .catch(() => ({}));
+
+        console.error(
+          "FlowPayDR new provider admin alert failed:",
+          adminAlertError
+        );
+      }
+    }
+  } catch (adminAlertError) {
     console.error(
-      "FlowPayDR new provider admin alert failed:",
+      "FlowPayDR new provider admin alert request failed:",
       adminAlertError
     );
   }
-} catch (adminAlertError) {
-  console.error(
-    "FlowPayDR new provider admin alert request failed:",
-    adminAlertError
-  );
-}
 
+  // --------------------------------------------------
+  // RESET FORM
+  // --------------------------------------------------
   setNewProviderName("");
   setNewProviderEmail("");
   setNewProviderPhone("");
@@ -736,13 +760,12 @@ try {
 
   await loadDashboard();
 
-    showToast(
+  showToast(
     lang === "es"
       ? "Profesional agregado"
       : "Provider added"
   );
 }
-
 // PROVIDER PROFILE PHOTO
 async function uploadProviderPhoto(provider, file) {
   if (!provider?.id || !file) return;

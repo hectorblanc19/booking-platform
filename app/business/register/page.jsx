@@ -337,7 +337,56 @@ export default function BusinessRegisterPage() {
 if (businessError) {
   throw businessError;
 }
-      // --------------------------------------------------
+
+
+// --------------------------------------------------
+// FLOWPAYDR ADMIN ALERT — NEW BUSINESS
+// --------------------------------------------------
+try {
+  const accessToken =
+    currentSession?.access_token || null;
+
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  // If the new account already has a session,
+  // include its authenticated token.
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const adminAlertResponse = await fetch(
+    "/api/admin/notify",
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        type: "new_business",
+        business_id: business.id,
+        registration_user_id: userId,
+      }),
+    }
+  );
+
+  if (!adminAlertResponse.ok) {
+    const adminAlertError = await adminAlertResponse
+      .json()
+      .catch(() => ({}));
+
+    console.error(
+      "FlowPayDR new business admin alert failed:",
+      adminAlertError
+    );
+  }
+} catch (adminAlertError) {
+  console.error(
+    "FlowPayDR new business admin alert request failed:",
+    adminAlertError
+  );
+}      
+
+       // --------------------------------------------------
       // 5. EXISTING USER WHO RE-REGISTERED
       // Already has a valid session, so go straight to dashboard
       // --------------------------------------------------
@@ -351,8 +400,8 @@ if (businessError) {
 
       // --------------------------------------------------
       // 6. NEW ACCOUNT WITH EMAIL CONFIRMATION REQUIRED
-      // --------------------------------------------------
-      if (!currentSession) {
+      // --------------------------------------------------     
+       if (!currentSession) {
         setSuccess(tr.success);
 
         setTimeout(() => {

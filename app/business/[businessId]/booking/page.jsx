@@ -1760,17 +1760,13 @@ const { data: bar } = await supabase
         )}
       </div>
 
-      {isBarberBusiness && barbers.length === 0 && (
+            {providers.length === 0 && (
         <p className="mt-4 text-red-600 text-center">
-          No barbers found for this business.
+          {lang === "es"
+            ? "No hay profesionales disponibles para este negocio."
+            : "No providers found for this business."}
         </p>
       )}
-
-      {!isBarberBusiness && providers.length === 0 && (
-        <p className="mt-4 text-red-600 text-center">
-          No providers found for this business.
-        </p>
-      )}
-    </div>
+       </div>
   );
 }

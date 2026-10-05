@@ -1,3 +1,6 @@
+
+
+
    
 "use client";
 
@@ -689,6 +692,42 @@ async function addProvider() {
 
     return;
   }
+
+// --------------------------------------------------
+// FLOWPAYDR ADMIN ALERT — NEW PROVIDER
+// --------------------------------------------------
+try {
+  const adminAlertResponse = await fetch("/api/admin/notify", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      type: "new_provider",
+      business_name: business?.name || "Negocio sin nombre",
+      provider_name: newProviderName,
+      provider_email: newProviderEmail || null,
+      provider_phone: newProviderPhone || null,
+      provider_specialty: newProviderSpecialty || null,
+    }),
+  });
+
+  if (!adminAlertResponse.ok) {
+    const adminAlertError = await adminAlertResponse
+      .json()
+      .catch(() => ({}));
+
+    console.error(
+      "FlowPayDR new provider admin alert failed:",
+      adminAlertError
+    );
+  }
+} catch (adminAlertError) {
+  console.error(
+    "FlowPayDR new provider admin alert request failed:",
+    adminAlertError
+  );
+}
 
   setNewProviderName("");
   setNewProviderEmail("");

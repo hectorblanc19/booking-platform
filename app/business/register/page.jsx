@@ -316,7 +316,25 @@ export default function BusinessRegisterPage() {
       // 4. USER HAS NO BUSINESS
       // Create a new business under this Auth user
       // --------------------------------------------------
-     const {
+    
+
+ // --------------------------------------------------
+// FLOWPAYDR 7-DAY FREE TRIAL
+// --------------------------------------------------
+const trialStart = new Date();
+
+const trialEnd = new Date(trialStart);
+trialEnd.setDate(trialEnd.getDate() + 7);
+
+const formatLocalDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const {
   data: business,
   error: businessError,
 } = await supabase
@@ -330,10 +348,14 @@ export default function BusinessRegisterPage() {
     open_time: form.openTime || null,
     close_time: form.closeTime || null,
     owner_id: userId,
+
+    // Billing / free trial
+    trial_start_date: formatLocalDate(trialStart),
+    trial_end_date: formatLocalDate(trialEnd),
+    billing_enabled: true,
   })
   .select()
   .single();
-
 if (businessError) {
   throw businessError;
 }

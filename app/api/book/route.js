@@ -229,20 +229,21 @@ export async function POST(req) {
 
       providerInfo = foundProvider;
 
-      // Verify service belongs to business + provider
-      const {
-        data: serviceInfo,
-        error: serviceError,
-      } = await supabase
-        .from("business_services")
-        .select(
-          "id, business_id, provider_id, name, price, duration, is_active"
-        )
-        .eq("id", service_id)
-        .eq("business_id", resolvedBusinessId)
-        .eq("provider_id", provider_id)
-        .eq("is_active", true)
-        .maybeSingle();
+  // Verify service belongs to business and is available
+// either for this provider specifically or for all providers.
+const {
+  data: serviceInfo,
+  error: serviceError,
+} = await supabase
+  .from("business_services")
+  .select(
+    "id, business_id, provider_id, name, price, duration, is_active"
+  )
+  .eq("id", service_id)
+  .eq("business_id", resolvedBusinessId)
+  .or(`provider_id.eq.${provider_id},provider_id.is.null`)
+  .eq("is_active", true)
+  .maybeSingle();
 
       if (serviceError || !serviceInfo) {
         console.error(

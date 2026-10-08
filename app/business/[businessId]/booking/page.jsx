@@ -197,29 +197,30 @@ function getDominicanNow() {
     );
   }
 
+
   // LOAD SERVICES FOR THIS PROVIDER
-  async function loadServices(providerToLoad) {
-    if (!providerToLoad?.id) {
-      setServices([]);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("business_services")
-      .select("*")
-      .eq("business_id", businessId)
-      .eq("provider_id", providerToLoad.id)
-      .eq("is_active", true)
-      .order("name");
-
-    if (error) {
-      console.error("Error loading services:", error);
-      setServices([]);
-      return;
-    }
-
-    setServices(data || []);
+async function loadServices(providerToLoad) {
+  if (!providerToLoad?.id) {
+    setServices([]);
+    return;
   }
+
+  const { data, error } = await supabase
+    .from("business_services")
+    .select("*")
+    .eq("business_id", businessId)
+    .or(`provider_id.eq.${providerToLoad.id},provider_id.is.null`)
+    .eq("is_active", true)
+    .order("name");
+
+  if (error) {
+    console.error("Error loading services:", error);
+    setServices([]);
+    return;
+  }
+
+  setServices(data || []);
+}
 
   // LOAD AVAILABLE TIMES USING SELECTED SERVICE DURATION
   async function loadAvailableTimes(date, service = selectedService) {

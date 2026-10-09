@@ -413,46 +413,258 @@ function isPastAppointment(appointment) {
                           )}
                         </p>
 
-                        {/* GENERIC PROVIDER STATUS ACTIONS */}
+                          {/* GENERIC PROVIDER STATUS ACTIONS */}
                         {!isBarberBusiness &&
-                          a.status ===
-                            "confirmed" &&
-                          isPastAppointment(a) && (
-                            <div className="flex flex-wrap gap-2 mt-3">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateAppointmentStatus(
-                                    a.id,
-                                    "completed"
-                                  )
-                                }
-                                className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold"
-                              >
-                                ✅{" "}
-                                {lang === "es"
-                                  ? "Completado"
-                                  : "Completed"}
-                              </button>
+                          a.status === "confirmed" && (
+                            <>
+                              {/* BEFORE APPOINTMENT TIME */}
+                              {!isPastAppointment(a) && (
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      window.location.href =
+                                        `/customer/reschedule?secret=${a.id}`
+                                    }
+                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold"
+                                  >
+                                    🔄{" "}
+                                    {lang === "es"
+                                      ? "Reprogramar"
+                                      : "Reschedule"}
+                                  </button>
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  updateAppointmentStatus(
-                                    a.id,
-                                    "no_show"
-                                  )
-                                }
-                                className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold"
-                              >
-                                ⚠️{" "}
-                                {lang === "es"
-                                  ? "No asistió"
-                                  : "No Show"}
-                              </button>
-                            </div>
-                          )}
-                      </div>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const confirmed =
+                                        window.confirm(
+                                          lang === "es"
+                                            ? `¿Cancelar la cita de ${a.customer_name}?`
+                                            : `Cancel ${a.customer_name}'s appointment?`
+                                        );
+
+                                      if (!confirmed) return;
+
+                                      if (
+                                        isPastAppointment(a)
+                                      ) {
+                                        alert(
+                                          lang === "es"
+                                            ? "Esta cita ya pasó. No se puede cancelar."
+                                            : "This appointment has already passed. It cannot be cancelled."
+                                        );
+                                        return;
+                                      }
+
+                                      const { error } =
+                                        await supabase
+                                          .from(
+                                            "appointments"
+                                          )
+                                          .update({
+                                            status:
+                                              "cancelled",
+                                          })
+                                          .eq(
+                                            "id",
+                                            a.id
+                                          );
+
+                                      if (error) {
+                                        console.error(
+                                          "Appointment cancellation error:",
+                                          error
+                                        );
+
+                                        alert(
+                                          lang === "es"
+                                            ? "No se pudo cancelar la cita."
+                                            : "Could not cancel the appointment."
+                                        );
+
+                                        return;
+                                      }
+
+                                      // NOTIFY PROVIDER
+                                      if (a.provider_id) {
+                                        try {
+                                          const {
+                                            data:
+                                              providerData,
+                                          } =
+                                            await supabase
+                                              .from(
+                                                "providers"
+                                              )
+                                              .select(
+                                                "name, email"
+                                              )
+                                              .eq(
+                                                "id",
+                                                a.provider_id
+                                              )
+                                              .maybeSingle();
+
+                                          if (
+                                            providerData?.email
+                                          ) {
+                                            const response =
+                                              await fetch(
+                                                "/api/send-barber-notification",
+                                                {
+                                                  method:
+                                                    "POST",
+
+                                                  headers:
+                                                    {
+                                                      "Content-Type":
+                                                        "application/json",
+                                                    },
+
+                                                  body:
+                                                    JSON.stringify(
+                                                      {
+                                                        provider_email:
+                                                          providerData.email,
+
+                                                        provider_name:
+                                                          providerData.name,
+
+                                                        provider_id:
+                                                          a.provider_id,
+
+                                                        customer_name:
+                                                          a.customer_name,
+
+                                                        customer_phone:
+                                                          a.customer_phone,
+
+                                                        customer_email:
+                                                          a.customer_email ||
+                                                          null,
+
+                                                        service:
+                                                          a.service,
+
+                                                        date:
+                                                          a.date,
+
+                                                        time:
+                                                          a.time,
+
+                                                        notes:
+                                                          a.notes ||
+                                                          null,
+
+                                                        guest_count:
+                                                          a.is_group_booking
+                                                            ? a.guest_count
+                                                            : null,
+
+                                                        pickup_location:
+                                                          a.is_group_booking
+                                                            ? a.pickup_location
+                                                            : null,
+
+                                                        is_group_booking:
+                                                          Boolean(
+                                                            a.is_group_booking
+                                                          ),
+
+                                                        dashboard_link:
+                                                          null,
+
+                                                        lang:
+                                                          a.lang ||
+                                                          lang,
+
+                                                        notification_type:
+                                                          "cancelled",
+                                                      }
+                                                    ),
+                                                }
+                                              );
+
+                                            if (
+                                              !response.ok
+                                            ) {
+                                              const data =
+                                                await response.json();
+
+                                              console.error(
+                                                "Provider cancellation email error:",
+                                                data
+                                              );
+                                            }
+                                          }
+                                        } catch (
+                                          notificationError
+                                        ) {
+                                          console.error(
+                                            "Provider cancellation notification failed:",
+                                            notificationError
+                                          );
+                                        }
+                                      }
+
+                                      alert(
+                                        lang === "es"
+                                          ? "Cita cancelada."
+                                          : "Appointment cancelled."
+                                      );
+
+                                      window.location.reload();
+                                    }}
+                                    className="px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold"
+                                  >
+                                    ❌{" "}
+                                    {lang === "es"
+                                      ? "Cancelar"
+                                      : "Cancel"}
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* AFTER APPOINTMENT TIME */}
+                              {isPastAppointment(a) && (
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateAppointmentStatus(
+                                        a.id,
+                                        "completed"
+                                      )
+                                    }
+                                    className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold"
+                                  >
+                                    ✅{" "}
+                                    {lang === "es"
+                                      ? "Completado"
+                                      : "Completed"}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateAppointmentStatus(
+                                        a.id,
+                                        "no_show"
+                                      )
+                                    }
+                                    className="px-3 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold"
+                                  >
+                                    ⚠️{" "}
+                                    {lang === "es"
+                                      ? "No asistió"
+                                      : "No Show"}
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          )}                     
+                       </div>
                     ))}
 
                     {/* PAGINATION */}

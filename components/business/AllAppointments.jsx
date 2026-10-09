@@ -1,3 +1,4 @@
+
 "use client";
 
 import { supabase } from "@/lib/supabaseClient";
@@ -34,8 +35,8 @@ export default function AllAppointments({
   APPOINTMENTS_PER_PAGE,
   toggleBarberOpen,
   changeBarberPage,
-}) {
-  
+  professionalMode = false,
+}) {  
 
 function getDominicanNow() {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -181,40 +182,42 @@ function isPastAppointment(appointment) {
       <div className="mb-4 flex flex-wrap gap-3 items-center">
 
         {/* Barber / Provider Filter */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {isBarberBusiness
-              ? lang === "es"
-                ? "Barbero"
-                : "Barber"
-              : lang === "es"
-              ? "Profesional"
-              : "Provider"}
-          </label>
 
-          <select
-            className="border rounded px-2 py-1 text-sm"
-            value={filterBarberId}
-            onChange={(e) =>
-              setFilterBarberId(e.target.value)
-            }
-          >
-            <option value="all">
-              {lang === "es" ? "Todos" : "All"}
-            </option>
+{!professionalMode && (
+  <div>
+    <label className="block text-sm font-medium mb-1">
+      {isBarberBusiness
+        ? lang === "es"
+          ? "Barbero"
+          : "Barber"
+        : lang === "es"
+        ? "Profesional"
+        : "Provider"}
+    </label>
 
-            {Object.entries(
-              isBarberBusiness
-                ? barberMap
-                : providerMap
-            ).map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
+    <select
+      className="border rounded px-2 py-1 text-sm"
+      value={filterBarberId}
+      onChange={(e) =>
+        setFilterBarberId(e.target.value)
+      }
+    >
+      <option value="all">
+        {lang === "es" ? "Todos" : "All"}
+      </option>
 
+      {Object.entries(
+        isBarberBusiness
+          ? barberMap
+          : providerMap
+      ).map(([id, name]) => (
+        <option key={id} value={id}>
+          {name}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
         {/* Date Filter */}
         <div>
           <label className="block text-sm font-medium mb-1">

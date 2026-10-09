@@ -1,7 +1,3 @@
-
-
-
-   
 "use client";
 
 import { useEffect, useState } from "react";
@@ -40,6 +36,7 @@ export default function BusinessDashboard() {
 const [business, setBusiness] = useState(null);
 const [barbers, setBarbers] = useState([]);
 const [providers, setProviders] = useState([]);
+const [grantingProviderAccessId, setGrantingProviderAccessId] = useState(null);
 const [services, setServices] = useState([]);
 const [appointments, setAppointments] = useState([]);
 const [customers, setCustomers] = useState([]);
@@ -766,6 +763,231 @@ async function addProvider() {
       : "Provider added"
   );
 }
+
+// --------------------------------------------------
+// GIVE PROVIDER ACCESS TO PROFESSIONAL DASHBOARD
+// --------------------------------------------------
+async function grantProviderAccess(provider) {
+  if (!provider?.id) return;
+
+  if (!provider.email?.trim()) {
+    showToast(
+      lang === "es"
+        ? "Agrega un correo electrónico al profesional antes de darle acceso."
+        : "Add an email address to the provider before giving access."
+    );
+    return;
+  }
+
+  const confirmed = window.confirm(
+    lang === "es"
+      ? `¿Deseas darle acceso al panel a ${provider.name}?\n\nSe utilizará este correo:\n${provider.email}`
+      : `Do you want to give ${provider.name} dashboard access?\n\nThis email will be used:\n${provider.email}`
+  );
+
+  if (!confirmed) return;
+
+  setGrantingProviderAccessId(provider.id);
+
+  try {
+    // --------------------------------------------------
+    // GET BUSINESS OWNER SESSION
+    // --------------------------------------------------
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error(
+        "Provider access session error:",
+        sessionError
+      );
+
+      showToast(
+        lang === "es"
+          ? "No se pudo verificar tu sesión."
+          : "Could not verify your session."
+      );
+
+      return;
+    }
+
+    if (!session?.access_token) {
+      showToast(
+        lang === "es"
+          ? "Tu sesión expiró. Inicia sesión nuevamente."
+          : "Your session expired. Please sign in again."
+      );
+
+      return;
+    }
+
+    // --------------------------------------------------
+    // CALL SECURE SERVER API
+    // --------------------------------------------------
+    const response = await fetch(
+      "/api/provider/grant-access",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          providerId: provider.id,
+        }),
+      }
+    );
+
+    const result = await response
+      .json()
+      .catch(() => ({}));
+
+    if (!response.ok) {
+  console.error(
+    "Grant provider access error:",
+    result
+  );
+
+  let message =
+    lang === "es"
+      ? "No se pudo dar acceso al profesional."
+      : "Could not give dashboard access to the provider.";
+
+  // --------------------------------------------------
+  // EMAIL ALREADY BELONGS TO A BUSINESS OWNER
+  // --------------------------------------------------
+  if (result?.code === "EMAIL_IS_BUSINESS_OWNER") {
+    message =
+      lang === "es"
+        ? "Este correo ya está siendo utilizado por el dueño de otro negocio en FlowPayDR. Usa un correo diferente para este profesional."
+        : "This email is already being used by another FlowPayDR business owner. Use a different email for this professional.";
+  }
+
+  // --------------------------------------------------
+  // SAME BUSINESS OWNER EMAIL
+  // --------------------------------------------------
+  else if (result?.code === "OWNER_EMAIL_NOT_ALLOWED") {
+    message =
+      lang === "es"
+        ? "Este correo pertenece al dueño de este negocio. Usa un correo diferente para este profesional."
+        : "This email belongs to this business owner. Use a different email for this professional.";
+  }
+
+  // --------------------------------------------------
+  // EMAIL ALREADY CONNECTED TO ANOTHER PROFESSIONAL
+  // --------------------------------------------------
+  else if (result?.code === "EMAIL_IS_OTHER_PROVIDER") {
+    message =
+      lang === "es"
+        ? "Este correo ya está conectado al panel de otro profesional. Usa un correo diferente."
+        : "This email is already connected to another professional dashboard. Use a different email.";
+  }
+
+  // --------------------------------------------------
+  // PROVIDER DOES NOT HAVE EMAIL
+  // --------------------------------------------------
+  else if (result?.code === "PROVIDER_EMAIL_REQUIRED") {
+    message =
+      lang === "es"
+        ? "Agrega un correo electrónico al profesional antes de darle acceso al panel."
+        : "Add an email address to the professional before giving dashboard access.";
+  }
+
+  // --------------------------------------------------
+  // SESSION / AUTHORIZATION
+  // --------------------------------------------------
+  else if (
+    result?.code === "UNAUTHORIZED" ||
+    result?.code === "FORBIDDEN"
+  ) {
+    message =
+      lang === "es"
+        ? "No se pudo verificar tu acceso. Inicia sesión nuevamente e inténtalo otra vez."
+        : "Your access could not be verified. Sign in again and try again.";
+  }
+
+  // --------------------------------------------------
+  // INVITATION ERROR
+  // --------------------------------------------------
+  else if (result?.code === "INVITATION_ERROR") {
+    message =
+      lang === "es"
+        ? "No se pudo enviar la invitación. Verifica el correo electrónico e inténtalo nuevamente."
+        : "The invitation could not be sent. Check the email address and try again.";
+  }
+
+  // --------------------------------------------------
+  // GENERAL ERROR
+  // --------------------------------------------------
+  else {
+    message =
+      lang === "es"
+        ? "No se pudo dar acceso al profesional. Verifica la información e inténtalo nuevamente."
+        : result?.error ||
+          "Could not give dashboard access to the provider.";
+  }
+
+  showToast(message);
+  return;
+}    await loadDashboard();
+
+    // --------------------------------------------------
+    // RESULT MESSAGE
+    // --------------------------------------------------
+    if (result.alreadyActive) {
+      showToast(
+        lang === "es"
+          ? "Este profesional ya tiene acceso al panel."
+          : "This professional already has dashboard access."
+      );
+
+      return;
+    }
+
+    if (result.existingAccount) {
+      showToast(
+        lang === "es"
+          ? "La cuenta existente fue conectada al panel del profesional."
+          : "The existing account was connected to the professional dashboard."
+      );
+
+      return;
+    }
+
+    if (result.invited) {
+      showToast(
+        lang === "es"
+          ? `Invitación enviada a ${provider.email}.`
+          : `Invitation sent to ${provider.email}.`
+      );
+
+      return;
+    }
+
+    showToast(
+      lang === "es"
+        ? "Acceso al panel preparado correctamente."
+        : "Dashboard access prepared successfully."
+    );
+  } catch (error) {
+    console.error(
+      "Grant provider access request error:",
+      error
+    );
+
+    showToast(
+      lang === "es"
+        ? "Ocurrió un error al preparar el acceso."
+        : "An error occurred while preparing access."
+    );
+  } finally {
+    setGrantingProviderAccessId(null);
+  }
+}
+
+
 // PROVIDER PROFILE PHOTO
 async function uploadProviderPhoto(provider, file) {
   if (!provider?.id || !file) return;
@@ -2505,8 +2727,11 @@ if (!accessGranted) {
   cancelEditProvider={cancelEditProvider}
   updateProvider={updateProvider}
   deleteProvider={deleteProvider}
+
+  grantProviderAccess={grantProviderAccess}
+  grantingProviderAccessId={grantingProviderAccessId}
 />
-   
+
 {/* PROVIDER AVAILABILITY + BLOCKS — NOT USED FOR TOURS */}
 {!isTourBusiness && (
   <>
@@ -2858,4 +3083,5 @@ if (!accessGranted) {
 }
 
  
+
 

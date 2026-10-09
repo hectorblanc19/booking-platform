@@ -119,19 +119,18 @@ console.log(
           return;
         }
 
-        if (!providerData) {
-          if (!mounted) return;
+       if (!providerData) {
+  if (!mounted) return;
 
-          setMessage(
-            lang === "es"
-              ? "Esta cuenta no está conectada a un profesional de FlowPayDR."
-              : "This account is not connected to a FlowPayDR professional."
-          );
+  setMessage(
+    lang === "es"
+      ? `Esta cuenta no está conectada a un profesional de FlowPayDR. Cuenta detectada: ${currentUser.email || "sin correo"}`
+      : `This account is not connected to a FlowPayDR professional. Detected account: ${currentUser.email || "no email"}`
+  );
 
-          setLoading(false);
-          return;
-        }
-
+  setLoading(false);
+  return;
+}
         if (!providerData.dashboard_access) {
           if (!mounted) return;
 

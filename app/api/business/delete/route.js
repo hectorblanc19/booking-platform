@@ -211,30 +211,6 @@ export async function POST(req) {
     }
 
     // --------------------------------------------------
-    // KEEP BARBER FLOW SEPARATE
-    // --------------------------------------------------
-    const normalizedCategory = String(
-      business.category || ""
-    )
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
-
-    const isBarberBusiness =
-      normalizedCategory.includes("barber") ||
-      normalizedCategory.includes("barbero");
-
-    if (isBarberBusiness) {
-      return NextResponse.json(
-        {
-          error:
-            "Barber businesses must use the existing barber deletion flow.",
-        },
-        { status: 400 }
-      );
-    }
-
-    // --------------------------------------------------
     // GET PROVIDERS BEFORE DELETING
     // --------------------------------------------------
     const {

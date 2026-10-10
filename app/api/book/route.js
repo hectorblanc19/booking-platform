@@ -501,11 +501,27 @@ const {
       .select()
       .single();
 
-    // =========================================================
+       // =========================================================
     // 8. IDEMPOTENCY / UNIQUE-CONSTRAINT HANDLING
     // =========================================================
 
     if (insertError) {
+      // Database safeguard: reject bookings during blocked hours.
+      if (
+        insertError.code === "23514" &&
+        insertError.message?.includes("PROVIDER_BLOCKED")
+      ) {
+        return json(
+          {
+            success: false,
+            code: "PROVIDER_BLOCKED",
+            error: "Provider unavailable at this time",
+          },
+          409
+        );
+      }
+
+      // Keep existing duplicate-booking protection.
       if (insertError.code === "23505") {
         const { data: sameRequest } = await supabase
           .from("appointments")
@@ -716,4 +732,4 @@ const {
       500
     );
   }
-}
+}           

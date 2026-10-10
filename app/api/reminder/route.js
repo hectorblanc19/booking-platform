@@ -196,15 +196,14 @@ function wasBookedLateForTomorrow(
 }
 
 // ======================================================
-// ⭐ APPROVED WHATSAPP TEMPLATES
+// APPROVED WHATSAPP REMINDER TEMPLATES
 // ======================================================
 
 const WHATSAPP_TEMPLATE_ES =
-  "HXfe4159fcb4b427cbddec12ba00fb878a";
+  "HXecfb5c21f463bcf8007b2e6a297899d4";
 
 const WHATSAPP_TEMPLATE_EN =
-  "HX37e32987ffc5518dea06b2dd66609aee";
-
+  "HX7ba6d506ea51a79929efa5dbce6ada9f";
 // Tour reminder templates
 const WHATSAPP_TOUR_TEMPLATE_ES =
   "HXf03b16c0d65da7eb24a9a6852b4b20bc";
@@ -1067,33 +1066,58 @@ export async function GET(req) {
                     : "EN",
               }
             );
-          } else {
-            // Existing barber/provider reminder
-            contentSid =
-              isSpanish
-                ? WHATSAPP_TEMPLATE_ES
-                : WHATSAPP_TEMPLATE_EN;
+
+                    } else {
+            // ----------------------------------------------
+            // BARBER / PROVIDER WHATSAPP REMINDER
+            // Spanish and English - 5 variables
+            // ----------------------------------------------
+
+            if (!businessName) {
+              throw new Error(
+                `Appointment ${appt.id} is missing a business name`
+              );
+            }
+
+            contentSid = isSpanish
+              ? WHATSAPP_TEMPLATE_ES
+              : WHATSAPP_TEMPLATE_EN;
 
             variables = {
+              // Customer name
               "1":
                 appt.customer_name ||
-                "Cliente",
+                (isSpanish ? "Cliente" : "Customer"),
 
+              // Appointment date
               "2":
+                formatWhatsAppDate(tomorrowDate),
+
+              // Business name
+              "3":
+                businessName,
+
+              // Professional name
+              "4":
                 professionalName,
 
-              "3":
-                formatWhatsAppDate(
-                  tomorrowDate
-                ),
-
-              "4":
-                formatWhatsAppTime(
-                  appt.time
-                ),
+              // Appointment time
+              "5":
+                formatWhatsAppTime(appt.time),
             };
-          }
 
+            console.log(
+              "📅 Provider WhatsApp reminder:",
+              {
+                appointmentId: appt.id,
+                businessName,
+                professionalName,
+                date: tomorrowDate,
+                time: appt.time,
+                language: isSpanish ? "ES" : "EN",
+              }
+            );
+          }
           // ----------------------------------------------
           // SEND WHATSAPP
           // ----------------------------------------------

@@ -546,63 +546,130 @@ We look forward to seeing you! 😊
 Automated reminder from FlowPayDR Booking.`;
 
 
-          // ----------------------------------------------
-          // EMAIL
-          // ----------------------------------------------
+// ----------------------------------------------
+// FLOWPAYDR BRANDED HTML EMAIL
+// ----------------------------------------------
 
-          let emailSent =
-            false;
+const escapeEmailHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[char]);
 
-          if (
-            appt.customer_email
-          ) {
-            try {
-              const {
-                error:
-                  emailError,
-              } =
-                await resend.emails.send(
-                  {
-                    from:
-                      "FlowPayDR <info@flowpaydr.com>",
-                    to:
-                      appt.customer_email,
-                    subject,
-                   text: emailMessage,
-                  }
-                );
+const emailHtml = `
+<!DOCTYPE html>
+<html lang="${isSpanish ? "es" : "en"}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0;padding:24px 12px;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#171717;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+    style="width:100%;max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:14px;">
+    <tr>
+      <td align="center" style="background-color:#101010;padding:24px;border-radius:14px 14px 0 0;">
+        <img
+          src="https://www.flowpaydr.com/FlowPayDR%20Booking%20Gold%20Logo.png"
+          alt="FlowPayDR Booking"
+          width="190"
+          style="display:block;width:190px;max-width:100%;height:auto;border:0;"
+        >
+      </td>
+    </tr>
 
-              if (
-                emailError
-              ) {
-                console.error(
-                  "❌ Email reminder error:",
-                  emailError
-                );
-              } else {
-                emailSent =
-                  true;
+    <tr>
+      <td style="padding:30px 26px;">
+        <h1 style="font-size:24px;margin:0 0 20px;color:#171717;">
+          ${isSpanish ? "Recordatorio de tu cita" : "Appointment Reminder"}
+        </h1>
 
-                console.log(
-                  "📧 Email reminder sent to:",
-                  appt.customer_email
-                );
-              }
-            } catch (
-              emailErr
-            ) {
-              console.error(
-                "❌ Email exception:",
-                emailErr
-              );
-            }
-          } else {
-            console.log(
-              "ℹ️ No email for appointment:",
-              appt.id
-            );
-          }
+        <p style="font-size:16px;line-height:1.6;">
+          ${isSpanish ? "Hola" : "Hello"} ${escapeEmailHtml(customerName)},
+        </p>
 
+        <p style="font-size:15px;line-height:1.7;color:#444444;">
+          ${isSpanish
+            ? "Te recordamos que tienes una cita programada para hoy."
+            : "This is a reminder that you have an appointment scheduled for today."}
+        </p>
+
+        <table role="presentation" cellpadding="10" cellspacing="0" border="0"
+          style="width:100%;background-color:#f7f7f7;border-radius:8px;font-size:14px;">
+          <tr>
+            <td><strong>${isSpanish ? "Negocio" : "Business"}</strong></td>
+            <td>${escapeEmailHtml(emailBusinessName || "FlowPayDR Booking")}</td>
+          </tr>
+          <tr>
+            <td><strong>${isSpanish ? "Profesional" : "Professional"}</strong></td>
+            <td>${escapeEmailHtml(professionalName)}</td>
+          </tr>
+          <tr>
+            <td><strong>${isSpanish ? "Fecha" : "Date"}</strong></td>
+            <td>${escapeEmailHtml(appointmentDateFormatted)}</td>
+          </tr>
+          <tr>
+            <td><strong>${isSpanish ? "Hora" : "Time"}</strong></td>
+            <td>${escapeEmailHtml(formattedTime)}</td>
+          </tr>
+        </table>
+
+        <p style="font-size:16px;margin-top:26px;">
+          ${isSpanish ? "¡Te esperamos!" : "We look forward to seeing you!"}
+        </p>
+      </td>
+    </tr>
+
+    <tr>
+      <td align="center" style="padding:18px;background-color:#f7f7f7;border-radius:0 0 14px 14px;font-size:12px;color:#777777;">
+        ${isSpanish
+          ? "Recordatorio automático de FlowPayDR Booking."
+          : "Automated reminder from FlowPayDR Booking."}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+let emailSent = false;
+
+if (appt.customer_email) {
+  try {
+    const { error: emailError } = await resend.emails.send({
+      from: "FlowPayDR <info@flowpaydr.com>",
+      to: appt.customer_email,
+     subject,
+     text: emailMessage,
+     html: emailHtml,
+      });
+
+    if (emailError) {
+      console.error(
+        "❌ Email reminder error:",
+        emailError
+      );
+    } else {
+      emailSent = true;
+
+      console.log(
+        "📧 Email reminder sent to:",
+        appt.customer_email
+      );
+    }
+  } catch (emailErr) {
+    console.error(
+      "❌ Email reminder exception:",
+      emailErr
+    );
+  }
+} else {
+  console.log(
+    "ℹ️ No email for appointment:",
+    appt.id
+  );
+}
           // ----------------------------------------------
           // PUSH
           // ----------------------------------------------

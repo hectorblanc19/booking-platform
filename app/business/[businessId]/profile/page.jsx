@@ -186,6 +186,57 @@ export default function BusinessProfilePage() {
     );
   }
 
+// ==================================================
+// BLOCKED BUSINESS SCREEN — ES / EN
+// ==================================================
+if (business?.is_blocked === true) {
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+      <div className="bg-white shadow-lg rounded-2xl p-8 max-w-md w-full text-center">
+
+        <div className="flex justify-center gap-3 mb-6">
+          <button
+            onClick={() => setLang("es")}
+            className={`px-4 py-2 rounded-lg text-sm ${
+              lang === "es"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            Español
+          </button>
+
+          <button
+            onClick={() => setLang("en")}
+            className={`px-4 py-2 rounded-lg text-sm ${
+              lang === "en"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            English
+          </button>
+        </div>
+
+        <h1 className="text-xl font-bold text-gray-900 mb-4">
+          {business.name || "FlowPayDR Booking"}
+        </h1>
+
+        <p className="text-gray-700 text-base">
+          {lang === "es"
+            ? "Esta página no está disponible temporalmente. Por favor, comuníquese con la administración."
+            : "This page is temporarily unavailable. Please contact administration."}
+        </p>
+
+        <p className="text-xs text-gray-400 mt-6">
+          FlowPayDR Booking
+        </p>
+      </div>
+    </div>
+  );
+}
+
+
   // ==================================================
   // PAGE NOT AVAILABLE
   // ==================================================

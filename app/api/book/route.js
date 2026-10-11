@@ -169,65 +169,74 @@ export async function POST(req) {
 
     let providerInfo = null;
 
-    // =========================================================
-    // 4. NEW BUSINESS / PROVIDER BOOKING
-    // =========================================================
+ // =========================================================
+// 4. NEW BUSINESS / PROVIDER BOOKING
+// =========================================================
 
-    if (isProviderBooking) {
-      // Verify business exists
-      const {
-        data: businessInfo,
-        error: businessError,
-      } = await supabase
-        .from("businesses")
-        .select("id, name")
-        .eq("id", resolvedBusinessId)
-        .maybeSingle();
+if (isProviderBooking) {
+  // Verify business exists and check blocked status
+  const {
+    data: businessInfo,
+    error: businessError,
+  } = await supabase
+    .from("businesses")
+    .select("id, name, is_blocked")
+    .eq("id", resolvedBusinessId)
+    .maybeSingle();
 
-      if (businessError || !businessInfo) {
-        console.error(
-          "Business lookup failed:",
-          businessError
-        );
+  if (businessError || !businessInfo) {
+    console.error("Business lookup failed:", businessError);
 
-        return json(
-          {
-            success: false,
-            code: "BUSINESS_NOT_FOUND",
-            error: "Business not found",
-          },
-          404
-        );
-      }
+    return json(
+      {
+        success: false,
+        code: "BUSINESS_NOT_FOUND",
+        error: "Business not found",
+      },
+      404
+    );
+  }
 
-      // Verify provider belongs to this business
-      const {
-        data: foundProvider,
-        error: providerError,
-      } = await supabase
-        .from("providers")
-        .select("id, name, email, business_id")
-        .eq("id", provider_id)
-        .eq("business_id", resolvedBusinessId)
-        .maybeSingle();
+  // Prevent bookings for blocked businesses
+  if (businessInfo.is_blocked === true) {
+    return json(
+      {
+        success: false,
+        code: "BUSINESS_BLOCKED",
+        error:
+          lang === "en"
+            ? "This page is temporarily unavailable. Please contact administration."
+            : "Esta página no está disponible temporalmente. Por favor, comuníquese con la administración.",
+      },
+      403
+    );
+  }
 
-      if (providerError || !foundProvider) {
-        console.error(
-          "Provider lookup failed:",
-          providerError
-        );
+  // Verify provider belongs to this business
+  const {
+    data: foundProvider,
+    error: providerError,
+  } = await supabase
+    .from("providers")
+    .select("id, name, email, business_id")
+    .eq("id", provider_id)
+    .eq("business_id", resolvedBusinessId)
+    .maybeSingle();
 
-        return json(
-          {
-            success: false,
-            code: "PROVIDER_NOT_FOUND",
-            error: "Provider not found",
-          },
-          404
-        );
-      }
+  if (providerError || !foundProvider) {
+    console.error("Provider lookup failed:", providerError);
 
-      providerInfo = foundProvider;
+    return json(
+      {
+        success: false,
+        code: "PROVIDER_NOT_FOUND",
+        error: "Provider not found",
+      },
+      404
+    );
+  }
+
+  providerInfo = foundProvider;
 
   // Verify service belongs to business and is available
 // either for this provider specifically or for all providers.

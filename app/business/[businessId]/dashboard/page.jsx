@@ -199,26 +199,32 @@ async function checkBusinessAccess() {
   // --------------------------------------------------
   // 2. NOT ADMIN — CHECK BUSINESS OWNER
   // --------------------------------------------------
-  const { data: ownedBusiness, error: ownerError } = await supabase
-    .from("businesses")
-    .select("id")
-    .eq("id", businessId)
-    .eq("owner_id", user.id)
-    .maybeSingle();
+ const { data: ownedBusiness, error: ownerError } = await supabase
+  .from("businesses")
+  .select("id, is_blocked")
+  .eq("id", businessId)
+  .eq("owner_id", user.id)
+  .maybeSingle();
 
   if (ownerError) {
     console.error("Business owner access check error:", ownerError);
   }
 
   if (ownedBusiness) {
-    setIsFlowPayAdmin(false);
-    setAccessGranted(true);
-    setCheckingAuth(false);
+  setIsFlowPayAdmin(false);
 
-    await loadDashboard();
+  if (ownedBusiness.is_blocked === true) {
+    setAccessGranted(false);
+    setCheckingAuth(false);
     return;
   }
 
+  setAccessGranted(true);
+  setCheckingAuth(false);
+
+  await loadDashboard();
+  return;
+}
   // --------------------------------------------------
   // 3. NEITHER ADMIN NOR OWNER
   // --------------------------------------------------
@@ -3083,5 +3089,4 @@ if (!accessGranted) {
 }
 
  
-
 

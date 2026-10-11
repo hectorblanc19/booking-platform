@@ -188,6 +188,37 @@ async function loadAll() {
     showMessage("success", "Barber deleted");
     loadAll();
   }
+
+// ==========================================
+// BUSINESS BLOCK / UNBLOCK
+// ==========================================
+
+async function toggleBusinessBlock(id, currentlyBlocked) {
+  const action = currentlyBlocked ? "unblock" : "block";
+
+  if (!window.confirm(`Are you sure you want to ${action} this business?`)) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("businesses")
+    .update({ is_blocked: !currentlyBlocked })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error changing business block status:", error);
+    showMessage("error", error.message);
+    return;
+  }
+
+  showMessage(
+    "success",
+    currentlyBlocked ? "Business unblocked" : "Business blocked"
+  );
+
+  await loadAll();
+}
+
   // ⭐ Block Barber
   async function blockBarber(id) {
     const { error } = await supabase
@@ -399,37 +430,51 @@ if (loading) return <p className="p-6">Loading admin panel...</p>;
           </p>
         )}
       </div>
-      {/* ⭐ EDIT + MANAGE + DELETE BUTTONS */}
-      <div className="flex gap-3">
-        <button
-          className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
-          onClick={() => setEditingBusiness(b)}
-        >
-          Edit
-        </button>
-        <button
-          className="bg-purple-600 text-white px-3 py-1 rounded text-xs"
-          onClick={() => {
-            window.location.href = `/business/${b.id}/dashboard?admin=1`;
-          }}
-        >
-          Manage
-        </button>
-        <button
-          className="text-red-600 text-sm"
-          onClick={() => deleteBusiness(b.id)}
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  ))}
-  {filteredBusinesses.length === 0 && (
-    <p className="text-xs text-gray-500">No businesses found.</p>
-  )}
+
+      {/* ⭐ EDIT + MANAGE + BLOCK + DELETE BUTTONS */}
+<div className="flex gap-3">
+  <button
+    className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+    onClick={() => setEditingBusiness(b)}
+  >
+    Edit
+  </button>
+
+  <button
+    className="bg-purple-600 text-white px-3 py-1 rounded text-xs"
+    onClick={() => {
+      window.location.href = `/business/${b.id}/dashboard?admin=1`;
+    }}
+  >
+    Manage
+  </button>
+
+  {/* BUSINESS BLOCK / UNBLOCK */}
+  <button
+    className={`px-3 py-1 rounded text-xs text-white ${
+      b.is_blocked ? "bg-green-600" : "bg-red-600"
+    }`}
+    onClick={() => toggleBusinessBlock(b.id, b.is_blocked)}
+  >
+    {b.is_blocked ? "Unblock" : "Block"}
+  </button>
+
+  <button
+    className="text-red-600 text-sm"
+    onClick={() => deleteBusiness(b.id)}
+  >
+    Delete
+  </button>
 </div>
-      </section>
-      {/* ⭐ BARBERS SECTION ⭐ */}
+</div>
+))}
+{filteredBusinesses.length === 0 && (
+  <p className="text-xs text-gray-500">No businesses found.</p>
+)}
+</div>
+</section>
+
+{/* ⭐ BARBERS SECTION ⭐ */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Barbers</h2>

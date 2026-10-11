@@ -8,9 +8,9 @@ export default function HomeClient() {
       brand: "FLOWPAYDR BOOKING",
       badge: "Reservas online para negocios y profesionales",
       title: "Tu agenda trabajando,",
-      title2: "incluso cuando tú no estás.",
+      title2: "incluso cuando tÃº no estÃ¡s.",
       subtitle:
-        "Tus clientes reservan online. Tú administras citas, clientes, servicios, horarios y tu equipo desde un solo lugar.",
+        "Tus clientes reservan online. TÃº administras citas, clientes, servicios, horarios y tu equipo desde un solo lugar.",
       book: "Reservar una Cita",
       businessDashboard: "Panel de Negocio",
       barberDashboard: "Panel de Barbero",
@@ -18,7 +18,7 @@ export default function HomeClient() {
       productTitle: "Todo tu negocio,",
       productTitle2: "en un solo lugar.",
       productText:
-        "Una agenda clara para saber qué sigue, quién atiende y cómo va tu día sin depender de mensajes y libretas.",
+        "Una agenda clara para saber quÃ© sigue, quiÃ©n atiende y cÃ³mo va tu dÃ­a sin depender de mensajes y libretas.",
       today: "Citas de hoy",
       calendar: "Calendario",
       customers: "Clientes",
@@ -28,76 +28,76 @@ export default function HomeClient() {
       noShow: "No Show",
       qrTitle: "QR para Reservar",
       qrText:
-        "Comparte tu QR y permite que tus clientes reserven fácilmente.",
+        "Comparte tu QR y permite que tus clientes reserven fÃ¡cilmente.",
       teamTitle: "Tu equipo",
       teamText:
         "Administra barberos y profesionales desde tu panel.",
-      customerTitle: "¿Buscas reservar una cita?",
+      customerTitle: "Â¿Buscas reservar una cita?",
       customerText:
         "Encuentra un negocio o profesional, selecciona tu servicio, fecha y horario disponible.",
-      customerButton: "Buscar dónde reservar",
-      businessTitle: "¿Tienes un negocio?",
+      customerButton: "Buscar dÃ³nde reservar",
+      businessTitle: "Â¿Tienes un negocio?",
       businessText:
         "Comienza a organizar tus citas, clientes, servicios, horarios y profesionales con FlowPayDR Booking.",
       businessRegister: "Registrar Negocio",
-      businessRegisterSub: "Barbería, salón, uñas, spa y más",
+      businessRegisterSub: "BarberÃ­a, salÃ³n, uÃ±as, spa y mÃ¡s",
       barberRegister: "Soy Barbero",
       barberRegisterSub: "Crear mi perfil profesional",
-      whyEyebrow: "HERRAMIENTAS PARA TU DÍA A DÍA",
+      whyEyebrow: "HERRAMIENTAS PARA TU DÃA A DÃA",
       whyTitle: "Menos tiempo organizando.",
-      whyTitle2: "Más tiempo atendiendo.",
+      whyTitle2: "MÃ¡s tiempo atendiendo.",
       feature1Title: "Reservas 24/7",
       feature1Text:
-        "Tus clientes pueden reservar desde su teléfono cuando les resulte conveniente.",
+        "Tus clientes pueden reservar desde su telÃ©fono cuando les resulte conveniente.",
       feature2Title: "Confirmaciones y recordatorios",
       feature2Text:
-        "Mantén a tus clientes informados sobre sus próximas citas.",
+        "MantÃ©n a tus clientes informados sobre sus prÃ³ximas citas.",
       feature3Title: "Clientes e historial",
       feature3Text:
-        "Consulta la información y el historial de citas de tus clientes.",
+        "Consulta la informaciÃ³n y el historial de citas de tus clientes.",
       feature4Title: "Tu equipo",
       feature4Text:
         "Administra los profesionales de tu negocio y sus citas desde un mismo lugar.",
       feature5Title: "Servicios y horarios",
       feature5Text:
-        "Configura servicios, disponibilidad, días de trabajo y horarios.",
-      feature6Title: "Ubicación",
+        "Configura servicios, disponibilidad, dÃ­as de trabajo y horarios.",
+      feature6Title: "UbicaciÃ³n",
       feature6Text:
         "Ayuda a tus clientes a encontrar tu negocio con Google Maps y Waze.",
       categoriesEyebrow: "HECHO PARA DIFERENTES NEGOCIOS",
-      categoriesTitle: "¿Cuál es tu negocio?",
+      categoriesTitle: "Â¿CuÃ¡l es tu negocio?",
       categoriesText:
         "FlowPayDR se adapta a negocios y profesionales que trabajan con reservas.",
-      catBarbershop: "Barberías",
+      catBarbershop: "BarberÃ­as",
       catBarber: "Barberos",
-      catNails: "Uñas",
+      catNails: "UÃ±as",
       catSalon: "Salones",
       catSpa: "Spas",
       catVet: "Veterinarios",
-      catClinic: "Clínicas",
+      catClinic: "ClÃ­nicas",
       catCarWash: "Car Wash",
-      howEyebrow: "EMPIEZA FÁCIL",
+      howEyebrow: "EMPIEZA FÃCIL",
       howTitle: "De tu negocio a recibir reservas.",
       howText:
         "Configura tu cuenta, comparte tu enlace y deja que tus clientes reserven.",
       step1: "Registra tu negocio",
       step1Text:
-        "Crea tu cuenta y agrega la información principal de tu negocio.",
+        "Crea tu cuenta y agrega la informaciÃ³n principal de tu negocio.",
       step2: "Configura tus servicios",
       step2Text:
         "Agrega tus servicios, horarios y los profesionales de tu equipo.",
       step3: "Comparte tu enlace o QR",
       step3Text:
-        "Tus clientes pueden entrar directamente a tu página de reservas.",
+        "Tus clientes pueden entrar directamente a tu pÃ¡gina de reservas.",
       step4: "Recibe tus reservas",
       step4Text:
         "Las nuevas citas quedan organizadas en tu panel.",
       finalEyebrow: "FLOWPAYDR BOOKING",
       finalTitle: "Tu negocio sigue recibiendo",
-      finalTitle2: "reservas mientras tú trabajas.",
+      finalTitle2: "reservas mientras tÃº trabajas.",
       finalText:
-        "Dale a tus clientes una forma sencilla de reservar y mantén tu agenda organizada.",
-      footerText: "Reservas fáciles para clientes y negocios.",
+        "Dale a tus clientes una forma sencilla de reservar y mantÃ©n tu agenda organizada.",
+      footerText: "Reservas fÃ¡ciles para clientes y negocios.",
       footerMarketplace: "Reservar",
       footerRegister: "Registrar Negocio",
     },
@@ -201,36 +201,35 @@ export default function HomeClient() {
   };
   const tr = t[lang];
   const categories = [
-    { icon: "💈", label: tr.catBarbershop },
-    { icon: "✂️", label: tr.catBarber },
-    { icon: "💅", label: tr.catNails },
-    { icon: "✨", label: tr.catSalon },
-    { icon: "🧖", label: tr.catSpa },
-    { icon: "🐾", label: tr.catVet },
-    { icon: "🩺", label: tr.catClinic },
-    { icon: "🚗", label: tr.catCarWash },
+    { icon: "ðŸ’ˆ", label: tr.catBarbershop },
+    { icon: "âœ‚ï¸", label: tr.catBarber },
+    { icon: "ðŸ’…", label: tr.catNails },
+    { icon: "âœ¨", label: tr.catSalon },
+    { icon: "ðŸ§–", label: tr.catSpa },
+    { icon: "ðŸ¾", label: tr.catVet },
+    { icon: "ðŸ©º", label: tr.catClinic },
+    { icon: "ðŸš—", label: tr.catCarWash },
   ];
   return (
     <main className="min-h-screen bg-white text-gray-950">
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-5 sm:px-6 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center font-black">
-              F
-            </div>
-            <div className="font-black tracking-tight text-lg">
-              FLOWPAYDR
-              <span className="text-gray-400 font-semibold">
-                {" "}BOOKING
-              </span>
-            </div>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/select-business"
-              className="hidden lg:block text-sm font-bold text-gray-600 hover:text-black"
-            >
+
+{/* HEADER */}
+<header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 backdrop-blur">
+  <div className="max-w-7xl mx-auto px-5 sm:px-6 h-20 flex items-center justify-between">
+
+    <Link href="/" className="flex items-center">
+      <img
+        src="/FlowPayDR%20Booking%20Gold%20Logo.png"
+        alt="FlowPayDR Booking"
+        className="h-14 w-auto max-w-[180px] object-contain"
+      />
+    </Link>
+
+    <div className="flex items-center gap-3">
+      <Link
+        href="/select-business"
+        className="hidden lg:block text-sm font-bold text-gray-600 hover:text-black"
+      >
               {tr.book}
             </Link>
             <Link
@@ -293,7 +292,7 @@ export default function HomeClient() {
                 href="/select-business"
                 className="bg-black text-white px-8 py-4 rounded-xl text-base sm:text-lg font-black shadow-lg hover:bg-gray-800 transition"
               >
-                {tr.book} →
+                {tr.book} â†’
               </Link>
               <Link
                 href="/business/login"
@@ -330,8 +329,8 @@ export default function HomeClient() {
                 </p>
                 <h3 className="font-black text-lg sm:text-xl mt-1">
                   {lang === "es"
-                    ? "Panel del Negocio — FlowPayDR"
-                    : "Business Dashboard — FlowPayDR"}
+                    ? "Panel del Negocio â€” FlowPayDR"
+                    : "Business Dashboard â€” FlowPayDR"}
                 </h3>
               </div>
               <div className="flex gap-1.5">
@@ -350,7 +349,7 @@ export default function HomeClient() {
                     </p>
                   </div>
                   <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center text-xl">
-                    📅
+                    ðŸ“…
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -412,12 +411,12 @@ export default function HomeClient() {
               </div>
               <div className="p-5 sm:p-8 bg-gray-50/50">
                 <DashboardStat
-                  icon="👥"
+                  icon="ðŸ‘¥"
                   label={tr.customers}
                   value="24"
                 />
                 <DashboardStat
-                  icon="📅"
+                  icon="ðŸ“…"
                   label={tr.appointments}
                   value="38"
                 />
@@ -446,7 +445,7 @@ export default function HomeClient() {
                   </p>
                 </div>
                 <div className="mt-4 bg-black text-white rounded-2xl p-5">
-                  <div className="text-2xl">💈</div>
+                  <div className="text-2xl">ðŸ’ˆ</div>
                   <h4 className="font-black mt-3">{tr.teamTitle}</h4>
                   <p className="text-sm text-gray-400 mt-2 leading-relaxed">
                     {tr.teamText}
@@ -463,7 +462,7 @@ export default function HomeClient() {
           <div className="grid md:grid-cols-2 gap-6">
             <div className="border border-gray-200 rounded-[28px] p-8 sm:p-10">
               <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl">
-                📅
+                ðŸ“…
               </div>
               <h2 className="text-3xl font-black mt-7">
                 {tr.customerTitle}
@@ -475,12 +474,12 @@ export default function HomeClient() {
                 href="/select-business"
                 className="inline-flex mt-8 bg-black text-white px-6 py-3.5 rounded-xl font-black hover:bg-gray-800 transition"
               >
-                {tr.customerButton} →
+                {tr.customerButton} â†’
               </Link>
             </div>
             <div className="bg-black text-white rounded-[28px] p-8 sm:p-10">
               <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-2xl">
-                💼
+                ðŸ’¼
               </div>
               <h2 className="text-3xl font-black mt-7">
                 {tr.businessTitle}
@@ -494,7 +493,7 @@ export default function HomeClient() {
                   className="bg-white text-black px-5 py-4 rounded-xl text-center hover:bg-gray-100 transition"
                 >
                   <span className="block font-black">
-                    🏢 {tr.businessRegister}
+                    ðŸ¢ {tr.businessRegister}
                   </span>
                   <span className="block text-xs text-gray-500 mt-1 font-semibold">
                     {tr.businessRegisterSub}
@@ -526,32 +525,32 @@ export default function HomeClient() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-12">
             <Feature
-              icon="📅"
+              icon="ðŸ“…"
               title={tr.feature1Title}
               text={tr.feature1Text}
             />
             <Feature
-              icon="🔔"
+              icon="ðŸ””"
               title={tr.feature2Title}
               text={tr.feature2Text}
             />
             <Feature
-              icon="👥"
+              icon="ðŸ‘¥"
               title={tr.feature3Title}
               text={tr.feature3Text}
             />
             <Feature
-              icon="💈"
+              icon="ðŸ’ˆ"
               title={tr.feature4Title}
               text={tr.feature4Text}
             />
             <Feature
-              icon="🕐"
+              icon="ðŸ•"
               title={tr.feature5Title}
               text={tr.feature5Text}
             />
             <Feature
-              icon="📍"
+              icon="ðŸ“"
               title={tr.feature6Title}
               text={tr.feature6Text}
             />
@@ -644,7 +643,7 @@ export default function HomeClient() {
               href="/select-business"
               className="bg-white text-black px-8 py-4 rounded-xl font-black hover:bg-gray-100 transition"
             >
-              {tr.book} →
+              {tr.book} â†’
             </Link>
             <Link
               href="/business/login"
@@ -690,7 +689,7 @@ export default function HomeClient() {
         </div>
         <div className="max-w-7xl mx-auto px-6 pb-8">
           <p className="text-xs text-gray-300">
-            © 2026 FlowPayDR
+            Â© 2026 FlowPayDR
           </p>
         </div>
       </footer>

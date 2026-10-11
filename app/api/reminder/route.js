@@ -492,6 +492,60 @@ export async function GET(req) {
               ? `Recordatorio de Cita (${formattedTime})`
               : `Appointment Reminder (${formattedTime})`;
 
+// ----------------------------------------------
+// PROFESSIONAL EMAIL REMINDER — ES / EN
+// ----------------------------------------------
+
+let emailBusinessName = "";
+
+if (appt.business_id) {
+  const { data: emailBusiness } = await supabase
+    .from("businesses")
+    .select("name")
+    .eq("id", appt.business_id)
+    .maybeSingle();
+
+  emailBusinessName = emailBusiness?.name || "";
+}
+
+const customerName =
+  appt.customer_name?.trim() ||
+  (isSpanish ? "Cliente" : "Customer");
+
+const appointmentDateFormatted = (() => {
+  const [year, month, day] = String(appt.date).split("-");
+  return `${day}/${month}/${year}`;
+})();
+
+const emailMessage = isSpanish
+  ? `Hola ${customerName} 👋
+
+📅 Recordatorio de tu cita
+
+Te recordamos que hoy, ${appointmentDateFormatted}, tienes una cita programada.
+
+🏢 Negocio: ${emailBusinessName || "FlowPayDR Booking"}
+✂️ Profesional: ${professionalName}
+🕘 Hora: ${formattedTime}
+
+¡Te esperamos! 😊
+
+Recordatorio automático de FlowPayDR Booking.`
+  : `Hello ${customerName} 👋
+
+📅 Appointment Reminder
+
+This is a reminder that you have an appointment scheduled for today, ${appointmentDateFormatted}.
+
+🏢 Business: ${emailBusinessName || "FlowPayDR Booking"}
+✂️ Professional: ${professionalName}
+🕘 Time: ${formattedTime}
+
+We look forward to seeing you! 😊
+
+Automated reminder from FlowPayDR Booking.`;
+
+
           // ----------------------------------------------
           // EMAIL
           // ----------------------------------------------
@@ -514,8 +568,7 @@ export async function GET(req) {
                     to:
                       appt.customer_email,
                     subject,
-                    text:
-                      finalMessage,
+                   text: emailMessage,
                   }
                 );
 

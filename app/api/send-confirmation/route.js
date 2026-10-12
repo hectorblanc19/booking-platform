@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToSubscription } from "@/lib/push";
@@ -337,161 +337,78 @@ export async function POST(req) {
       subject: tr.subject,
 
       html: `
-        <div
-          style="
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            max-width: 550px;
-            margin: auto;
-            border-radius: 12px;
-            background: #ffffff;
-            border: 1px solid #eeeeee;
-          "
-        >
+        <div style="background:#f4f5f7;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#171717;">
+          <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;">
 
-          <h2 style="text-align:center;">
-            ${tr.title}
-          </h2>
+            <div style="background:#101010;padding:24px;text-align:center;">
+              <img
+                src="https://www.flowpaydr.com/FlowPayDR%20Booking%20Gold%20Logo.png"
+                alt="FlowPayDR Booking"
+                width="190"
+                style="display:block;width:190px;max-width:100%;height:auto;margin:0 auto;border:0;"
+              />
+            </div>
 
-          <p style="text-align:center;">
-            ${tr.thanks}
-            <strong>
-              ${finalBusinessName}
-            </strong>
-          </p>
+            <div style="padding:30px 26px;">
+              <h2 style="font-size:24px;text-align:center;margin:0 0 18px;">
+                ${tr.title}
+              </h2>
 
-          <h3>
-            ${tr.details}
-          </h3>
+              <p style="text-align:center;font-size:16px;line-height:1.6;">
+                ${tr.thanks}
+                <strong>${finalBusinessName}</strong>
+              </p>
 
-          <p>
-            <strong>
-              ${tr.service}:
-            </strong>
+              <h3 style="font-size:18px;margin-top:28px;">
+                ${tr.details}
+              </h3>
 
-            ${translatedService}
-          </p>
+              <div style="background:#f7f7f7;padding:18px;border-radius:10px;font-size:14px;line-height:1.8;">
+                <p><strong>${tr.service}:</strong> ${translatedService}</p>
 
-          <p>
-            <strong>
+                <p><strong>${
+                  professionalType === "barber"
+                    ? tr.barber
+                    : langCode === "es"
+                    ? "Profesional"
+                    : "Professional"
+                }:</strong> ${professionalInfo?.name || "N/A"}</p>
+
+                <p><strong>${tr.business}:</strong> ${finalBusinessLabel}</p>
+                <p><strong>${tr.address}:</strong> ${finalAddress}</p>
+                <p><strong>${tr.phone}:</strong> ${finalPhone}</p>
+                <p><strong>${tr.date}:</strong> ${date}</p>
+                <p><strong>${tr.time}:</strong> ${formatTime(time)}</p>
+
+                ${tourDetailsHtml}
+              </div>
+
               ${
-                professionalType ===
-                "barber"
-                  ? tr.barber
-                  : langCode === "es"
-                  ? "Profesional"
-                  : "Professional"
-              }:
-            </strong>
+                mapsLink
+                  ? `
+                    <div style="text-align:center;margin-top:24px;">
+                      <a href="${mapsLink}"
+                         style="background:#171717;color:#ffffff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block;font-size:15px;">
+                        ${tr.maps}
+                      </a>
+                    </div>
+                  `
+                  : ""
+              }
 
-            ${
-              professionalInfo?.name ||
-              "N/A"
-            }
-          </p>
+              <div style="text-align:center;margin-top:18px;">
+                <a href="${secret_link}"
+                   style="background:#c99b35;color:#101010;padding:13px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-size:16px;font-weight:bold;">
+                  ${tr.button}
+                </a>
+              </div>
+            </div>
 
-          <p>
-            <strong>
-              ${tr.business}:
-            </strong>
+            <div style="background:#f7f7f7;padding:18px;text-align:center;font-size:12px;color:#777777;">
+              FlowPayDR Booking • info@flowpaydr.com
+            </div>
 
-            ${finalBusinessLabel}
-          </p>
-
-          <p>
-            <strong>
-              ${tr.address}:
-            </strong>
-
-            ${finalAddress}
-          </p>
-
-          <p>
-            <strong>
-              ${tr.phone}:
-            </strong>
-
-            ${finalPhone}
-          </p>
-
-          <p>
-            <strong>
-              ${tr.date}:
-            </strong>
-
-            ${date}
-          </p>
-
-          <p>
-            <strong>
-              ${tr.time}:
-            </strong>
-
-            ${formatTime(time)}
-          </p>
-
-          ${tourDetailsHtml}
-
-          ${
-            mapsLink
-              ? `
-                <div
-                  style="
-                    text-align:center;
-                    margin-top: 20px;
-                  "
-                >
-                  <a
-                    href="${mapsLink}"
-                    style="
-                      background:#10b981;
-                      color:white;
-                      padding:10px 18px;
-                      border-radius:8px;
-                      text-decoration:none;
-                      font-size:15px;
-                      display:inline-block;
-                    "
-                  >
-                    ${tr.maps}
-                  </a>
-                </div>
-              `
-              : ""
-          }
-
-          <div
-            style="
-              text-align:center;
-              margin-top:25px;
-            "
-          >
-            <a
-              href="${secret_link}"
-              style="
-                background:#2563eb;
-                color:white;
-                padding:12px 20px;
-                border-radius:8px;
-                text-decoration:none;
-                font-size:16px;
-                display:inline-block;
-              "
-            >
-              ${tr.button}
-            </a>
           </div>
-
-          <p
-            style="
-              margin-top:30px;
-              font-size:12px;
-              text-align:center;
-              color:#666666;
-            "
-          >
-            FlowPayDR • info@flowpaydr.com
-          </p>
         </div>
       `,
     });

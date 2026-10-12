@@ -200,10 +200,11 @@ function wasBookedLateForTomorrow(
 // ======================================================
 
 const WHATSAPP_TEMPLATE_ES =
-  "HXecfb5c21f463bcf8007b2e6a297899d4";
+  "HX7d286d27a22d7bc3ee897853fd307bf1";
 
 const WHATSAPP_TEMPLATE_EN =
-  "HX7ba6d506ea51a79929efa5dbce6ada9f";
+  "HX091df12c89d884d6e398e0d4fb826056";
+
 // Tour reminder templates
 const WHATSAPP_TOUR_TEMPLATE_ES =
   "HXf03b16c0d65da7eb24a9a6852b4b20bc";

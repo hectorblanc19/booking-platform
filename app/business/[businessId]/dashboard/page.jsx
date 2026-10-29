@@ -2201,6 +2201,29 @@ if (!accessGranted) {
         </div>
       )}
 
+      {/* BUSINESS LOGOUT BUTTON */}
+      <div className="flex justify-end mb-3">
+        <button
+          type="button"
+          onClick={async () => {
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+              showToast(
+                lang === "es"
+                  ? "No se pudo cerrar sesión."
+                  : "Could not sign out."
+              );
+              return;
+            }
+
+            window.location.replace("/business/login");
+          }}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold"
+        >
+          {lang === "es" ? "Cerrar sesión" : "Log out"}
+        </button>
+      </div>
       {/* LANGUAGE TOGGLE */}
       <div className="flex justify-end mb-4 text-sm font-semibold cursor-pointer">
         <span

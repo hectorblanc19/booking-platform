@@ -42,3 +42,12 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# FlowPayDR backup protection
+*.backup
+*.backup.*
+*.bak
+*.before-*
+*.before-*.bak
+*.backup-*/
+backup-before-*/

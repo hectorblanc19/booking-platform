@@ -33,6 +33,7 @@ export default function BusinessDashboard() {
   const { businessId } = useParams();
 
  const [lang, setLang] = useState("es");
+const [activeTab, setActiveTab] = useState("inicio");
 const [business, setBusiness] = useState(null);
 const [barbers, setBarbers] = useState([]);
 const [providers, setProviders] = useState([]);
@@ -2245,7 +2246,37 @@ if (!accessGranted) {
         {business?.name} — {t[lang].dashboard}
       </h1>
 
+      {/* DASHBOARD 2.0 NAVIGATION */}
+      <nav
+        aria-label={lang === "es" ? "Navegación del panel" : "Dashboard navigation"}
+        className="flex flex-wrap gap-2 mb-8 p-3 bg-white border rounded-xl shadow-sm"
+      >
+        {[
+          { id: "inicio", es: "Inicio", en: "Home", icon: "🏠" },
+          { id: "citas", es: "Citas", en: "Appointments", icon: "📅" },
+          { id: "clientes", es: "Clientes", en: "Customers", icon: "👥" },
+          { id: "profesionales", es: "Profesionales", en: "Professionals", icon: "💈" },
+          { id: "servicios", es: "Servicios", en: "Services", icon: "✂️" },
+          { id: "configuracion", es: "Configuración", en: "Settings", icon: "⚙️" },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setActiveTab(item.id)}
+            aria-current={activeTab === item.id ? "page" : undefined}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              activeTab === item.id
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {item.icon} {lang === "es" ? item.es : item.en}
+          </button>
+        ))}
+      </nav>
+
      {/* BUSINESS INFO */}
+{(activeTab === "inicio" || activeTab === "configuracion") && (
 <section className="mb-12">
   <h2 className="text-2xl font-semibold mb-3">{t[lang].businessInfo}</h2>
 
@@ -2318,9 +2349,10 @@ if (!accessGranted) {
   )}
 </div>  
 </section>
+)}
 
 {/* BUSINESS PROFILE CUSTOMIZATION */}
-{!isBarberBusiness && (
+{(activeTab === "inicio" || activeTab === "configuracion") && !isBarberBusiness && (
   <div className="mb-12">
     <BusinessProfileCustomizer
       businessId={businessId}
@@ -2331,7 +2363,7 @@ if (!accessGranted) {
 )}
 
 {/* BUSINESS STORE HOURS */}
-{!isBarberBusiness && !isTourBusiness && (
+{(activeTab === "inicio" || activeTab === "configuracion") && !isBarberBusiness && !isTourBusiness && (
   <BusinessHours
     businessId={businessId}
     lang={lang}
@@ -2541,7 +2573,8 @@ if (!accessGranted) {
   </section>
 ) : (
   <>
-    <ManualAppointment
+    {(activeTab === "inicio" || activeTab === "citas") && (
+<ManualAppointment
       t={t}
       lang={lang}
       isBarberBusiness={isBarberBusiness}
@@ -2571,18 +2604,21 @@ if (!accessGranted) {
       addAppointment={addAppointment}
       savingAppointment={savingAppointment}
     />
+)}
 
-    <BusinessQRCode
+    {(activeTab === "inicio" || activeTab === "configuracion") && (
+<BusinessQRCode
   t={t}
   lang={lang}
   businessId={businessId}
   isBarberBusiness={isBarberBusiness}
-  /> 
+  />
+)} 
  </>
  )}
 
 {/* BARBERS */}
-{isBarberBusiness && (
+{(activeTab === "inicio" || activeTab === "profesionales") && isBarberBusiness && (
   <BarberManagement
     t={t}
     lang={lang}
@@ -2605,7 +2641,7 @@ if (!accessGranted) {
   />
 )}
 {/* PROVIDERS */}
-{!isBarberBusiness && (
+{(activeTab === "inicio" || activeTab === "profesionales") && !isBarberBusiness && (
   <section className="mb-12">
     <h2 className="text-2xl font-semibold mb-3">
       {lang === "es" ? "Profesionales" : "Providers"}
@@ -2788,7 +2824,7 @@ if (!accessGranted) {
 )}
 
 {/* BUSINESS SERVICES */}
-{!isBarberBusiness && (
+{(activeTab === "inicio" || activeTab === "servicios") && !isBarberBusiness && (
   <BusinessServices
     lang={lang}
     services={services}
@@ -3011,6 +3047,7 @@ if (!accessGranted) {
 )}
 
 {/* TODAY'S SCHEDULE */}
+{(activeTab === "inicio" || activeTab === "citas") && (
 <TodaysSchedule
   t={t}
   lang={lang}
@@ -3019,7 +3056,9 @@ if (!accessGranted) {
   barberMap={barberMap}
   providerMap={providerMap}
 />
+)}
       {/* CALENDAR */}
+{(activeTab === "inicio" || activeTab === "citas") && (
 <CalendarView
   t={t}
   lang={lang}
@@ -3035,13 +3074,17 @@ if (!accessGranted) {
   setSelectedDate={setSelectedDate}
   loadAppointmentsForDate={loadAppointmentsForDate}
 />
+)}
       {/* CUSTOMERS */}
+{(activeTab === "inicio" || activeTab === "clientes") && (
 <CustomerList
   t={t}
   lang={lang}
   customers={customers}
 />
+)}
      {/* ALL APPOINTMENTS */}
+{(activeTab === "inicio" || activeTab === "citas") && (
 <AllAppointments
   t={t}
   lang={lang}
@@ -3062,8 +3105,9 @@ if (!accessGranted) {
   toggleBarberOpen={toggleBarberOpen}
   changeBarberPage={changeBarberPage}
 />
-      {/* CLOSE / DELETE BUSINESS ACCOUNT — GENERIC BUSINESSES ONLY */}
-      {!isBarberBusiness && (
+)}
+      {/* CLOSE / DELETE BUSINESS ACCOUNT - GENERIC BUSINESSES ONLY */}
+      {(activeTab === "inicio" || activeTab === "configuracion") && !isBarberBusiness && (
         <section className="mt-8 border border-red-200 bg-red-50 rounded-xl p-5">
           <h2 className="text-xl font-bold text-red-700 mb-2">
             {lang === "es" ? "Eliminar cuenta" : "Delete Account"}

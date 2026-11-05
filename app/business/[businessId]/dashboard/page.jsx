@@ -17,7 +17,7 @@ import AllAppointments from "@/components/business/AllAppointments";
 import BarberManagement from "@/components/business/BarberManagement";
 import BusinessProfileCustomizer from "@/components/BusinessProfileCustomizer";
 
-/* ⭐ ADD THIS BLOCK RIGHT HERE */
+/* ADD THIS BLOCK RIGHT HERE */
 const serviceLabels = {
   es: ["Corte", "Barba", "Color", "Niños", "Cejas", "Afeitado", "Diseño", "Blowout", "Shape Up"],
   en: ["Haircut", "Beard", "Color", "Kids", "Eyebrows", "Shave", "Design", "Blowout", "Shape Up"]
@@ -27,7 +27,7 @@ const dayLabels = {
   es: ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"],
   en: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 };
-/* ⭐ END OF BLOCK */
+/* END OF BLOCK */
 
 export default function BusinessDashboard() {
   const { businessId } = useParams();
@@ -96,6 +96,7 @@ const [newProviderName, setNewProviderName] = useState("");
 const [newProviderEmail, setNewProviderEmail] = useState("");
 const [newProviderPhone, setNewProviderPhone] = useState("");
 const [newProviderSpecialty, setNewProviderSpecialty] = useState("");
+const [newProviderSpecialtyEn, setNewProviderSpecialtyEn] = useState("");
 
 // EDIT PROVIDER
 const [editingProviderId, setEditingProviderId] = useState(null);
@@ -103,6 +104,7 @@ const [editProviderName, setEditProviderName] = useState("");
 const [editProviderEmail, setEditProviderEmail] = useState("");
 const [editProviderPhone, setEditProviderPhone] = useState("");
 const [editProviderSpecialty, setEditProviderSpecialty] = useState("");
+const [editProviderSpecialtyEn, setEditProviderSpecialtyEn] = useState("");
 const [savingEditProvider, setSavingEditProvider] = useState(false);
 
 // PROVIDER PROFILE PHOTO
@@ -198,7 +200,7 @@ async function checkBusinessAccess() {
   }
 
   // --------------------------------------------------
-  // 2. NOT ADMIN — CHECK BUSINESS OWNER
+  // 2. NOT ADMIN - CHECK BUSINESS OWNER
   // --------------------------------------------------
  const { data: ownedBusiness, error: ownerError } = await supabase
   .from("businesses")
@@ -232,7 +234,7 @@ async function checkBusinessAccess() {
   setAccessGranted(false);
   setCheckingAuth(false);
 }
-/* ⭐ NEW STATE FOR FILTERS + GROUPING + PAGINATION ⭐ */
+/* NEW STATE FOR FILTERS + GROUPING + PAGINATION */
   const [filterBarberId, setFilterBarberId] = useState("all");
   const [filterDate, setFilterDate] = useState("");
   const [filterMonth, setFilterMonth] = useState("all");
@@ -469,31 +471,73 @@ if (serviceError) {
 
 setServices(serviceData || []);
 
-    const { data: appt } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("business_id", businessId)
-      .order("date", { ascending: true })
-      .order("time", { ascending: true });
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+
+    if (sessionError || !sessionData?.session?.access_token) {
+      console.error("Missing business authentication session");
+      setLoading(false);
+      return;
+    }
+
+    const appointmentResponse = await fetch(
+      `/api/business/appointments?businessId=${encodeURIComponent(businessId)}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!appointmentResponse.ok) {
+      console.error(
+        "Business appointments API error:",
+        appointmentResponse.status
+      );
+      setLoading(false);
+      return;
+    }
+
+    const appointmentResult = await appointmentResponse.json();
+    const appt = appointmentResult.appointments || [];
 
     setAppointments(appt || []);
 
     const unique = {};
-    (appt || []).forEach((a) => {
-      if (!unique[a.customer_email]) {
-        unique[a.customer_email] = {
+
+    (appt || []).forEach((a, index) => {
+      const phone = String(a.customer_phone || "").trim();
+      const email = String(a.customer_email || "").trim().toLowerCase();
+
+      // Keep country codes when provided. Do not guess missing codes.
+      const normalizedPhone = phone.replace(/\D/g, "");
+
+      const key = normalizedPhone
+        ? `phone:${normalizedPhone}`
+        : email
+          ? `email:${email}`
+          : `appointment:${a.id || index}`;
+
+      if (!unique[key]) {
+        unique[key] = {
           name: a.customer_name,
           email: a.customer_email,
           phone: a.customer_phone,
           last: a.date,
           count: 1,
+          history: [a],
         };
       } else {
-        unique[a.customer_email].count++;
-        unique[a.customer_email].last = a.date;
+        unique[key].count++;
+        unique[key].history.push(a);
+
+        if (a.date && (!unique[key].last || a.date > unique[key].last)) {
+          unique[key].last = a.date;
+        }
       }
     });
-
     setCustomers(Object.values(unique));
     setLoading(false);
   }
@@ -687,7 +731,8 @@ async function addProvider() {
       name: newProviderName,
       email: newProviderEmail || null,
       phone: newProviderPhone || null,
-      specialty: newProviderSpecialty || null,
+      specialty: newProviderSpecialty.trim() || null,
+      specialty_en: newProviderSpecialtyEn.trim() || null,
     })
     .select("id")
     .single();
@@ -705,7 +750,7 @@ async function addProvider() {
   }
 
   // --------------------------------------------------
-  // FLOWPAYDR ADMIN ALERT — NEW PROVIDER
+  // FLOWPAYDR ADMIN ALERT - NEW PROVIDER
   // --------------------------------------------------
   try {
     const {
@@ -761,6 +806,7 @@ async function addProvider() {
   setNewProviderEmail("");
   setNewProviderPhone("");
   setNewProviderSpecialty("");
+  setNewProviderSpecialtyEn("");
 
   await loadDashboard();
 
@@ -1072,6 +1118,7 @@ function startEditProvider(provider) {
   setEditProviderEmail(provider.email || "");
   setEditProviderPhone(provider.phone || "");
   setEditProviderSpecialty(provider.specialty || "");
+  setEditProviderSpecialtyEn(provider.specialty_en || "");
 }
 
 function cancelEditProvider() {
@@ -1080,6 +1127,7 @@ function cancelEditProvider() {
   setEditProviderEmail("");
   setEditProviderPhone("");
   setEditProviderSpecialty("");
+  setEditProviderSpecialtyEn("");
 }
 
 async function updateProvider() {
@@ -1104,6 +1152,7 @@ async function updateProvider() {
         email: editProviderEmail.trim() || null,
         phone: editProviderPhone.trim() || null,
         specialty: editProviderSpecialty.trim() || null,
+        specialty_en: editProviderSpecialtyEn.trim() || null,
       })
       .eq("id", editingProviderId)
       .eq("business_id", businessId);
@@ -1145,11 +1194,7 @@ async function deleteProvider(provider) {
       .limit(1);
 
   if (appointmentCheckError) {
-    console.error(
-      "Provider appointment check error:",
-      appointmentCheckError
-    );
-
+    console.error("Provider appointment check error:", appointmentCheckError);
     showToast(
       lang === "es"
         ? "No se pudo verificar el historial del profesional."
@@ -1175,38 +1220,83 @@ async function deleteProvider(provider) {
 
   if (!confirmed) return;
 
-  const { error } = await supabase
-    .from("providers")
-    .delete()
-    .eq("id", provider.id)
-    .eq("business_id", businessId);
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
 
-  if (error) {
-    console.error("Delete provider error:", error);
+  const token = sessionData?.session?.access_token;
 
+  if (sessionError || !token) {
+    showToast(
+      lang === "es"
+        ? "Tu sesión expiró. Inicia sesión nuevamente."
+        : "Your session expired. Please sign in again."
+    );
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/provider/delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        businessId,
+        providerId: provider.id,
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        showToast(
+          lang === "es"
+            ? "Tu sesión expiró. Inicia sesión nuevamente."
+            : "Your session expired. Please sign in again."
+        );
+      } else if (response.status === 403) {
+        showToast(
+          lang === "es"
+            ? "No tienes permiso para eliminar este profesional."
+            : "You do not have permission to delete this provider."
+        );
+      } else if (response.status === 409) {
+        showToast(
+          lang === "es"
+            ? "No puedes eliminar este profesional porque tiene historial de citas."
+            : "You cannot delete this provider because they have appointment history."
+        );
+      } else {
+        showToast(
+          lang === "es"
+            ? "No se pudo eliminar el profesional."
+            : "Could not delete provider."
+        );
+      }
+      return;
+    }
+
+    if (selectedAvailabilityProviderId === provider.id) {
+      setSelectedAvailabilityProviderId("");
+      setProviderAvailability([]);
+    }
+
+    await loadDashboard();
+
+    showToast(
+      lang === "es"
+        ? "Profesional eliminado correctamente."
+        : "Provider deleted successfully."
+    );
+  } catch (error) {
+    console.error("Delete provider API error:", error);
     showToast(
       lang === "es"
         ? "No se pudo eliminar el profesional."
         : "Could not delete provider."
     );
-    return;
   }
-
-  if (selectedAvailabilityProviderId === provider.id) {
-    setSelectedAvailabilityProviderId("");
-    setProviderAvailability([]);
-  }
-
-  await loadDashboard();
-
-  showToast(
-    lang === "es"
-      ? "Profesional eliminado correctamente."
-      : "Provider deleted successfully."
-  );
 }
-
-
 // BUSINESS SERVICES
 async function addService() {
   if (!newServiceName.trim()) {
@@ -1842,11 +1932,6 @@ async function addAppointment() {
       serviceDuration = selectedService.duration;
       servicePrice = selectedService.price;
 
-      // If the service belongs to a specific provider,
-      // use that provider automatically.
-      if (selectedService.provider_id) {
-        effectiveProviderId = selectedService.provider_id;
-      }
 
       if (!effectiveProviderId) {
         showToast(
@@ -1859,6 +1944,66 @@ async function addAppointment() {
     }
 
  // --------------------------------------------------
+    if (!isBarberBusiness) {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      const token = sessionData?.session?.access_token;
+
+      if (sessionError || !token) {
+        showToast(
+          lang === "es"
+            ? "Inicia sesión nuevamente."
+            : "Please sign in again."
+        );
+        return;
+      }
+
+      const response = await fetch("/api/business/manual-appointment", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          businessId,
+          serviceId: selectedService.id,
+          providerId: effectiveProviderId,
+          customerName: newAppointmentName,
+          customerPhone: newAppointmentPhone,
+          customerEmail: newAppointmentEmail,
+          date: newAppointmentDate,
+          time: newAppointmentTime,
+          lang,
+        }),
+      });
+
+      if (!response.ok) {
+        showToast(
+          response.status === 409
+            ? lang === "es"
+              ? "Ese horario no está disponible."
+              : "That time is unavailable."
+            : lang === "es"
+              ? "No se pudo crear la cita."
+              : "Could not create appointment."
+        );
+        return;
+      }
+
+      setNewAppointmentName("");
+      setNewAppointmentPhone("");
+      setNewAppointmentEmail("");
+      setNewAppointmentService("");
+      setNewAppointmentDate("");
+      setNewAppointmentTime("");
+      setNewAppointmentBarberId("");
+      setNewAppointmentProviderId("");
+
+      await loadDashboard();
+      showToast(t[lang].appointmentAdded);
+      return;
+    }
 // CHECK APPOINTMENT OVERLAP
 // --------------------------------------------------
 let query = supabase
@@ -1962,6 +2107,7 @@ if (isBarberBusiness) {
     // Only generic businesses use business_services here.
     // This leaves the barber appointment behavior unchanged.
     if (!isBarberBusiness) {
+      appointmentData.secret_link = crypto.randomUUID();
       appointmentData.duration = serviceDuration;
       appointmentData.price = servicePrice;
     }
@@ -2023,14 +2169,45 @@ const providerMap = Object.fromEntries(
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   }
   async function loadAppointmentsForDate(dateStr) {
-    const { data } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("business_id", businessId)
-      .eq("date", dateStr)
-      .order("time", { ascending: true });
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
 
-    setSelectedAppointments(data || []);
+      if (sessionError || !sessionData?.session?.access_token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch(
+        `/api/business/appointments?businessId=${encodeURIComponent(businessId)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Appointment API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      setSelectedAppointments(
+        (result.appointments || []).filter(
+          (appointment) => appointment.date === dateStr
+        )
+      );
+    } catch (error) {
+      console.error("Error loading calendar appointments:", error);
+      setSelectedAppointments([]);
+      alert(
+        lang === "es"
+          ? "No se pudieron cargar las citas del calendario."
+          : "Could not load calendar appointments."
+      );
+    }
   }
 
   function changeMonth(offset) {
@@ -2041,7 +2218,7 @@ const providerMap = Object.fromEntries(
     setSelectedAppointments([]);
   }
 
-  /* ⭐ FILTER + GROUP + PAGINATION LOGIC ⭐ */
+  /* FILTER + GROUP + PAGINATION LOGIC */
 
   const APPOINTMENTS_PER_PAGE = 20;
 
@@ -2174,7 +2351,7 @@ const response = await fetch("/api/business/delete", {
 
 
  if (checkingAuth) {
-  return <p className="p-6 text-center">Checking access…</p>;
+  return <p className="p-6 text-center">Checking access...</p>;
 }
 
 if (!accessGranted) {
@@ -2243,7 +2420,7 @@ if (!accessGranted) {
       </div>
 
       <h1 className="text-3xl font-bold mb-6">
-        {business?.name} — {t[lang].dashboard}
+        {business?.name} - {t[lang].dashboard}
       </h1>
 
       {/* DASHBOARD 2.0 NAVIGATION */}
@@ -2613,7 +2790,7 @@ if (!accessGranted) {
   businessId={businessId}
   isBarberBusiness={isBarberBusiness}
   />
-)} 
+)}
  </>
  )}
 
@@ -2660,9 +2837,16 @@ if (!accessGranted) {
 
         <input
           className="border p-2 rounded"
-          placeholder={lang === "es" ? "Especialidad" : "Specialty"}
+          placeholder={lang === "es" ? "Especialidad (español)" : "Specialty (Spanish)"}
           value={newProviderSpecialty}
           onChange={(e) => setNewProviderSpecialty(e.target.value)}
+        />
+
+        <input
+          className="border p-2 rounded"
+          placeholder={lang === "es" ? "Especialidad (inglés)" : "Specialty (English)"}
+          value={newProviderSpecialtyEn}
+          onChange={(e) => setNewProviderSpecialtyEn(e.target.value)}
         />
 
         <input
@@ -2785,6 +2969,8 @@ if (!accessGranted) {
   setEditProviderPhone={setEditProviderPhone}
   editProviderSpecialty={editProviderSpecialty}
   setEditProviderSpecialty={setEditProviderSpecialty}
+  editProviderSpecialtyEn={editProviderSpecialtyEn}
+  setEditProviderSpecialtyEn={setEditProviderSpecialtyEn}
 
   savingEditProvider={savingEditProvider}
 
@@ -2797,7 +2983,7 @@ if (!accessGranted) {
   grantingProviderAccessId={grantingProviderAccessId}
 />
 
-{/* PROVIDER AVAILABILITY + BLOCKS — NOT USED FOR TOURS */}
+{/* PROVIDER AVAILABILITY + BLOCKS - NOT USED FOR TOURS */}
 {!isTourBusiness && (
   <>
     <ProviderAvailability
@@ -2814,6 +3000,7 @@ if (!accessGranted) {
 
     {selectedAvailabilityProviderId && (
       <ProviderBlockingPanel
+        businessId={businessId}
         providerId={selectedAvailabilityProviderId}
         lang={lang}
       />
@@ -3107,7 +3294,7 @@ if (!accessGranted) {
 />
 )}
       {/* CLOSE / DELETE BUSINESS ACCOUNT - GENERIC BUSINESSES ONLY */}
-      {(activeTab === "inicio" || activeTab === "configuracion") && !isBarberBusiness && (
+      {activeTab === "configuracion" && !isBarberBusiness && (
         <section className="mt-8 border border-red-200 bg-red-50 rounded-xl p-5">
           <h2 className="text-xl font-bold text-red-700 mb-2">
             {lang === "es" ? "Eliminar cuenta" : "Delete Account"}

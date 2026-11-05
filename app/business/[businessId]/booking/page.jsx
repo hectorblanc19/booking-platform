@@ -1290,7 +1290,7 @@ if (business?.is_blocked === true) {
 
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 max-w-xl mx-auto">
+    <div className="min-h-screen bg-gray-100 text-gray-900 p-6 max-w-xl mx-auto" style={{ colorScheme: "light" }}>
 
       {/* LANGUAGE */}
       <div className="flex justify-end mb-4 gap-2">

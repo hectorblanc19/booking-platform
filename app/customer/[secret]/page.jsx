@@ -1,4 +1,5 @@
 "use client";
+import { googleCalendarUrl, downloadAppointmentICS } from "../calendar-utils";
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
@@ -564,6 +565,40 @@ export default function CustomerSecretPage() {
     );
   }
 
+  function calendarDetails() {
+    const service =
+      serviceNames[appointment.service]?.[lang] ||
+      appointment.service;
+
+    const professional =
+      provider?.name || barber?.name || "";
+
+    return {
+      title: `${service} - ${business?.name || professional || "FlowPayDR"}`,
+      description: `${lang === "es" ? "Profesional" : "Professional"}: ${professional}`,
+      location: business?.address || ""
+    };
+  }
+
+  function addToGoogleCalendar() {
+    try {
+      window.open(
+        googleCalendarUrl(appointment, calendarDetails()),
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } catch {
+      alert("Could not create calendar event.");
+    }
+  }
+
+  function addToDeviceCalendar() {
+    try {
+      downloadAppointmentICS(appointment, calendarDetails());
+    } catch {
+      alert("Could not download calendar event.");
+    }
+  }
   if (
     appointment ===
     "not-found"
@@ -745,6 +780,28 @@ export default function CustomerSecretPage() {
 
       </div>
 
+        {appointment.status === "confirmed" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <button
+              type="button"
+              className="bg-blue-600 text-white px-4 py-3 rounded-xl"
+              onClick={addToGoogleCalendar}
+            >
+              {lang === "es"
+                ? "Agregar a Google Calendar"
+                : "Add to Google Calendar"}
+            </button>
+            <button
+              type="button"
+              className="bg-gray-800 text-white px-4 py-3 rounded-xl"
+              onClick={addToDeviceCalendar}
+            >
+              {lang === "es"
+                ? "Descargar calendario (Apple/Outlook)"
+                : "Download Calendar (Apple/Outlook)"}
+            </button>
+          </div>
+        )}
       {/* APPOINTMENT CARD */}
       <div className="p-5 border rounded-xl bg-white shadow-md">
 

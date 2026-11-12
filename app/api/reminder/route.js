@@ -4,7 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 import { sendPushToSubscription } from "@/lib/push";
 import { sendWhatsAppTemplate } from "@/utils/twilio/twilio";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -76,6 +78,48 @@ function getTomorrowDRDate() {
   return tomorrow.toISOString().split("T")[0];
 }
 
+function getBusinessLocalDateTime(
+  timezone = "America/Santo_Domingo",
+  date = new Date()
+) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+  };
+}
+
+function getPreviousCalendarDate(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(
+    Date.UTC(year, month - 1, day - 1)
+  ).toISOString().slice(0, 10);
+}
+function getNextCalendarDate(dateString) {
+  const [year, month, day] = dateString
+    .split("-")
+    .map(Number);
+
+  return new Date(
+    Date.UTC(year, month - 1, day + 1)
+  ).toISOString().slice(0, 10);
+}
 function formatWhatsAppDate(dateString) {
   const [year, month, day] = dateString.split("-");
   return `${day}/${month}/${year}`;
@@ -141,7 +185,8 @@ function normalizeWhatsAppPhone(phone) {
 
 function wasBookedLateForTomorrow(
   appt,
-  currentDate
+  currentDate,
+  timezone = "America/Santo_Domingo"
 ) {
   if (!appt?.created_at) return false;
 
@@ -160,8 +205,7 @@ function wasBookedLateForTomorrow(
     new Intl.DateTimeFormat(
       "en-US",
       {
-        timeZone:
-          "America/Santo_Domingo",
+        timeZone: timezone,
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -636,7 +680,7 @@ const emailHtml = `
 `;
 let emailSent = false;
 
-if (appt.customer_email) {
+if (appt.customer_email && resend) {
   try {
     const { error: emailError } = await resend.emails.send({
       from: "FlowPayDR <info@flowpaydr.com>",
@@ -873,18 +917,10 @@ if (appt.customer_email) {
             "appointments"
           )
           .select("*")
-          .eq(
-            "date",
-            tomorrowDate
-          )
-          .eq(
-            "status",
-            "confirmed"
-          )
-          .eq(
-            "whatsapp_reminder_sent",
-            false
-          );
+          .gte("date", getPreviousCalendarDate(currentDate))
+          .lte("date", getNextCalendarDate(getNextCalendarDate(tomorrowDate)))
+          .eq("status", "confirmed")
+          .eq("whatsapp_reminder_sent", false);
 
       if (error) {
         whatsappStatus =
@@ -950,18 +986,59 @@ if (appt.customer_email) {
       ) {
         try {
           // ----------------------------------------------
+          // BUSINESS / TOUR DETECTION
+          // ----------------------------------------------
+
+          let businessName = "";
+          let businessCategory = "";
+          let businessTimezone = "America/Santo_Domingo";
+
+          if (appt.business_id) {
+            const {
+              data: business,
+              error: businessError,
+            } = await supabase
+              .from("businesses")
+              .select("name, category, timezone")
+              .eq("id", appt.business_id)
+              .maybeSingle();
+
+            if (businessError) {
+              console.error(
+                "⚠️ Business lookup error:",
+                businessError.message
+              );
+            }
+
+            businessName = business?.name || "";
+            businessCategory = business?.category || "";
+            businessTimezone = business?.timezone || "America/Santo_Domingo";
+          }
+
+          // ----------------------------------------------
           // SHOULD SEND NOW?
           // ----------------------------------------------
+
+          const businessNow =
+            getBusinessLocalDateTime(businessTimezone);
+
+          const businessTomorrow =
+            getNextCalendarDate(businessNow.date);
+
+          const isBusinessReminderWindow =
+            businessNow.hour >= 20 &&
+            businessNow.hour <= 21;
 
           const lateTomorrowBooking =
             wasBookedLateForTomorrow(
               appt,
-              currentDate
+              businessNow.date,
+              businessTimezone
             );
 
           const shouldSendWhatsApp =
-            isDailyWhatsAppWindow ||
-            lateTomorrowBooking;
+            appt.date === businessTomorrow &&
+            isBusinessReminderWindow;
 
           if (
             !shouldSendWhatsApp
@@ -1014,34 +1091,6 @@ if (appt.customer_email) {
             "→",
             normalizedPhone
           );
-
-          // ----------------------------------------------
-          // BUSINESS / TOUR DETECTION
-          // ----------------------------------------------
-
-          let businessName = "";
-          let businessCategory = "";
-
-          if (appt.business_id) {
-            const {
-              data: business,
-              error: businessError,
-            } = await supabase
-              .from("businesses")
-              .select("name, category")
-              .eq("id", appt.business_id)
-              .maybeSingle();
-
-            if (businessError) {
-              console.error(
-                "⚠️ Business lookup error:",
-                businessError.message
-              );
-            }
-
-            businessName = business?.name || "";
-            businessCategory = business?.category || "";
-          }
 
           const normalizedBusinessCategory =
             String(businessCategory)
@@ -1149,9 +1198,7 @@ if (appt.customer_email) {
                 appt.service,
 
               "4":
-                formatWhatsAppDate(
-                  tomorrowDate
-                ),
+                formatWhatsAppDate(appt.date),
 
               "5":
                 formatWhatsAppTime(
@@ -1212,7 +1259,7 @@ if (appt.customer_email) {
 
               // Appointment date
               "2":
-                formatWhatsAppDate(tomorrowDate),
+                formatWhatsAppDate(appt.date),
 
               // Business name
               "3":

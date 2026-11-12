@@ -146,9 +146,9 @@ const isTourBusiness =
   }
 
 // DOMINICAN REPUBLIC CURRENT DATE AND TIME
-function getDominicanNow() {
+function getBusinessNow(timezone = "America/Santo_Domingo") {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Santo_Domingo",
+    timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -240,11 +240,11 @@ async function loadServices(providerToLoad) {
     setDayClosed(false);
 
     try {
-      const dominicanNow = getDominicanNow();
-      const todayString = dominicanNow.date;
+      const businessNow = getBusinessNow(business?.timezone);
+      const todayString = businessNow.date;
       const isToday = date === todayString;
       const currentMinutes =
-        dominicanNow.hours * 60 + dominicanNow.minutes;
+        businessNow.hours * 60 + businessNow.minutes;
 
       // TOURS USE FIXED DEPARTURE TIMES + GUEST CAPACITY.
       // Multiple customers may book the same departure until capacity is full.
@@ -1561,7 +1561,7 @@ if (business?.is_blocked === true) {
             <input
               type="date"
               value={appointmentDate}
-              min={getDominicanNow().date}
+              min={getBusinessNow(business?.timezone).date}
               onChange={(e) => {
                 const selectedDate = e.target.value;
 

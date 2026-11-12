@@ -46,6 +46,45 @@ const [loading, setLoading] = useState(true);
 // BUSINESS GOOGLE MAPS PIN
 const [businessMapUrl, setBusinessMapUrl] = useState("");
 const [savingBusinessMapUrl, setSavingBusinessMapUrl] = useState(false);
+const [businessTimezone, setBusinessTimezone] = useState("America/Santo_Domingo");
+const [savingBusinessTimezone, setSavingBusinessTimezone] = useState(false);
+
+async function saveBusinessTimezone() {
+  if (!businessTimezone) return;
+
+  setSavingBusinessTimezone(true);
+
+  try {
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: businessTimezone,
+    });
+
+    const { error } = await supabase
+      .from("businesses")
+      .update({ timezone: businessTimezone })
+      .eq("id", businessId);
+
+    if (error) throw error;
+
+    await loadDashboard();
+
+    showToast(
+      lang === "es"
+        ? "Zona horaria guardada correctamente."
+        : "Business time zone saved successfully."
+    );
+  } catch (error) {
+    console.error("Timezone save error:", error);
+
+    showToast(
+      lang === "es"
+        ? "No se pudo guardar la zona horaria."
+        : "Could not save the business time zone."
+    );
+  } finally {
+    setSavingBusinessTimezone(false);
+  }
+}
 
 // Detect business category
 const normalizedCategory = business?.category?.trim().toLowerCase() || "";
@@ -440,6 +479,7 @@ async function loadDashboard() {
       .single();
     setBusiness(biz || null);
     setBusinessMapUrl(biz?.map_url || "");
+    setBusinessTimezone(biz?.timezone || "America/Santo_Domingo");
 
    const { data: bar } = await supabase
   .from("barbers")
@@ -2528,6 +2568,53 @@ if (!accessGranted) {
 </section>
 )}
 
+{activeTab === "configuracion" && (
+  <section className="mb-8 border rounded-xl p-5 space-y-3">
+    <h3 className="font-semibold">
+      {lang === "es"
+        ? "Zona horaria del negocio"
+        : "Business Time Zone"}
+    </h3>
+
+    <select
+      value={businessTimezone}
+      onChange={(e) => setBusinessTimezone(e.target.value)}
+      className="border p-2 rounded w-full"
+    >
+      {Array.from(
+        new Set([
+          "America/Santo_Domingo",
+          "America/New_York",
+          businessTimezone,
+          ...(typeof Intl.supportedValuesOf === "function"
+            ? Intl.supportedValuesOf("timeZone")
+            : []),
+        ].filter(Boolean))
+      ).sort().map((zone) => (
+        <option key={zone} value={zone}>
+          {zone.replaceAll("_", " ")}
+        </option>
+      ))}
+    </select>
+
+    <p className="text-sm text-gray-500">
+      {lang === "es"
+        ? "Selecciona la zona horaria donde opera tu negocio."
+        : "Select the time zone where your business operates."}
+    </p>
+
+    <button
+      type="button"
+      onClick={saveBusinessTimezone}
+      disabled={savingBusinessTimezone}
+      className="bg-blue-600 text-white px-4 py-2 rounded"
+    >
+      {savingBusinessTimezone
+        ? lang === "es" ? "Guardando..." : "Saving..."
+        : lang === "es" ? "Guardar zona horaria" : "Save Time Zone"}
+    </button>
+  </section>
+)}
 {/* BUSINESS PROFILE CUSTOMIZATION */}
 {(activeTab === "inicio" || activeTab === "configuracion") && !isBarberBusiness && (
   <div className="mb-12">

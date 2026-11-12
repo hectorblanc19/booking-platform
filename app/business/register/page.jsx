@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -18,8 +18,19 @@ export default function BusinessRegisterPage() {
     category: "",
     openTime: "08:00",
     closeTime: "18:00",
+    timezone: "America/Santo_Domingo",
   });
 
+  useEffect(() => {
+    try {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (detected) {
+        setForm((previous) => ({ ...previous, timezone: detected }));
+      }
+    } catch {
+      // Keep default timezone.
+    }
+  }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -347,6 +358,7 @@ const {
     booking_system: "provider",
     open_time: form.openTime || null,
     close_time: form.closeTime || null,
+    timezone: form.timezone,
     owner_id: userId,
 
     // Billing / free trial
@@ -770,6 +782,50 @@ try {
             </div>
           </div>
 
+          <div style={{ marginBottom: "22px" }}>
+  <label>
+    {lang === "es"
+      ? "Zona horaria del negocio"
+      : "Business Time Zone"}
+  </label>
+
+  <select
+    name="timezone"
+    value={form.timezone}
+    onChange={handleChange}
+    required
+    style={inputStyle}
+  >
+    {(() => {
+      const detected = form.timezone;
+      const supported =
+        typeof Intl.supportedValuesOf === "function"
+          ? Intl.supportedValuesOf("timeZone")
+          : [];
+
+      const zones = Array.from(
+        new Set([
+          "America/Santo_Domingo",
+          "America/New_York",
+          detected,
+          ...supported,
+        ].filter(Boolean))
+      ).sort();
+
+      return zones.map((zone) => (
+        <option key={zone} value={zone}>
+          {zone.replaceAll("_", " ")}
+        </option>
+      ));
+    })()}
+  </select>
+
+  <p style={{ fontSize: "12px", color: "#666", marginTop: "6px" }}>
+    {lang === "es"
+      ? "Detectada automáticamente. Confirma la zona horaria donde opera tu negocio."
+      : "Automatically detected. Confirm the time zone where your business operates."}
+  </p>
+</div>
           <button
             type="submit"
             disabled={loading}

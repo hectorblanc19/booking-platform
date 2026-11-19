@@ -67,7 +67,7 @@ export default function BankPaymentPage() {
     }).format(Number(payment.price || 0));
 
     const message = es
-      ? `Hola, realicé una transferencia bancaria para mi cita en FlowPayDR.
+      ? `Hola, quiero enviar el comprobante de transferencia bancaria de mi cita en FlowPayDR.
 
 Cliente: ${payment.customer_name}
 Servicio: ${payment.service}
@@ -75,7 +75,7 @@ Fecha: ${payment.date}
 Monto: ${amount}
 
 Adjunto mi comprobante de transferencia.`
-      : `Hello, I made a bank transfer for my FlowPayDR appointment.
+      : `Hello, I would like to send the bank transfer receipt for my FlowPayDR appointment.
 
 Customer: ${payment.customer_name}
 Service: ${payment.service}
@@ -136,7 +136,7 @@ Here is my bank transfer receipt.`;
 
             <p><strong>{es ? "Banco" : "Bank"}:</strong> {payment.bank_name}</p>
             <p><strong>{es ? "Titular" : "Account holder"}:</strong> {payment.account_holder}</p>
-            <p><strong>{es ? "Tipo de cuenta" : "Account type"}:</strong> {payment.account_type}</p>
+            <p><strong>{es ? "Tipo de cuenta" : "Account type"}:</strong> {payment.account_type === "savings" ? (es ? "Ahorros" : "Savings") : payment.account_type === "checking" ? (es ? "Corriente" : "Checking") : payment.account_type}</p>
             <p><strong>{es ? "Número de cuenta" : "Account number"}:</strong> {payment.account_number}</p>
 
             <button

@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { sendPushToSubscription } from "@/lib/push";
@@ -82,6 +82,22 @@ export async function POST(req) {
   }
 
   // ⭐ DETERMINE LANGUAGE
+  // Optional bank transfer for customer confirmation email.
+  let bankTransferEnabled = false;
+
+  if (business_id) {
+    const { data: bankSettings, error: bankError } = await supabase
+      .from("business_payment_settings")
+      .select("bank_transfer_enabled")
+      .eq("business_id", business_id)
+      .maybeSingle();
+
+    if (bankError) {
+      console.error("Confirmation bank settings lookup:", bankError);
+    } else {
+      bankTransferEnabled = bankSettings?.bank_transfer_enabled === true;
+    }
+  }
   const langCode =
     lang === "es"
       ? "es"
@@ -402,6 +418,30 @@ export async function POST(req) {
                   ${tr.button}
                 </a>
               </div>
+
+              ${
+                bankTransferEnabled && business_id && secret_link
+                  ? `
+                    <div style="text-align:center;margin-top:18px;">
+                      <p style="font-size:13px;color:#666;">
+                        ${
+                          langCode === "es"
+                            ? "Si deseas pagar por transferencia bancaria, puedes hacerlo cuando quieras."
+                            : "If you prefer to pay by bank transfer, you can do so at your convenience."
+                        }
+                      </p>
+                      <a href="${new URL(`/payment/bank/${encodeURIComponent(new URL(secret_link).pathname.split("/").filter(Boolean).pop())}?lang=${langCode}`, secret_link).toString()}"
+                         style="background:#1976d2;color:#ffffff;padding:13px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-size:15px;font-weight:bold;">
+                        ${
+                          langCode === "es"
+                            ? "Pagar por transferencia bancaria"
+                            : "Pay by Bank Transfer"
+                        }
+                      </a>
+                    </div>
+                  `
+                  : ""
+              }
             </div>
 
             <div style="background:#f7f7f7;padding:18px;text-align:center;font-size:12px;color:#777777;">

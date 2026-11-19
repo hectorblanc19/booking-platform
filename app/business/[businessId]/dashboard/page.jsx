@@ -149,6 +149,14 @@ const [savingEditProvider, setSavingEditProvider] = useState(false);
 // PROVIDER PROFILE PHOTO
 const [uploadingProviderPhotoId, setUploadingProviderPhotoId] = useState(null);
 
+// BANK TRANSFER SETTINGS
+const [bankTransferEnabled, setBankTransferEnabled] = useState(false);
+const [bankName, setBankName] = useState("");
+const [accountHolder, setAccountHolder] = useState("");
+const [accountType, setAccountType] = useState("");
+const [accountNumber, setAccountNumber] = useState("");
+const [receiptWhatsapp, setReceiptWhatsapp] = useState("");
+const [savingBankSettings, setSavingBankSettings] = useState(false);
 // BUSINESS ACCOUNT DELETION
 const [deletingBusiness, setDeletingBusiness] = useState(false);
 
@@ -469,6 +477,57 @@ async function saveBusinessMapUrl() {
   }
 }
   
+async function saveBankSettings() {
+  if (
+    bankTransferEnabled &&
+    (![bankName, accountHolder, accountType, accountNumber, receiptWhatsapp]
+      .every((value) => value.trim()))
+  ) {
+    showToast(
+      lang === "es"
+        ? "Completa todos los datos bancarios antes de activar las transferencias."
+        : "Complete all bank details before enabling transfers."
+    );
+    return;
+  }
+
+  setSavingBankSettings(true);
+
+  try {
+    const { error } = await supabase
+      .from("business_payment_settings")
+      .upsert(
+        {
+          business_id: businessId,
+          bank_transfer_enabled: bankTransferEnabled,
+          bank_name: bankName.trim(),
+          account_holder: accountHolder.trim(),
+          account_type: accountType,
+          account_number: accountNumber.trim(),
+          receipt_whatsapp: receiptWhatsapp.trim(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "business_id" }
+      );
+
+    if (error) throw error;
+
+    showToast(
+      lang === "es"
+        ? "Configuración bancaria guardada."
+        : "Bank settings saved successfully."
+    );
+  } catch (error) {
+    console.error("Bank settings save error:", error);
+    showToast(
+      lang === "es"
+        ? "No se pudo guardar la configuración bancaria."
+        : "Could not save bank settings."
+    );
+  } finally {
+    setSavingBankSettings(false);
+  }
+}
 async function loadDashboard() {
     setLoading(true);
 
@@ -480,6 +539,24 @@ async function loadDashboard() {
     setBusiness(biz || null);
     setBusinessMapUrl(biz?.map_url || "");
     setBusinessTimezone(biz?.timezone || "America/Santo_Domingo");
+    // LOAD BANK TRANSFER SETTINGS
+    const { data: paymentSettings, error: paymentSettingsError } = await supabase
+      .from("business_payment_settings")
+      .select("*")
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (paymentSettingsError) {
+      console.error("Bank settings loading error:", paymentSettingsError);
+    } else {
+      setBankTransferEnabled(paymentSettings?.bank_transfer_enabled ?? false);
+      setBankName(paymentSettings?.bank_name || "");
+      setAccountHolder(paymentSettings?.account_holder || "");
+      setAccountType(paymentSettings?.account_type || "");
+      setAccountNumber(paymentSettings?.account_number || "");
+      setReceiptWhatsapp(paymentSettings?.receipt_whatsapp || "");
+    }
+
 
    const { data: bar } = await supabase
   .from("barbers")
@@ -3380,7 +3457,83 @@ if (!accessGranted) {
   changeBarberPage={changeBarberPage}
 />
 )}
-      {/* CLOSE / DELETE BUSINESS ACCOUNT - GENERIC BUSINESSES ONLY */}
+            {/* BANK TRANSFER FORM */}
+{activeTab === "configuracion" && (
+  <section className="mt-8 bg-white border rounded-xl p-5 space-y-4">
+    <h2 className="text-xl font-bold">
+      {lang === "es" ? "Transferencias bancarias" : "Bank Transfers"}
+    </h2>
+
+    <p className="text-sm text-gray-600">
+      {lang === "es"
+        ? "Permite que tus clientes paguen directamente a tu cuenta bancaria después de reservar."
+        : "Allow customers to pay directly to your bank account after booking."}
+    </p>
+
+    <label className="flex items-center gap-3">
+      <input
+        type="checkbox"
+        checked={bankTransferEnabled}
+        onChange={(e) => setBankTransferEnabled(e.target.checked)}
+      />
+      <span>
+        {lang === "es" ? "Habilitar transferencias bancarias" : "Enable bank transfers"}
+      </span>
+    </label>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <input
+        className="border rounded-lg p-3"
+        placeholder={lang === "es" ? "Nombre del banco" : "Bank name"}
+        value={bankName}
+        onChange={(e) => setBankName(e.target.value)}
+      />
+
+      <input
+        className="border rounded-lg p-3"
+        placeholder={lang === "es" ? "Titular de la cuenta" : "Account holder"}
+        value={accountHolder}
+        onChange={(e) => setAccountHolder(e.target.value)}
+      />
+
+      <select
+        className="border rounded-lg p-3"
+        value={accountType}
+        onChange={(e) => setAccountType(e.target.value)}
+      >
+        <option value="">{lang === "es" ? "Tipo de cuenta" : "Account type"}</option>
+        <option value="savings">{lang === "es" ? "Ahorros" : "Savings"}</option>
+        <option value="checking">{lang === "es" ? "Corriente" : "Checking"}</option>
+      </select>
+
+      <input
+        className="border rounded-lg p-3"
+        placeholder={lang === "es" ? "Número de cuenta" : "Account number"}
+        value={accountNumber}
+        onChange={(e) => setAccountNumber(e.target.value)}
+      />
+
+      <input
+        className="border rounded-lg p-3 md:col-span-2"
+        placeholder={lang === "es" ? "WhatsApp para recibir comprobantes" : "WhatsApp for receipts"}
+        value={receiptWhatsapp}
+        onChange={(e) => setReceiptWhatsapp(e.target.value)}
+      />
+    </div>
+
+    <button
+      type="button"
+      onClick={saveBankSettings}
+      disabled={savingBankSettings}
+      className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold disabled:opacity-50"
+    >
+      {savingBankSettings
+        ? lang === "es" ? "Guardando..." : "Saving..."
+        : lang === "es" ? "Guardar configuración" : "Save Settings"}
+    </button>
+  </section>
+)}
+{/* CLOSE / DELETE BUSINESS ACCOUNT - GENERIC BUSINESSES ONLY */}
       {activeTab === "configuracion" && !isBarberBusiness && (
         <section className="mt-8 border border-red-200 bg-red-50 rounded-xl p-5">
           <h2 className="text-xl font-bold text-red-700 mb-2">

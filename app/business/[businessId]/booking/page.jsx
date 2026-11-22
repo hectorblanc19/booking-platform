@@ -1149,7 +1149,7 @@ if (!isTourBusiness && createdAppointment?.secret_link) {
 
    const { data: biz } = await supabase
   .from("businesses")
-  .select("id, name, category, booking_system, is_blocked, photo_url, address, phone, map_url, timezone")
+  .select("*")
   .eq("id", businessId)
   .single();
 
@@ -1170,7 +1170,7 @@ setProfileSettings(settings || null);
 
 const { data: bar } = await supabase
       .from("barbers")
-      .select("id, name, photo_url")
+      .select("*")
       .eq("business_id", businessId);
 
     setBarbers(bar || []);
@@ -1178,7 +1178,7 @@ const { data: bar } = await supabase
     const { data: prov, error: providerError } =
       await supabase
         .from("providers")
-        .select("id, business_id, name, photo_url, specialty, specialty_en")
+        .select("*")
         .eq("business_id", businessId);
 
     if (providerError) {
@@ -1196,7 +1196,7 @@ const { data: bar } = await supabase
         error: selectedProviderError,
       } = await supabase
         .from("providers")
-        .select("id, business_id, name, photo_url, specialty, specialty_en")
+        .select("*")
         .eq("id", providerId)
         .eq("business_id", businessId)
         .single();

@@ -24,6 +24,7 @@ export default function BusinessBookingPage() {
   // SERVICES
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
+  const [additionalServiceIds, setAdditionalServiceIds] = useState([]);
 
   // APPOINTMENT FORM
   const [customerName, setCustomerName] = useState("");
@@ -35,6 +36,7 @@ export default function BusinessBookingPage() {
   const [pickupLocation, setPickupLocation] = useState("");
   const [savingAppointment, setSavingAppointment] = useState(false);
   const bookingLockRef = useRef(false);
+  const pendingBookingRef = useRef(null);
 
   // PROVIDER AVAILABILITY
   const [availableTimes, setAvailableTimes] = useState([]);
@@ -222,6 +224,58 @@ async function loadServices(providerToLoad) {
   setServices(data || []);
 }
 
+  function getCombinedService(
+    primary = selectedService,
+    extraIds = additionalServiceIds
+  ) {
+    if (!primary || isTourBusiness) return primary;
+
+    const extras = extraIds
+      .map((id) => services.find((item) => item.id === id))
+      .filter(Boolean);
+
+    return {
+      ...primary,
+      duration: [primary, ...extras].reduce(
+        (total, item) => total + Number(item.duration || 0),
+        0
+      ),
+      price: [primary, ...extras].reduce(
+        (total, item) => total + Number(item.price || 0),
+        0
+      ),
+    };
+  }
+
+  function addExtraService(id) {
+    if (!id || !selectedService) return;
+    if (id === selectedService.id || additionalServiceIds.includes(id)) return;
+
+    const next = [...additionalServiceIds, id];
+    setAdditionalServiceIds(next);
+    setAppointmentTime("");
+
+    if (appointmentDate) {
+      loadAvailableTimes(
+        appointmentDate,
+        getCombinedService(selectedService, next)
+      );
+    }
+  }
+
+  function removeExtraService(id) {
+    const next = additionalServiceIds.filter((item) => item !== id);
+    setAdditionalServiceIds(next);
+    setAppointmentTime("");
+
+    if (appointmentDate && selectedService) {
+      loadAvailableTimes(
+        appointmentDate,
+        getCombinedService(selectedService, next)
+      );
+    }
+  }
+
   // LOAD AVAILABLE TIMES USING SELECTED SERVICE DURATION
   async function loadAvailableTimes(date, service = selectedService) {
     if (!date || !provider?.id || !service) {
@@ -384,15 +438,19 @@ const {
         return;
       }
 
-      const {
-        data: appointments,
-        error: appointmentsError,
-      } = await supabase
-        .from("appointments")
-        .select("time, duration")
-        .eq("provider_id", provider.id)
-        .eq("date", date)
-        .eq("status", "confirmed");
+      const availabilityResult = await fetch(
+        `/api/public/provider-availability?providerId=${encodeURIComponent(provider.id)}&date=${encodeURIComponent(date)}`,
+        { cache: "no-store" }
+      ).then(async (response) => {
+        if (!response.ok) throw new Error(`Availability API: ${response.status}`);
+        return response.json();
+      }).then(
+        (data) => ({ data: data, error: null }),
+        (error) => ({ data: null, error })
+      );
+      const { data: availabilityData, error: appointmentsError } = availabilityResult;
+      const appointments = availabilityData?.appointments;
+      const providerBlocks = availabilityData?.blocks;
 
       if (appointmentsError) {
         console.error(
@@ -405,19 +463,7 @@ const {
 
      const existingAppointments = appointments || [];
 
-// LOAD BLOCKS FOR THIS PROVIDER + DATE
-const { data: providerBlocks, error: blocksError } = await supabase
-  .from("provider_blocks")
-  .select("start_time, end_time")
-  .eq("provider_id", provider.id)
-  .eq("date", date);
-
-if (blocksError) {
-  console.error("Error loading provider blocks:", blocksError);
-  setAvailableTimes([]);
-  return;
-}
-
+// Blocks are supplied by the server-side availability API.
 const existingBlocks = providerBlocks || [];
 
 
@@ -507,6 +553,7 @@ if (!hasAppointmentConflict && !hasBlockConflict) {
       services.find((item) => item.id === serviceId) || null;
 
     setSelectedService(service);
+    setAdditionalServiceIds([]);
     setAppointmentTime("");
 
     if (appointmentDate && service) {
@@ -589,7 +636,7 @@ if (currentBusiness.is_blocked === true) {
 
 
 // RECHECK AVAILABILITY / CAPACITY IMMEDIATELY BEFORE SAVING
-const selectedDuration = Number(selectedService.duration) || 60;
+const selectedDuration = Number(getCombinedService()?.duration) || 60;
 
     if (isTourBusiness) {
       const maxGuests = Number(selectedService.max_guests_per_departure) || 0;
@@ -605,7 +652,7 @@ const selectedDuration = Number(selectedService.duration) || 60;
             ? "Esa hora ya no está configurada para este tour. Selecciona otra salida."
             : "That departure is no longer configured for this tour. Please select another departure."
         );
-        await loadAvailableTimes(appointmentDate, selectedService);
+        await loadAvailableTimes(appointmentDate, getCombinedService());
         return;
       }
 
@@ -664,7 +711,7 @@ const selectedDuration = Number(selectedService.duration) || 60;
             ? `Only ${remainingGuests} spots remain for this departure.`
             : "This departure is full. Please select another time or date."
         );
-        await loadAvailableTimes(appointmentDate, selectedService);
+        await loadAvailableTimes(appointmentDate, getCombinedService());
         return;
       }
 
@@ -721,10 +768,7 @@ const selectedDuration = Number(selectedService.duration) || 60;
 
     setAppointmentTime("");
 
-    await loadAvailableTimes(
-      appointmentDate,
-      selectedService
-    );
+    await loadAvailableTimes(appointmentDate, getCombinedService());
 
     return;
   }
@@ -760,25 +804,26 @@ const selectedDuration = Number(selectedService.duration) || 60;
 
       setAppointmentTime("");
 
-      await loadAvailableTimes(
-        appointmentDate,
-        selectedService
-      );
+      await loadAvailableTimes(appointmentDate, getCombinedService());
 
       return;
     }
   }
 
   // 2. CHECK EXISTING APPOINTMENTS
-  const {
-    data: currentAppointments,
-    error: checkError,
-  } = await supabase
-    .from("appointments")
-    .select("time, duration")
-    .eq("provider_id", provider.id)
-    .eq("date", appointmentDate)
-    .eq("status", "confirmed");
+  const availabilityCheckResult = await fetch(
+    `/api/public/provider-availability?providerId=${encodeURIComponent(provider.id)}&date=${encodeURIComponent(appointmentDate)}`,
+    { cache: "no-store" }
+  ).then(async (response) => {
+    if (!response.ok) throw new Error(`Availability API: ${response.status}`);
+    return response.json();
+  }).then(
+    (data) => ({ data: data, error: null }),
+    (error) => ({ data: null, error })
+  );
+  const { data: currentAvailability, error: checkError } = availabilityCheckResult;
+  const currentAppointments = currentAvailability?.appointments;
+  const currentProviderBlocks = currentAvailability?.blocks;
 
   if (checkError) {
     console.error("Error checking appointments:", checkError);
@@ -809,10 +854,7 @@ const selectedDuration = Number(selectedService.duration) || 60;
         : "That time was just booked or conflicts with another appointment. Please select another time."
     );
 
-    await loadAvailableTimes(
-      appointmentDate,
-      selectedService
-    );
+    await loadAvailableTimes(appointmentDate, getCombinedService());
 
     return;
   }
@@ -820,31 +862,8 @@ const selectedDuration = Number(selectedService.duration) || 60;
   // 3. CHECK PROVIDER BLOCKS AGAIN
   // This protects against a block being created after
   // the customer already opened the booking page.
-  const {
-    data: currentProviderBlocks,
-    error: blockCheckError,
-  } = await supabase
-    .from("provider_blocks")
-    .select("start_time, end_time")
-    .eq("provider_id", provider.id)
-    .eq("date", appointmentDate);
-
-  if (blockCheckError) {
-    console.error(
-      "Error checking provider blocks:",
-      blockCheckError
-    );
-
-    alert(
-      lang === "es"
-        ? "No se pudo verificar la disponibilidad del profesional. Intenta otra vez."
-        : "Could not verify the provider's availability. Please try again."
-    );
-
-    return;
-  }
-
-  const appointmentStart =
+  // Blocks were rechecked by the availability API above.
+const appointmentStart =
     timeToMinutes(appointmentTime);
 
   const appointmentEnd =
@@ -874,10 +893,7 @@ const selectedDuration = Number(selectedService.duration) || 60;
 
     setAppointmentTime("");
 
-    await loadAvailableTimes(
-      appointmentDate,
-      selectedService
-    );
+    await loadAvailableTimes(appointmentDate, getCombinedService());
 
     return;
   }
@@ -944,7 +960,27 @@ try {
     // provider-based businesses.
     // =========================================================
 
-    const bookingRequestId = crypto.randomUUID();
+    const bookingDetails = JSON.stringify({
+      businessId,
+      providerId: provider.id,
+      serviceId: selectedService.id,
+      serviceIds: [selectedService.id, ...additionalServiceIds],
+      date: appointmentDate,
+      time: appointmentTime,
+      duration: selectedDuration,
+      customerName,
+      customerPhone,
+      customerEmail,
+    });
+
+    if (pendingBookingRef.current?.details !== bookingDetails) {
+      pendingBookingRef.current = {
+        details: bookingDetails,
+        id: crypto.randomUUID(),
+      };
+    }
+
+    const bookingRequestId = pendingBookingRef.current.id;
 
     const response = await fetch("/api/book", {
       method: "POST",
@@ -955,6 +991,10 @@ try {
         business_id: businessId,
         provider_id: provider.id,
         service_id: selectedService.id,
+        service_ids: [
+          selectedService.id,
+          ...additionalServiceIds,
+        ],
 
         service: selectedService.name,
         date: appointmentDate,
@@ -992,10 +1032,7 @@ try {
             : "That time was just booked or is no longer available. Please select another time."
         );
 
-        await loadAvailableTimes(
-          appointmentDate,
-          selectedService
-        );
+        await loadAvailableTimes(appointmentDate, getCombinedService());
       } else {
         alert(
           lang === "es"
@@ -1009,7 +1046,7 @@ try {
 
     createdAppointment = result.appointment;
   }
-     
+
 
 // =========================================================
 // TOUR NOTIFICATIONS
@@ -1070,57 +1107,7 @@ if (isTourBusiness) {
     }
   }
 
-  // SEND NEW APPOINTMENT EMAIL TO PROVIDER
-  if (provider?.email) {
-    try {
-      const providerResponse = await fetch(
-        "/api/send-barber-notification",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
 
-          body: JSON.stringify({
-            provider_email: provider.email,
-            provider_name: provider.name,
-            provider_id: provider.id,
-
-            customer_name: customerName,
-            customer_phone: customerPhone,
-            customer_email: customerEmail || null,
-
-            service: selectedService.name,
-            date: appointmentDate,
-            time: appointmentTime,
-            notes: null,
-
-            dashboard_link: null,
-            lang: lang,
-
-            guest_count: Number(guestCount),
-            pickup_location: pickupLocation.trim(),
-            is_group_booking: true,
-          }),
-        }
-      );
-
-      const providerData =
-        await providerResponse.json();
-
-      if (!providerData.success) {
-        console.error(
-          "Provider notification email error:",
-          providerData
-        );
-      }
-    } catch (providerEmailError) {
-      console.error(
-        "Provider notification email request failed:",
-        providerEmailError
-      );
-    }
-  }
 }
 
 alert(
@@ -1158,9 +1145,11 @@ if (!isTourBusiness && createdAppointment?.secret_link) {
   async function loadData() {
     setLoading(true);
 
+    try {
+
    const { data: biz } = await supabase
   .from("businesses")
-  .select("*")
+  .select("id, name, category, booking_system, is_blocked, photo_url, address, phone, map_url, timezone")
   .eq("id", businessId)
   .single();
 
@@ -1181,7 +1170,7 @@ setProfileSettings(settings || null);
 
 const { data: bar } = await supabase
       .from("barbers")
-      .select("*")
+      .select("id, name, photo_url")
       .eq("business_id", businessId);
 
     setBarbers(bar || []);
@@ -1189,7 +1178,7 @@ const { data: bar } = await supabase
     const { data: prov, error: providerError } =
       await supabase
         .from("providers")
-        .select("*")
+        .select("id, business_id, name, photo_url, specialty, specialty_en")
         .eq("business_id", businessId);
 
     if (providerError) {
@@ -1207,7 +1196,7 @@ const { data: bar } = await supabase
         error: selectedProviderError,
       } = await supabase
         .from("providers")
-        .select("*")
+        .select("id, business_id, name, photo_url, specialty, specialty_en")
         .eq("id", providerId)
         .eq("business_id", businessId)
         .single();
@@ -1228,8 +1217,11 @@ const { data: bar } = await supabase
       setProvider(null);
       setServices([]);
     }
-
-    setLoading(false);
+    } catch (error) {
+      console.error("Error loading business booking:", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (loading) {
@@ -1337,7 +1329,7 @@ if (business?.is_blocked === true) {
         <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl shadow-sm text-center">
           {business?.address && (
             <p className="text-sm text-gray-700">
-              📍 {business.address}
+              {"\uD83D\uDCCD"} {business.address}
             </p>
           )}
 
@@ -1501,7 +1493,9 @@ if (business?.is_blocked === true) {
                   key={service.id}
                   value={service.id}
                 >
-                  {service.name}
+                  {lang === "en" && service.name_en?.trim()
+  ? service.name_en
+  : service.name}
                   {service.price !== null
                     ? ` — ${formatPrice(service.price)}`
                     : ""}
@@ -1510,11 +1504,90 @@ if (business?.is_blocked === true) {
               ))}
             </select>
 
+            {selectedService && !isTourBusiness && (
+              <div className="mb-3">
+                {additionalServiceIds.map((id) => {
+                  const item = services.find((service) => service.id === id);
+                  if (!item) return null;
+
+                  return (
+                    <div
+                      key={id}
+                      className="flex items-center justify-between gap-2 p-2 mb-2 border rounded"
+                    >
+                      <span className="text-sm">
+                        {lang === "en" && item.name_en?.trim()
+                          ? item.name_en
+                          : item.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeExtraService(id)}
+                        className="text-red-600 text-sm underline"
+                      >
+                        {lang === "es" ? "Quitar" : "Remove"}
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {services.some(
+                  (item) =>
+                    item.id !== selectedService.id &&
+                    !additionalServiceIds.includes(item.id)
+                ) && (
+                  <select
+                    value=""
+                    onChange={(e) => addExtraService(e.target.value)}
+                    className="border p-2 rounded w-full"
+                  >
+                    <option value="">
+                      {lang === "es"
+                        ? "+ Agregar otro servicio"
+                        : "+ Add another service"}
+                    </option>
+                    {services
+                      .filter(
+                        (item) =>
+                          item.id !== selectedService.id &&
+                          !additionalServiceIds.includes(item.id)
+                      )
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {lang === "en" && item.name_en?.trim()
+                            ? item.name_en
+                            : item.name}
+                        </option>
+                      ))}
+                  </select>
+                )}
+
+                {additionalServiceIds.length > 0 && (
+                  <div className="mt-3 p-3 border rounded bg-gray-50 text-sm">
+                    <p>
+                      <strong>
+                        {lang === "es" ? "Duracion total:" : "Total duration:"}
+                      </strong>{" "}
+                      {getCombinedService()?.duration} min
+                    </p>
+                    <p>
+                      <strong>
+                        {lang === "es" ? "Precio total:" : "Total price:"}
+                      </strong>{" "}
+                      {formatPrice(getCombinedService()?.price)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* SELECTED SERVICE INFO */}
-            {selectedService && (
+            {selectedService && (isTourBusiness || additionalServiceIds.length === 0) && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="font-semibold">
-                  {selectedService.name}
+                  {lang === "en" && selectedService.name_en?.trim()
+  ? selectedService.name_en
+  : selectedService.name}
                 </p>
 
                 <div className="flex gap-4 mt-1 text-sm text-gray-700">
@@ -1537,9 +1610,11 @@ if (business?.is_blocked === true) {
                   </span>
                 </div>
 
-                {selectedService.description && (
+                {((lang === "en" && selectedService.description_en?.trim()) || selectedService.description) && (
                   <p className="text-sm text-gray-600 mt-2">
-                    {selectedService.description}
+                    {lang === "en" && selectedService.description_en?.trim()
+  ? selectedService.description_en
+  : selectedService.description}
                   </p>
                 )}
               </div>
@@ -1569,10 +1644,7 @@ if (business?.is_blocked === true) {
                 setAppointmentTime("");
 
                 if (selectedService) {
-                  loadAvailableTimes(
-                    selectedDate,
-                    selectedService
-                  );
+                  loadAvailableTimes(selectedDate, getCombinedService());
                 } else {
                   setAvailableTimes([]);
                 }
@@ -1664,21 +1736,33 @@ if (business?.is_blocked === true) {
             {appointmentTime && selectedService && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="font-semibold text-green-800">
-                  {selectedService.name}
+                  {!isTourBusiness && additionalServiceIds.length > 0
+                    ? [
+                        selectedService,
+                        ...services.filter((service) =>
+                          additionalServiceIds.includes(service.id)
+                        ),
+                      ]
+                        .map((service) =>
+                          lang === "en" && service.name_en?.trim()
+                            ? service.name_en
+                            : service.name
+                        )
+                        .join(" + ")
+                    : lang === "en" && selectedService.name_en?.trim()
+                    ? selectedService.name_en
+                    : selectedService.name}
                 </p>
 
                 <p className="text-sm text-green-700 mt-1">
                   {formatTime(appointmentTime)}
-                  {" • "}
-                  {selectedService.duration} min
-                  {selectedService.price !== null &&
-                    ` • ${formatPrice(
-                      selectedService.price
-                    )}`}
+                  {" \u2022 "}
+                  {getCombinedService()?.duration} min
+                  {getCombinedService()?.price != null &&
+                    ` \u2022 ${formatPrice(getCombinedService().price)}`}
                 </p>
               </div>
             )}
-
             {/* SAVE */}
             <button
               type="button"
@@ -1725,9 +1809,6 @@ if (business?.is_blocked === true) {
                       {b.name}
                     </p>
 
-                    <p className="text-gray-500">
-                      {b.email}
-                    </p>
                   </div>
                 </div>
 
@@ -1795,13 +1876,9 @@ if (business?.is_blocked === true) {
 
                     {providerItem.specialty && (
                       <p className="text-gray-500">
-                        {providerItem.specialty}
-                      </p>
-                    )}
-
-                    {providerItem.email && (
-                      <p className="text-gray-500">
-                        {providerItem.email}
+                        {lang === "en" && providerItem.specialty_en?.trim()
+  ? providerItem.specialty_en
+  : providerItem.specialty}
                       </p>
                     )}
                   </div>

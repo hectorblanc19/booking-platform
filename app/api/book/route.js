@@ -44,6 +44,7 @@ export async function POST(req) {
       business_id,
       provider_id,
       service_id,
+      service_ids,
 
       // Common fields
       service,
@@ -117,6 +118,54 @@ export async function POST(req) {
 
     // =========================================================
     // 2. IDEMPOTENCY CHECK
+    const sameBookingRequest = (existing) => {
+      const normalizePhone = (value) =>
+        String(value ?? "").replace(/\D/g, "");
+
+      const normalizeTime = (value) =>
+        String(value ?? "").slice(0, 5);
+
+      const sameCustomer =
+        String(existing.customer_name ?? "").trim() ===
+          String(customer_name ?? "").trim() &&
+        normalizePhone(existing.customer_phone) ===
+          normalizePhone(customer_phone);
+
+      const sameSlot =
+        String(existing.date ?? "") === String(date ?? "") &&
+        normalizeTime(existing.time) === normalizeTime(time);
+
+      const sameBusiness =
+        String(existing.business_id ?? "") ===
+          String(resolvedBusinessId ?? "");
+
+      if (isProviderBooking) {
+        return (
+          sameCustomer &&
+          sameSlot &&
+          sameBusiness &&
+          String(existing.provider_id ?? "") === String(provider_id ?? "") &&
+          JSON.stringify(
+            (existing.selected_services?.length
+              ? existing.selected_services.map((item) => item.id)
+              : [existing.service_id]
+            ).map(String)
+          ) ===
+          JSON.stringify(
+            (Array.isArray(service_ids) ? service_ids : [service_id]).map(String)
+          )
+        );
+      }
+
+      return (
+        sameCustomer &&
+        sameSlot &&
+        sameBusiness &&
+        String(existing.barber_id ?? "") === String(barber ?? "") &&
+        String(existing.service ?? "").trim() === String(service ?? "").trim()
+      );
+    };
+
     // =========================================================
 
     const {
@@ -148,11 +197,21 @@ export async function POST(req) {
     }
 
     if (priorAppointment) {
+      if (!sameBookingRequest(priorAppointment)) {
+        return json({
+          success: false,
+          code: "BOOKING_REQUEST_CONFLICT",
+          error: "Booking request cannot be reused",
+        }, 409);
+      }
       return json({
         success: true,
         already_created: true,
         secret_link: priorAppointment.secret_link,
-        appointment: priorAppointment,
+        appointment: {
+          id: priorAppointment.id,
+          secret_link: priorAppointment.secret_link,
+        },
       });
     }
 
@@ -168,6 +227,7 @@ export async function POST(req) {
     let finalPrice = price ?? 0;
 
     let providerInfo = null;
+    let selectedServices = null;
 
  // =========================================================
 // 4. NEW BUSINESS / PROVIDER BOOKING
@@ -180,7 +240,7 @@ if (isProviderBooking) {
     error: businessError,
   } = await supabase
     .from("businesses")
-    .select("id, name, is_blocked")
+    .select("id, name, is_blocked, timezone")
     .eq("id", resolvedBusinessId)
     .maybeSingle();
 
@@ -206,7 +266,7 @@ if (isProviderBooking) {
         error:
           lang === "en"
             ? "This page is temporarily unavailable. Please contact administration."
-            : "Esta página no está disponible temporalmente. Por favor, comuníquese con la administración.",
+            : "Esta pÃ¡gina no estÃ¡ disponible temporalmente. Por favor, comunÃ­quese con la administraciÃ³n.",
       },
       403
     );
@@ -238,52 +298,239 @@ if (isProviderBooking) {
 
   providerInfo = foundProvider;
 
-  // Verify service belongs to business and is available
-// either for this provider specifically or for all providers.
-const {
-  data: serviceInfo,
-  error: serviceError,
-} = await supabase
-  .from("business_services")
-  .select(
-    "id, business_id, provider_id, name, price, duration, is_active"
-  )
-  .eq("id", service_id)
-  .eq("business_id", resolvedBusinessId)
-  .or(`provider_id.eq.${provider_id},provider_id.is.null`)
-  .eq("is_active", true)
-  .maybeSingle();
+  // Validate all selected services using database values.
+  const requestedServiceIds = Array.isArray(service_ids)
+    ? service_ids
+    : [service_id];
 
-      if (serviceError || !serviceInfo) {
-        console.error(
-          "Service lookup failed:",
-          serviceError
-        );
+  if (
+    requestedServiceIds.length === 0 ||
+    requestedServiceIds.length > 10 ||
+    requestedServiceIds.some(
+      (id) => typeof id !== "string" || !id.trim()
+    ) ||
+    new Set(requestedServiceIds).size !== requestedServiceIds.length
+  ) {
+    return json(
+      {
+        success: false,
+        code: "INVALID_SERVICES",
+        error: "Invalid service selection",
+      },
+      400
+    );
+  }
 
-        return json(
-          {
-            success: false,
-            code: "SERVICE_NOT_FOUND",
-            error: "Service not found or unavailable",
-          },
-          404
-        );
+  const { data: serviceRecords, error: serviceError } = await supabase
+    .from("business_services")
+    .select("id, business_id, provider_id, name, price, duration, is_active")
+    .in("id", requestedServiceIds)
+    .eq("business_id", resolvedBusinessId)
+    .or(`provider_id.eq.${provider_id},provider_id.is.null`)
+    .eq("is_active", true);
+
+  if (
+    serviceError ||
+    !serviceRecords ||
+    serviceRecords.length !== requestedServiceIds.length
+  ) {
+    return json(
+      {
+        success: false,
+        code: "SERVICE_NOT_FOUND",
+        error: "One or more services are unavailable",
+      },
+      404
+    );
+  }
+
+  const servicesById = new Map(
+    serviceRecords.map((item) => [item.id, item])
+  );
+
+  selectedServices = requestedServiceIds.map((id) => {
+    const item = servicesById.get(id);
+    return {
+      id: item.id,
+      name: item.name,
+      duration: Number(item.duration),
+      price: Number(item.price),
+    };
+  });
+
+  if (
+    selectedServices.some(
+      (item) =>
+        !Number.isFinite(item.duration) ||
+        !Number.isInteger(item.duration) ||
+        item.duration <= 0 ||
+        !Number.isFinite(item.price) ||
+        item.price < 0
+    )
+  ) {
+    return json(
+      {
+        success: false,
+        code: "INVALID_SERVICE_VALUES",
+        error: "Service price or duration is not configured correctly",
+      },
+      400
+    );
+  }
+
+  finalService = selectedServices.map((item) => item.name).join(" + ");
+  finalDuration = selectedServices.reduce(
+    (total, item) => total + item.duration,
+    0
+  );
+  finalPrice = selectedServices.reduce(
+    (total, item) => total + item.price,
+    0
+  );
+
+      // Validate provider booking date and time.
+      const dateMatch = typeof date === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(date);
+
+      const timeMatch = typeof time === "string" &&
+        /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time);
+
+      if (!dateMatch || !timeMatch) {
+        return json({
+          success: false,
+          code: "INVALID_DATETIME",
+          error: "Invalid appointment date or time",
+        }, 400);
       }
 
-      // Trust database values instead of browser values.
-      finalService = serviceInfo.name;
+      const [year, month, day] = date.split("-").map(Number);
+      const bookingDate = new Date(Date.UTC(year, month - 1, day));
 
-      finalDuration =
-        Number(serviceInfo.duration) > 0
-          ? Number(serviceInfo.duration)
-          : finalDuration;
+      if (
+        bookingDate.getUTCFullYear() !== year ||
+        bookingDate.getUTCMonth() !== month - 1 ||
+        bookingDate.getUTCDate() !== day
+      ) {
+        return json({
+          success: false,
+          code: "INVALID_DATE",
+          error: "Invalid calendar date",
+        }, 400);
+      }
 
-      finalPrice =
-        serviceInfo.price !== null &&
-        serviceInfo.price !== undefined
-          ? Number(serviceInfo.price)
-          : finalPrice;
+      // Reject past provider appointments using the business timezone.
+      const nowParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: businessInfo?.timezone || "America/Santo_Domingo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(new Date());
 
+      const nowValues = Object.fromEntries(
+        nowParts
+          .filter((part) => part.type !== "literal")
+          .map((part) => [part.type, part.value])
+      );
+
+      const todayBusiness = `${nowValues.year}-${nowValues.month}-${nowValues.day}`;
+      const currentMinutesBusiness =
+        Number(nowValues.hour) * 60 + Number(nowValues.minute);
+
+      if (
+        date < todayBusiness ||
+        (date === todayBusiness &&
+          timeToMinutes(formattedTime) <= currentMinutesBusiness)
+      ) {
+        return json({
+          success: false,
+          code: "PAST_APPOINTMENT",
+          error: "Cannot book an appointment in the past",
+        }, 409);
+      }
+
+      const dayOfWeek = bookingDate.getUTCDay();
+      const appointmentStart = timeToMinutes(formattedTime);
+      const appointmentEnd = appointmentStart + finalDuration;
+
+      if (
+        !Number.isFinite(finalDuration) ||
+        finalDuration <= 0 ||
+        !Number.isFinite(appointmentEnd) ||
+        appointmentEnd > 1440
+      ) {
+        return json({
+          success: false,
+          code: "INVALID_DURATION",
+          error: "Invalid appointment duration",
+        }, 400);
+      }
+
+      // Enforce business opening hours.
+      const { data: businessHours, error: businessHoursError } =
+        await supabase
+          .from("business_hours")
+          .select("open_time, close_time, is_open")
+          .eq("business_id", resolvedBusinessId)
+          .eq("day_of_week", dayOfWeek)
+          .maybeSingle();
+
+      if (businessHoursError) {
+        console.error("Business hours lookup failed:", businessHoursError);
+        return json({
+          success: false,
+          code: "DATABASE_ERROR",
+          error: "Could not verify business hours",
+        }, 500);
+      }
+
+      if (
+        !businessHours ||
+        businessHours.is_open !== true ||
+        !businessHours.open_time ||
+        !businessHours.close_time ||
+        appointmentStart < timeToMinutes(businessHours.open_time) ||
+        appointmentEnd > timeToMinutes(businessHours.close_time)
+      ) {
+        return json({
+          success: false,
+          code: "OUTSIDE_BUSINESS_HOURS",
+          error: "Appointment is outside business hours",
+        }, 409);
+      }
+
+      // Enforce selected professional's working hours.
+      const { data: providerHours, error: providerHoursError } =
+        await supabase
+          .from("provider_availability")
+          .select("start_time, end_time, is_available")
+          .eq("provider_id", provider_id)
+          .eq("day_of_week", dayOfWeek)
+          .maybeSingle();
+
+      if (providerHoursError) {
+        console.error("Provider hours lookup failed:", providerHoursError);
+        return json({
+          success: false,
+          code: "DATABASE_ERROR",
+          error: "Could not verify professional hours",
+        }, 500);
+      }
+
+      if (
+        !providerHours ||
+        providerHours.is_available !== true ||
+        appointmentStart < timeToMinutes(providerHours.start_time) ||
+        appointmentEnd > timeToMinutes(providerHours.end_time)
+      ) {
+        return json({
+          success: false,
+          code: "OUTSIDE_PROVIDER_HOURS",
+          error: "Appointment is outside professional working hours",
+        }, 409);
+      }
       // Check existing confirmed appointments
       const {
         data: existingAppointments,
@@ -456,7 +703,8 @@ const {
           business_id: resolvedBusinessId,
           barber_id: null,
           provider_id,
-          service_id,
+          service_id: selectedServices[0].id,
+          selected_services: selectedServices,
 
           service: finalService,
           date,
@@ -530,6 +778,18 @@ const {
         );
       }
 
+      // Handle PostgreSQL provider-overlap exclusion violations.
+      if (insertError.code === "23P01") {
+        return json(
+          {
+            success: false,
+            code: "SLOT_TAKEN",
+            error: "Time slot already taken",
+          },
+          409
+        );
+      }
+
       // Keep existing duplicate-booking protection.
       if (insertError.code === "23505") {
         const { data: sameRequest } = await supabase
@@ -542,11 +802,21 @@ const {
           .maybeSingle();
 
         if (sameRequest) {
+          if (!sameBookingRequest(sameRequest)) {
+            return json({
+              success: false,
+              code: "BOOKING_REQUEST_CONFLICT",
+              error: "Booking request cannot be reused",
+            }, 409);
+          }
           return json({
             success: true,
             already_created: true,
             secret_link: sameRequest.secret_link,
-            appointment: sameRequest,
+            appointment: {
+              id: sameRequest.id,
+              secret_link: sameRequest.secret_link,
+            },
           });
         }
 
@@ -585,6 +855,7 @@ const {
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL ||
       "https://www.flowpaydr.com";
+
 
     const notificationJobs = [];
 
@@ -741,4 +1012,4 @@ const {
       500
     );
   }
-}           
+}

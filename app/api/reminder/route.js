@@ -300,44 +300,11 @@ export async function GET(req) {
     const jobStartedAt =
       new Date().toISOString();
 
-    const now =
-      getDRTime();
+    const currentDR = getDRDateParts();
+    const currentDate = currentDR.date;
 
-    const currentDR =
-      getDRDateParts();
-
-    const currentDate =
-      currentDR.date;
-
-    const currentTime =
-      now
-        .toTimeString()
-        .slice(
-          0,
-          8
-        );
-
-    const twoHours =
-      new Date(
-        now.getTime() +
-          120 * 60000
-      );
-
-    const twoHoursTime =
-      twoHours
-        .toTimeString()
-        .slice(
-          0,
-          8
-        );
-
-    console.log(
-      "⏱ DR Window:",
-      currentTime,
-      "→",
-      twoHoursTime
-    );
-
+    // Business-specific timezone filtering happens below.
+    console.log("Checking email reminders using each business timezone");
     // ==================================================
     // ⭐ STATUS TRACKING
     // ==================================================
@@ -357,72 +324,115 @@ export async function GET(req) {
     let appointments = [];
 
     // ==================================================
-    // ⭐ EXISTING 2-HOUR EMAIL + PUSH REMINDERS
+    // EMAIL + PUSH: BUSINESS TIMEZONE
     // ==================================================
 
     try {
-      const {
-        data,
-        error,
-      } =
-        await supabase
-          .from(
-            "appointments"
-          )
-          .select("*")
-          .eq(
-            "date",
-            currentDate
-          )
-          .eq(
-            "status",
-            "confirmed"
-          )
-          .gte(
-            "time",
-            currentTime
-          )
-          .lte(
-            "time",
-            twoHoursTime
-          )
-          .is(
-            "reminder_sent",
-            null
-          );
+      const nowUtc = new Date();
+      const candidateDates = new Set();
+
+      for (const timezone of [
+        "America/Santo_Domingo",
+        "America/New_York",
+        "Pacific/Honolulu",
+        "Pacific/Kiritimati",
+      ]) {
+        const local = getBusinessLocalDateTime(timezone, nowUtc);
+        candidateDates.add(getPreviousCalendarDate(local.date));
+        candidateDates.add(local.date);
+        candidateDates.add(getNextCalendarDate(local.date));
+      }
+
+      const dates = [...candidateDates].sort();
+
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("*")
+        .gte("date", dates[0])
+        .lte("date", dates[dates.length - 1])
+        .eq("status", "confirmed")
+        .is("reminder_sent", null);
 
       if (error) {
-        emailPushStatus =
-          "error";
-
-        emailPushError =
-          error.message;
-
-        console.error(
-          "❌ Email/push Supabase query error:",
-          error.message
-        );
+        emailPushStatus = "error";
+        emailPushError = error.message;
+        console.error("Email/push query error:", error.message);
       } else {
-        appointments =
-          data || [];
+        const candidates = data || [];
+        const businessIds = [
+          ...new Set(candidates.map(a => a.business_id).filter(Boolean)),
+        ];
+
+        const timezoneByBusiness = new Map();
+
+        if (businessIds.length > 0) {
+          const { data: businesses, error: businessError } = await supabase
+            .from("businesses")
+            .select("id, timezone")
+            .in("id", businessIds);
+
+          if (businessError) {
+            throw businessError;
+          }
+
+          for (const business of businesses || []) {
+            timezoneByBusiness.set(
+              business.id,
+              business.timezone || "America/Santo_Domingo"
+            );
+          }
+        }
+
+        appointments = candidates.filter(appt => {
+          const timezone =
+            timezoneByBusiness.get(appt.business_id) ||
+            "America/Santo_Domingo";
+
+          try {
+            const localNow = getBusinessLocalDateTime(timezone, nowUtc);
+            const [hours, minutes] = String(appt.time || "")
+              .split(":")
+              .map(Number);
+
+            if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+              return false;
+            }
+
+            const localToday = new Date(
+              `${localNow.date}T00:00:00Z`
+            ).getTime();
+
+            const appointmentDay = new Date(
+              `${appt.date}T00:00:00Z`
+            ).getTime();
+
+            const dayDifference =
+              Math.round((appointmentDay - localToday) / 86400000);
+
+            const minutesUntil =
+              dayDifference * 1440 +
+              hours * 60 +
+              minutes -
+              (localNow.hour * 60 + localNow.minute);
+
+            return minutesUntil > 0 && minutesUntil <= 120;
+          } catch (timezoneError) {
+            console.error(
+              "Invalid business timezone for appointment:",
+              appt.id,
+              timezoneError.message
+            );
+            return false;
+          }
+        });
       }
     } catch (queryErr) {
-      emailPushStatus =
-        "error";
-
-      emailPushError =
-        queryErr?.message ||
-        String(
-          queryErr
-        );
-
-      console.error(
-        "❌ Email/push query exception:",
-        queryErr
-      );
+      emailPushStatus = "error";
+      emailPushError = queryErr?.message || String(queryErr);
+      console.error("Email/push query exception:", emailPushError);
     }
 
-    // ==================================================
+    // ==================================================    // ==================================================
     // ⭐ PROCESS EMAIL + PUSH
     // ==================================================
 

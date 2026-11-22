@@ -438,33 +438,37 @@ const {
         return;
       }
 
-      const availabilityResult = await fetch(
-        `/api/public/provider-availability?providerId=${encodeURIComponent(provider.id)}&date=${encodeURIComponent(date)}`,
-        { cache: "no-store" }
-      ).then(async (response) => {
-        if (!response.ok) throw new Error(`Availability API: ${response.status}`);
-        return response.json();
-      }).then(
-        (data) => ({ data: data, error: null }),
-        (error) => ({ data: null, error })
-      );
-      const { data: availabilityData, error: appointmentsError } = availabilityResult;
-      const appointments = availabilityData?.appointments;
-      const providerBlocks = availabilityData?.blocks;
+      const {
+        data: appointments,
+        error: appointmentsError,
+      } = await supabase
+        .from("appointments")
+        .select("time, duration")
+        .eq("provider_id", provider.id)
+        .eq("date", date)
+        .eq("status", "confirmed");
 
       if (appointmentsError) {
-        console.error(
-          "Error loading appointments:",
-          appointmentsError
-        );
+        console.error("Error loading appointments:", appointmentsError);
         setAvailableTimes([]);
         return;
       }
 
-     const existingAppointments = appointments || [];
+      const existingAppointments = appointments || [];
 
-// Blocks are supplied by the server-side availability API.
-const existingBlocks = providerBlocks || [];
+      const { data: providerBlocks, error: blocksError } = await supabase
+        .from("provider_blocks")
+        .select("start_time, end_time")
+        .eq("provider_id", provider.id)
+        .eq("date", date);
+
+      if (blocksError) {
+        console.error("Error loading provider blocks:", blocksError);
+        setAvailableTimes([]);
+        return;
+      }
+
+      const existingBlocks = providerBlocks || [];
 
 
 const providerStartMinutes = timeToMinutes(
@@ -811,19 +815,15 @@ const selectedDuration = Number(getCombinedService()?.duration) || 60;
   }
 
   // 2. CHECK EXISTING APPOINTMENTS
-  const availabilityCheckResult = await fetch(
-    `/api/public/provider-availability?providerId=${encodeURIComponent(provider.id)}&date=${encodeURIComponent(appointmentDate)}`,
-    { cache: "no-store" }
-  ).then(async (response) => {
-    if (!response.ok) throw new Error(`Availability API: ${response.status}`);
-    return response.json();
-  }).then(
-    (data) => ({ data: data, error: null }),
-    (error) => ({ data: null, error })
-  );
-  const { data: currentAvailability, error: checkError } = availabilityCheckResult;
-  const currentAppointments = currentAvailability?.appointments;
-  const currentProviderBlocks = currentAvailability?.blocks;
+  const {
+    data: currentAppointments,
+    error: checkError,
+  } = await supabase
+    .from("appointments")
+    .select("time, duration")
+    .eq("provider_id", provider.id)
+    .eq("date", appointmentDate)
+    .eq("status", "confirmed");
 
   if (checkError) {
     console.error("Error checking appointments:", checkError);
@@ -862,7 +862,24 @@ const selectedDuration = Number(getCombinedService()?.duration) || 60;
   // 3. CHECK PROVIDER BLOCKS AGAIN
   // This protects against a block being created after
   // the customer already opened the booking page.
-  // Blocks were rechecked by the availability API above.
+  const {
+    data: currentProviderBlocks,
+    error: blockCheckError,
+  } = await supabase
+    .from("provider_blocks")
+    .select("start_time, end_time")
+    .eq("provider_id", provider.id)
+    .eq("date", appointmentDate);
+
+  if (blockCheckError) {
+    console.error("Error checking provider blocks:", blockCheckError);
+    alert(
+      lang === "es"
+        ? "No se pudo verificar la disponibilidad del profesional. Intenta otra vez."
+        : "Could not verify the provider's availability. Please try again."
+    );
+    return;
+  }
 const appointmentStart =
     timeToMinutes(appointmentTime);
 

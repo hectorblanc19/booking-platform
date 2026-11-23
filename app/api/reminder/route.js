@@ -452,13 +452,15 @@ export async function GET(req) {
       null;
 
     let appointments = [];
+    const timezoneByBusiness = new Map();
+    const nowUtc = new Date();
 
     // ==================================================
     // EMAIL + PUSH: BUSINESS TIMEZONE
     // ==================================================
 
     try {
-      const nowUtc = new Date();
+
       const candidateDates = new Set();
 
       for (const timezone of [
@@ -493,7 +495,7 @@ export async function GET(req) {
           ...new Set(candidates.map(a => a.business_id).filter(Boolean)),
         ];
 
-        const timezoneByBusiness = new Map();
+
 
         if (businessIds.length > 0) {
           const { data: businesses, error: businessError } = await supabase

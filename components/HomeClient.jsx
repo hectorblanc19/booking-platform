@@ -1,16 +1,68 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabaseClient";
 export default function HomeClient() {
   const [lang, setLang] = useState("es");
+  const [featuredBusinesses, setFeaturedBusinesses] = useState({});
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadFeaturedBusinesses() {
+      const ids = [
+        "233c9c84-38a1-4c0b-9dc7-4bc3d8f820bb",
+        "e83f1865-f343-40c6-b014-c3f5c3f6ff1e",
+      ];
+
+      const { data: profiles, error } = await supabase
+        .from("business_profile_settings")
+        .select("business_id, cover_url")
+        .in("business_id", ids)
+        .eq("published", true);
+
+      if (error || !profiles?.length) return;
+
+      const publishedIds = profiles.map((p) => p.business_id);
+
+      const { data: businesses } = await supabase
+        .from("businesses")
+        .select("id, name, photo_url")
+        .in("id", publishedIds);
+
+      if (!active) return;
+
+      const result = {};
+
+      for (const profile of profiles) {
+        const business = businesses?.find(
+          (b) => b.id === profile.business_id
+        );
+
+        result[profile.business_id] = {
+          name: business?.name || "",
+          image: profile.cover_url || business?.photo_url || null,
+        };
+      }
+
+      setFeaturedBusinesses(result);
+    }
+
+    loadFeaturedBusinesses();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const t = {
     es: {
       brand: "FLOWPAYDR BOOKING",
       badge: "Reservas online para negocios y profesionales",
-      title: "Tu agenda trabajando,",
-      title2: "incluso cuando tú no estás.",
+      title: "Tu negocio, tu propia",
+      title2: "página web profesional.",
       subtitle:
-        "Tus clientes reservan online. Tú administras citas, clientes, servicios, horarios y tu equipo desde un solo lugar.",
+        "Muestra tus servicios, precios, fotos, horarios y ubicación. Tus clientes reservan sus citas las 24 horas, mientras tú administras todo desde un solo lugar.",
       book: "Reservar una Cita",
       businessDashboard: "Panel de Negocio",
       barberDashboard: "Panel de Barbero",
@@ -104,10 +156,10 @@ export default function HomeClient() {
     en: {
       brand: "FLOWPAYDR BOOKING",
       badge: "Online booking for businesses and professionals",
-      title: "Your schedule keeps working,",
-      title2: "even when you're busy.",
+      title: "Your business deserves",
+      title2: "its own professional website.",
       subtitle:
-        "Customers book online. You manage appointments, customers, services, schedules and your team from one place.",
+        "Show your services, prices, photos, hours and location. Customers book appointments 24/7 while you manage everything in one place.",
       book: "Book an Appointment",
       businessDashboard: "Business Dashboard",
       barberDashboard: "Barber Dashboard",
@@ -289,18 +341,84 @@ export default function HomeClient() {
             </p>
             <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 mt-10">
               <Link
-                href="/select-business"
+                href="/business/register"
                 className="bg-black text-white px-8 py-4 rounded-xl text-base sm:text-lg font-black shadow-lg hover:bg-gray-800 transition"
               >
-                {tr.book} →
+                {lang === "es" ? "Registrar mi negocio" : "Register my business"}
               </Link>
               <Link
-                href="/business/login"
+                href="#business-examples"
                 className="bg-white border border-gray-200 text-black px-8 py-4 rounded-xl text-base sm:text-lg font-black shadow-sm hover:bg-gray-50 transition"
               >
-                {tr.businessDashboard}
+                {lang === "es" ? "Ver ejemplos reales" : "View real examples"}
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+      {/* REAL BUSINESS EXAMPLES */}
+      <section id="business-examples" className="px-6 py-20 sm:py-28 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="max-w-3xl mx-auto text-center">
+            <p className="text-xs font-black tracking-[0.25em] text-gray-400">
+              {lang === "es" ? "EJEMPLOS REALES" : "REAL EXAMPLES"}
+            </p>
+            <h2 className="mt-4 text-4xl sm:text-5xl font-black tracking-tight">
+              {lang === "es"
+                ? "Mira cómo puede verse tu negocio"
+                : "See what your business could look like"}
+            </h2>
+            <p className="mt-5 text-gray-500 text-lg">
+              {lang === "es"
+                ? "Tu propia página profesional con fotos, servicios, horarios y reservas online."
+                : "Your own professional page with photos, services, business hours and online booking."}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
+            {[
+              {
+                id: "233c9c84-38a1-4c0b-9dc7-4bc3d8f820bb",
+                name: "Emma Spa",
+                category: lang === "es" ? "Spa y belleza" : "Spa and beauty",
+              },
+              {
+                id: "e83f1865-f343-40c6-b014-c3f5c3f6ff1e",
+                name: "Flow Barbershop",
+                category: lang === "es" ? "Barbería" : "Barbershop",
+              },
+            ]
+              .filter((item) => featuredBusinesses[item.id])
+              .map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/business/${item.id}/profile`}
+                  className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-xl transition"
+                >
+                  <div className="h-56 sm:h-72 bg-gray-100 overflow-hidden">
+                    {featuredBusinesses[item.id]?.image ? (
+                      <img
+                        src={featuredBusinesses[item.id].image}
+                        alt={item.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xl">
+                        {item.name}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-6">
+                    <p className="text-sm text-gray-500 font-medium">
+                      {item.category}
+                    </p>
+                    <h3 className="text-2xl font-black mt-2">{item.name}</h3>
+                    <p className="mt-4 font-bold text-gray-900">
+                      {lang === "es" ? "Ver página" : "View page"} →
+                    </p>
+                  </div>
+                </Link>
+              ))}
           </div>
         </div>
       </section>

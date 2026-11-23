@@ -44,6 +44,38 @@ export default function ServiceWorkerClient({
       const registration = await navigator.serviceWorker.register("/service-worker.js");
       console.log("SW registered:", registration);
 
+      // Wait for the registered service worker to become active.
+      if (!registration.active) {
+        const worker = registration.installing || registration.waiting;
+
+        if (!worker) {
+          throw new Error("No service worker available for activation");
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          if (worker.state === "activated") {
+            resolve();
+            return;
+          }
+
+          const onStateChange = () => {
+            if (worker.state === "activated") {
+              worker.removeEventListener("statechange", onStateChange);
+              resolve();
+            } else if (worker.state === "redundant") {
+              worker.removeEventListener("statechange", onStateChange);
+              reject(new Error("Service worker became redundant"));
+            }
+          };
+
+          worker.addEventListener("statechange", onStateChange);
+        });
+      }
+
+      if (!registration.active) {
+        throw new Error("Service worker is not active");
+      }
+
       // Ask for notification permission
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {

@@ -25,7 +25,72 @@ export default function BusinessBookingPage() {
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
   const [additionalServiceIds, setAdditionalServiceIds] = useState([]);
+  const [groupBookingMode, setGroupBookingMode] = useState(false);
+const [groupConfirmation, setGroupConfirmation] = useState(null);
+  const [groupMembers, setGroupMembers] = useState([
+    { name: "", serviceIds: [] },
+    { name: "", serviceIds: [] },
+  ]);
 
+  function updateGroupMemberName(index, name) {
+    setGroupMembers((members) =>
+      members.map((member, i) =>
+        i === index ? { ...member, name } : member
+      )
+    );
+  }
+
+  function toggleGroupMemberService(index, serviceId) {
+    const nextMembers = groupMembers.map((member, i) => {
+      if (i !== index) return member;
+
+      const serviceIds = member.serviceIds.includes(serviceId)
+        ? member.serviceIds.filter((id) => id !== serviceId)
+        : [...member.serviceIds, serviceId];
+
+      return { ...member, serviceIds };
+    });
+
+    setGroupMembers(nextMembers);
+    setAppointmentTime("");
+
+    if (appointmentDate && groupBookingMode) {
+      loadAvailableTimes(
+        appointmentDate,
+        getGroupCombinedService(nextMembers)
+      );
+    }
+  }
+
+  function addGroupMember() {
+    if (groupMembers.length >= 5) return;
+
+    setGroupMembers([
+      ...groupMembers,
+      { name: "", serviceIds: [] },
+    ]);
+
+    setAppointmentTime("");
+    setAvailableTimes([]);
+  }
+
+  function removeGroupMember(index) {
+    if (groupMembers.length <= 2) return;
+
+    const nextMembers = groupMembers.filter((_, i) => i !== index);
+
+    setGroupMembers(nextMembers);
+    setAppointmentTime("");
+    setAvailableTimes([]);
+
+    if (appointmentDate && groupBookingMode) {
+      const combinedService = getGroupCombinedService(nextMembers);
+
+      if (combinedService) {
+        loadAvailableTimes(appointmentDate, combinedService);
+      }
+    }
+  }
   // APPOINTMENT FORM
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -247,6 +312,36 @@ async function loadServices(providerToLoad) {
     };
   }
 
+  function getGroupCombinedService(members = groupMembers) {
+    if (isTourBusiness || members.length < 2 || members.length > 5) {
+      return null;
+    }
+
+    const selectedIds = members.flatMap((member) => member.serviceIds);
+
+    if (members.some((member) => member.serviceIds.length === 0)) {
+      return null;
+    }
+
+    const selectedItems = selectedIds.map((id) =>
+      services.find((service) => service.id === id)
+    );
+
+    if (selectedItems.some((item) => !item)) {
+      return null;
+    }
+
+    return {
+      duration: selectedItems.reduce(
+        (total, item) => total + Number(item.duration || 0),
+        0
+      ),
+      price: selectedItems.reduce(
+        (total, item) => total + Number(item.price || 0),
+        0
+      ),
+    };
+  }
   function addExtraService(id) {
     if (!id || !selectedService) return;
     if (id === selectedService.id || additionalServiceIds.includes(id)) return;
@@ -568,6 +663,120 @@ if (!hasAppointmentConflict && !hasBlockConflict) {
   }
 
  async function saveAppointment() {
+    if (groupBookingMode && !isTourBusiness) {
+      if (bookingLockRef.current) return;
+
+      const members = groupMembers.map((member) => ({
+        name: member.name.trim(),
+        serviceIds: member.serviceIds,
+      }));
+
+      if (
+        !provider?.id ||
+        !appointmentDate ||
+        !appointmentTime ||
+        !customerName.trim() ||
+        !customerPhone.trim() ||
+        members.length < 2 ||
+        members.length > 5 ||
+        members.some((member) => !member.name || !member.serviceIds.length)
+      ) {
+        alert(
+          lang === "es"
+            ? "Completa los datos de todas las personas y selecciona fecha y hora."
+            : "Complete every person's details and select a date and time."
+        );
+        return;
+      }
+
+      const details = JSON.stringify({
+        businessId,
+        providerId: provider.id,
+        appointmentDate,
+        appointmentTime,
+        members,
+        customerName,
+        customerPhone,
+        customerEmail,
+      });
+
+      if (pendingBookingRef.current?.details !== details) {
+        pendingBookingRef.current = {
+          details,
+          id: crypto.randomUUID(),
+        };
+      }
+
+      bookingLockRef.current = true;
+      setSavingAppointment(true);
+
+      try {
+        const response = await fetch("/api/book-group", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            business_id: businessId,
+            provider_id: provider.id,
+            date: appointmentDate,
+            time: appointmentTime,
+            members,
+            customer_name: customerName.trim(),
+            customer_phone: customerPhone.trim(),
+            customer_email: customerEmail.trim() || null,
+            booking_request_id: pendingBookingRef.current.id,
+            lang,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          if (
+            result.code === "SLOT_TAKEN" ||
+            result.code === "PROVIDER_BLOCKED"
+          ) {
+            alert(
+              lang === "es"
+                ? "Ese horario ya no está disponible. Selecciona otra hora."
+                : "That time is no longer available. Select another time."
+            );
+            await loadAvailableTimes(appointmentDate, getGroupCombinedService());
+          } else {
+            alert(
+              lang === "es"
+                ? "No se pudo completar la reserva del grupo. Intenta otra vez."
+                : "Could not complete the group booking. Please try again."
+            );
+          }
+          return;
+        }
+
+        if (!Array.isArray(result.appointments) ||
+            result.appointments.length !== members.length) {
+          throw new Error("Incomplete group booking response");
+        }
+
+        setGroupConfirmation({
+          groupId: result.group_id,
+          businessName: business?.name || "",
+          appointments: [...result.appointments].sort((a, b) =>
+            String(a.time).localeCompare(String(b.time))
+          ),
+        });
+      } catch (error) {
+        console.error("Group booking error:", error);
+        alert(
+          lang === "es"
+            ? "No se pudo verificar la reserva. Intenta otra vez."
+            : "Could not verify the booking. Please try again."
+        );
+      } finally {
+        bookingLockRef.current = false;
+        setSavingAppointment(false);
+      }
+
+      return;
+    }
     // Prevent multiple rapid clicks from creating duplicate bookings
     if (bookingLockRef.current) {
       return;
@@ -1216,7 +1425,7 @@ const { data: bar } = await supabase
         .select("*")
         .eq("id", providerId)
         .eq("business_id", businessId)
-        .single();
+        .maybeSingle();
 
       if (selectedProviderError) {
         console.error(
@@ -1298,6 +1507,76 @@ if (business?.is_blocked === true) {
 
 
 
+  if (groupConfirmation) {
+    return (
+      <div className="min-h-screen bg-gray-100 text-gray-900 p-4 sm:p-6" style={{ colorScheme: "light" }}>
+        <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-md p-5 sm:p-7">
+          <div className="text-center mb-6">
+            <div className="text-4xl text-green-600 mb-3">✓</div>
+            <h1 className="text-2xl font-bold text-green-700">
+              {lang === "es"
+                ? "¡Reserva de grupo confirmada!"
+                : "Group booking confirmed!"}
+            </h1>
+            <p className="text-gray-600 mt-2">
+              {groupConfirmation.businessName}
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              {groupConfirmation.appointments.length}{" "}
+              {lang === "es" ? "personas" : "people"}
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {groupConfirmation.appointments.map((appointment, index) => (
+              <div
+                key={appointment.id || index}
+                className="border border-gray-200 rounded-xl p-4"
+              >
+                <div className="flex justify-between gap-3 items-start">
+                  <h2 className="font-semibold text-lg">
+                    {appointment.customer_name}
+                  </h2>
+                  <span className="text-sm font-semibold text-blue-700">
+                    {String(appointment.time || "").slice(0, 5)}
+                  </span>
+                </div>
+
+                <p className="text-gray-600 text-sm mt-2">
+                  {appointment.service}
+                </p>
+
+                <p className="text-gray-500 text-sm mt-1">
+                  {appointment.date}
+                </p>
+
+                {appointment.secret_link && (
+                  <a
+                    href={`/customer/${appointment.secret_link}`}
+                    className="block mt-4 text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg"
+                  >
+                    {lang === "es"
+                      ? "Ver y gestionar esta cita"
+                      : "View and manage this appointment"}
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-sm text-gray-500 mt-6">
+            {lang === "es"
+              ? "Cada cita se puede gestionar por separado."
+              : "Each appointment can be managed separately."}
+          </p>
+
+          <p className="text-center text-xs text-gray-400 mt-4">
+            FlowPayDR Booking
+          </p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 p-6 max-w-xl mx-auto" style={{ colorScheme: "light" }}>
 
@@ -1352,7 +1631,7 @@ if (business?.is_blocked === true) {
 
           {business?.phone && (
             <p className="text-sm text-gray-700 mt-1">
-              📞 {business.phone}
+              Tel: {business.phone}
             </p>
           )}
 
@@ -1487,6 +1766,147 @@ if (business?.is_blocked === true) {
               </div>
             )}
 
+            {/* GROUP BOOKING OPTION */}
+            {!isTourBusiness && (
+              <div className="mb-4 rounded-xl border p-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={groupBookingMode}
+                    onChange={(e) => {
+                      setGroupBookingMode(e.target.checked);
+                      setAppointmentTime("");
+                      setAvailableTimes([]);
+                      setDayClosed(false);
+                      setAppointmentDate("");
+                    }}
+                    className="h-5 w-5"
+                  />
+                  <span className="font-semibold">
+                    {lang === "es"
+                      ? "Reservar para varias personas (2 a 5)"
+                      : "Book for multiple people (2 to 5)"}
+                  </span>
+                </label>
+
+                {groupBookingMode && (
+                  <div className="mt-4 space-y-4">
+                    {groupMembers.map((member, index) => (
+                      <div key={index} className="rounded-lg border p-3">
+                        <div className="mb-3 flex items-center justify-between">
+                          <h3 className="font-semibold">
+                            {lang === "es" ? "Persona" : "Person"} {index + 1}
+                          </h3>
+                          {groupMembers.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => removeGroupMember(index)}
+                              className="text-sm text-red-600 underline"
+                            >
+                              {lang === "es" ? "Quitar" : "Remove"}
+                            </button>
+                          )}
+                        </div>
+
+                        <input
+                          type="text"
+                          value={member.name}
+                          onChange={(e) =>
+                            updateGroupMemberName(index, e.target.value)
+                          }
+                          placeholder={
+                            lang === "es"
+                              ? "Nombre de la persona"
+                              : "Person's name"
+                          }
+                          className="mb-3 w-full rounded border p-2"
+                        />
+
+                        <p className="mb-2 text-sm font-semibold">
+                          {lang === "es" ? "Seleccionar servicios" : "Select services"}
+                        </p>
+
+                        <div className="space-y-2">
+                          {services.map((service) => (
+                            <label
+                              key={service.id}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={member.serviceIds.includes(service.id)}
+                                onChange={() =>
+                                  toggleGroupMemberService(index, service.id)
+                                }
+                              />
+                              <span>
+                                {lang === "en" && service.name_en?.trim()
+                                  ? service.name_en
+                                  : service.name}
+                                {" - "}
+                                {service.duration} min
+                                {" - "}
+                                {formatPrice(service.price)}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {groupMembers.length < 5 && (
+                      <button
+                        type="button"
+                        onClick={addGroupMember}
+                        className="w-full rounded-lg border p-3 font-semibold"
+                      >
+                        {lang === "es" ? "+ Agregar persona" : "+ Add person"}
+                      </button>
+                    )}
+
+                    <div className="rounded-lg bg-gray-100 p-3 text-sm">
+                      <p>
+                        <strong>
+                          {lang === "es" ? "Duracion total:" : "Total duration:"}
+                        </strong>{" "}
+                        {groupMembers.reduce(
+                          (total, member) =>
+                            total +
+                            member.serviceIds.reduce(
+                              (sum, id) =>
+                                sum +
+                                (Number(services.find((s) => s.id === id)?.duration) || 0),
+                              0
+                            ),
+                          0
+                        )}{" "}
+                        min
+                      </p>
+                      <p>
+                        <strong>
+                          {lang === "es" ? "Precio total:" : "Total price:"}
+                        </strong>{" "}
+                        {formatPrice(
+                          groupMembers.reduce(
+                            (total, member) =>
+                              total +
+                              member.serviceIds.reduce(
+                                (sum, id) =>
+                                  sum +
+                                  (Number(services.find((s) => s.id === id)?.price) || 0),
+                                0
+                              ),
+                            0
+                          )
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {(!groupBookingMode || isTourBusiness) && (
+              <>
             {/* SERVICE */}
             <label className="block font-semibold mb-1">
               {lang === "es" ? "Servicio" : "Service"}
@@ -1645,6 +2065,9 @@ if (business?.is_blocked === true) {
               </div>
             )}
 
+              </>
+            )}
+
             {/* DATE */}
             <label className="block font-semibold mb-1">
               {lang === "es" ? "Fecha" : "Date"}
@@ -1660,8 +2083,13 @@ if (business?.is_blocked === true) {
                 setAppointmentDate(selectedDate);
                 setAppointmentTime("");
 
-                if (selectedService) {
-                  loadAvailableTimes(selectedDate, getCombinedService());
+                const bookingService =
+                  groupBookingMode && !isTourBusiness
+                    ? getGroupCombinedService()
+                    : getCombinedService();
+
+                if (bookingService) {
+                  loadAvailableTimes(selectedDate, bookingService);
                 } else {
                   setAvailableTimes([]);
                 }
@@ -1670,7 +2098,7 @@ if (business?.is_blocked === true) {
             />
 
             {/* TELL CUSTOMER TO SELECT SERVICE FIRST */}
-            {appointmentDate && !selectedService && (
+            {appointmentDate && !(groupBookingMode && !isTourBusiness ? getGroupCombinedService() : selectedService) && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
                 {lang === "es"
                   ? "Selecciona un servicio para ver los horarios disponibles."
@@ -1679,7 +2107,7 @@ if (business?.is_blocked === true) {
             )}
 
             {/* AVAILABLE TIMES */}
-            {appointmentDate && selectedService && (
+            {appointmentDate && (groupBookingMode && !isTourBusiness ? getGroupCombinedService() : selectedService) && (
               <div className="mb-4">
                 <p className="font-semibold mb-2">
                   {lang === "es"
@@ -1749,6 +2177,70 @@ if (business?.is_blocked === true) {
               </div>
             )}
 
+            {/* GROUP APPOINTMENT SCHEDULE PREVIEW */}
+            {groupBookingMode &&
+              !isTourBusiness &&
+              appointmentTime &&
+              getGroupCombinedService() && (
+                <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                  <p className="font-semibold text-blue-900 mb-2">
+                    {lang === "es"
+                      ? "Horario de cada persona"
+                      : "Schedule for each person"}
+                  </p>
+
+                  {(() => {
+                    const [hours, minutes] = appointmentTime.split(":").map(Number);
+                    let currentMinutes = hours * 60 + minutes;
+
+                    const formatTime = (totalMinutes) => {
+                      const h = Math.floor(totalMinutes / 60) % 24;
+                      const m = totalMinutes % 60;
+                      const suffix = h >= 12 ? "PM" : "AM";
+                      return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
+                    };
+
+                    return groupMembers.map((member, index) => {
+                      const memberServices = member.serviceIds
+                        .map((id) => services.find((service) => service.id === id))
+                        .filter(Boolean);
+
+                      const duration = memberServices.reduce(
+                        (sum, service) => sum + Number(service.duration || 0),
+                        0
+                      );
+
+                      const start = currentMinutes;
+                      currentMinutes += duration;
+
+                      return (
+                        <div
+                          key={index}
+                          className="border-b border-blue-200 py-2 last:border-b-0"
+                        >
+                          <p className="font-medium">
+                            {member.name.trim() ||
+                              `${lang === "es" ? "Persona" : "Person"} ${index + 1}`}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {memberServices.map((service) => service.name).join(" + ")}
+                          </p>
+                          <p className="text-sm font-semibold text-blue-900">
+                            {formatTime(start)} – {formatTime(currentMinutes)}
+                          </p>
+                        </div>
+                      );
+                    });
+                  })()}
+
+                  <p className="mt-3 text-sm font-semibold">
+                    {lang === "es" ? "Duración total" : "Total duration"}:{" "}
+                    {getGroupCombinedService().duration} min
+                    {" · "}
+                    RD${getGroupCombinedService().price}
+                  </p>
+                </div>
+              )}
             {/* SELECTED APPOINTMENT SUMMARY */}
             {appointmentTime && selectedService && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -1787,7 +2279,7 @@ if (business?.is_blocked === true) {
               disabled={
                 savingAppointment ||
                 loadingTimes ||
-                !selectedService ||
+                !(groupBookingMode && !isTourBusiness ? getGroupCombinedService() : selectedService) ||
                 !appointmentTime
               }
               className="w-full bg-green-600 text-white py-2 rounded-lg disabled:opacity-50"
@@ -1882,7 +2374,7 @@ if (business?.is_blocked === true) {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-2xl">👤</span>
+                      <span className="text-2xl">ðŸ‘¤</span>
                     )}
                   </div>
 

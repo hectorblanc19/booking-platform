@@ -260,6 +260,136 @@ const WHATSAPP_TOUR_TEMPLATE_EN =
 // ⭐ MAIN REMINDER JOB
 // ======================================================
 
+
+function buildGroupReminderHtml(appointments, businessName, lang = "es", professionalName = "") {
+  const spanish = String(lang || "es").toLowerCase() !== "en";
+  const ordered = [...appointments].sort((a, b) =>
+    String(a.date + " " + a.time).localeCompare(String(b.date + " " + b.time))
+  );
+
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;",
+      '"': "&quot;", "'": "&#39;",
+    })[char]);
+
+  const formatTime = (value) => {
+    const [hour, minute] = String(value || "0:00").split(":").map(Number);
+    return (hour % 12 || 12) + ":" +
+      String(minute || 0).padStart(2, "0") +
+      (hour >= 12 ? " PM" : " AM");
+  };
+
+  const formatDate = (value) => {
+    const parts = String(value || "").split("-");
+    return parts.length === 3
+      ? parts[2] + "/" + parts[1] + "/" + parts[0]
+      : String(value || "");
+  };
+
+  const first = ordered[0] || {};
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL ||
+    "https://www.flowpaydr.com").replace(/\/$/, "");
+
+  const rows = ordered.map((appt) => {
+    const link = baseUrl + "/customer/" +
+      encodeURIComponent(appt.secret_link || "");
+
+    return `
+      <tr>
+        <td style="padding:12px;border-bottom:1px solid #e5e5e5;">
+          <strong>${escapeHtml(appt.customer_name)}</strong>
+          <div style="color:#555;margin-top:4px;">
+            ${escapeHtml(appt.service)}
+          </div>
+          <div style="margin-top:4px;">
+            ${escapeHtml(formatTime(appt.time))}
+          </div>
+          ${appt.secret_link ? `
+            <a href="${escapeHtml(link)}"
+              style="display:inline-block;margin-top:8px;color:#9b741d;">
+              ${spanish ? "Ver o gestionar cita" : "View or manage appointment"}
+            </a>` : ""}
+        </td>
+      </tr>`;
+  }).join("");
+
+  const heading = spanish
+    ? "Recordatorio de tu reserva de grupo"
+    : "Group Booking Reminder";
+
+  const greeting = spanish ? "Hola" : "Hello";
+  const introduction = spanish
+    ? "Te recordamos que tienes una reserva de grupo programada para hoy."
+    : "This is a reminder that your group booking is scheduled for today.";
+
+  return `
+<!DOCTYPE html>
+<html lang="${spanish ? "es" : "en"}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0;padding:24px 12px;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#171717;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+    style="width:100%;max-width:560px;margin:0 auto;background-color:#ffffff;border-radius:14px;">
+    <tr>
+      <td align="center" style="background-color:#101010;padding:24px;border-radius:14px 14px 0 0;">
+        <img src="https://www.flowpaydr.com/FlowPayDR%20Booking%20Gold%20Logo.png"
+          alt="FlowPayDR Booking" width="190"
+          style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:30px 26px;">
+        <h1 style="font-size:24px;margin:0 0 20px;color:#171717;">
+          ${heading}
+        </h1>
+        <p style="font-size:16px;line-height:1.6;">
+          ${greeting} ${escapeHtml(first.customer_name)},
+        </p>
+        <p style="font-size:15px;line-height:1.7;color:#444444;">
+          ${introduction}
+        </p>
+        <table role="presentation" cellpadding="10" cellspacing="0" border="0"
+          style="width:100%;background-color:#f7f7f7;border-radius:8px;font-size:14px;">
+          <tr>
+            <td><strong>${spanish ? "Negocio" : "Business"}</strong></td>
+            <td>${escapeHtml(businessName || "FlowPayDR Booking")}</td>
+          </tr>
+          ${professionalName ? `
+          <tr>
+            <td><strong>${spanish ? "Profesional" : "Professional"}</strong></td>
+            <td>${escapeHtml(professionalName)}</td>
+          </tr>` : ""}
+          <tr>
+            <td><strong>${spanish ? "Fecha" : "Date"}</strong></td>
+            <td>${escapeHtml(formatDate(first.date))}</td>
+          </tr>
+        </table>
+        <h2 style="font-size:18px;margin:26px 0 12px;">
+          ${spanish ? "Citas del grupo" : "Group appointments"}
+        </h2>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+          style="width:100%;border-collapse:collapse;font-size:14px;">
+          ${rows}
+        </table>
+        <p style="font-size:16px;margin-top:26px;">
+          ${spanish ? "¡Te esperamos!" : "We look forward to seeing you!"}
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" style="padding:18px;background-color:#f7f7f7;border-radius:0 0 14px 14px;font-size:12px;color:#777777;">
+        ${spanish
+          ? "Recordatorio automático de FlowPayDR Booking."
+          : "Automated reminder from FlowPayDR Booking."}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
 export async function GET(req) {
   const cronSecret =
     process.env.CRON_SECRET;
@@ -443,11 +573,273 @@ export async function GET(req) {
         "📌 Appointments found for email/push:",
         appointments.length
       );
+      const processedEmailGroups = new Set();
+
 
       for (
         const appt of appointments
       ) {
         try {
+          const isGroupAppointment = Boolean(appt.group_id);
+
+
+          // GROUP BOOKING: COMBINED EMAIL + PUSH
+          if (isGroupAppointment) {
+            const groupId = appt.group_id;
+
+            const { data: groupMembers, error: groupError } =
+              await supabase
+                .from("appointments")
+                .select("*")
+                .eq("group_id", groupId)
+                .eq("status", "confirmed")
+                .order("date", { ascending: true })
+                .order("time", { ascending: true });
+
+            if (groupError || !groupMembers?.length) {
+              console.error("Group reminder lookup failed:", groupError);
+              continue;
+            }
+
+            const first = groupMembers[0];
+
+            // The earliest appointment controls the entire group reminder.
+            const groupTimezone =
+              timezoneByBusiness.get(first.business_id) ||
+              "America/Santo_Domingo";
+
+            const groupNow = getBusinessLocalDateTime(
+              groupTimezone,
+              nowUtc
+            );
+
+            const [firstHour, firstMinute] = String(first.time || "")
+              .split(":")
+              .map(Number);
+
+            if (!Number.isFinite(firstHour) ||
+                !Number.isFinite(firstMinute)) {
+              console.error("Invalid first group appointment time:", groupId);
+              continue;
+            }
+
+            const todayMs = Date.parse(groupNow.date + "T00:00:00Z");
+            const firstDayMs = Date.parse(first.date + "T00:00:00Z");
+
+            const minutesUntilFirst =
+              Math.round((firstDayMs - todayMs) / 86400000) * 1440 +
+              firstHour * 60 +
+              firstMinute -
+              (groupNow.hour * 60 + groupNow.minute);
+
+            if (minutesUntilFirst <= 0 || minutesUntilFirst > 120) {
+              continue;
+            }
+
+
+            if (processedEmailGroups.has(groupId)) {
+              continue;
+            }
+
+            processedEmailGroups.add(groupId);
+
+            const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL ||
+              "https://www.flowpaydr.com").replace(/\/$/, "");
+
+            const appointmentLinks = groupMembers.map((member) => ({
+              name: member.customer_name,
+              service: member.service,
+              date: member.date,
+              time: member.time,
+              url: baseUrl + "/customer/" +
+                encodeURIComponent(member.secret_link || ""),
+            }));
+
+            // EMAIL: one combined email to the organizer.
+            let emailComplete = groupMembers.every(
+              member => member.group_email_reminder_sent === true
+            );
+
+            if (!emailComplete) {
+              if (!first.customer_email) {
+                const { error } = await supabase
+                  .from("appointments")
+                  .update({ group_email_reminder_sent: true })
+                  .eq("group_id", groupId)
+                  .eq("status", "confirmed");
+
+                emailComplete = !error;
+
+                if (error) {
+                  console.error("Group email tracking failed:", error);
+                }
+              } else if (!resend) {
+                console.error("Group email service unavailable:", groupId);
+              } else {
+                try {
+                  const { data: groupBusiness, error: businessError } =
+                    await supabase
+                      .from("businesses")
+                      .select("name")
+                      .eq("id", first.business_id)
+                      .maybeSingle();
+
+                  if (businessError) {
+                    console.error("Group business lookup failed:", businessError);
+                  } else {
+                    const spanish =
+                      String(first.lang || "es").toUpperCase() === "ES";
+
+                    let groupProfessionalName = "";
+
+                    if (first.provider_id) {
+                      const { data: provider } = await supabase
+                        .from("providers")
+                        .select("name")
+                        .eq("id", first.provider_id)
+                        .maybeSingle();
+
+                      groupProfessionalName = provider?.name || "";
+                    } else if (first.barber_id) {
+                      const { data: barber } = await supabase
+                        .from("barbers")
+                        .select("name")
+                        .eq("id", first.barber_id)
+                        .maybeSingle();
+
+                      groupProfessionalName = barber?.name || "";
+                    }
+
+                    const groupHtml = buildGroupReminderHtml(
+                      groupMembers,
+                      groupBusiness?.name || "",
+                      first.lang,
+                      groupProfessionalName
+                    );
+
+                    const { error: emailError } = await resend.emails.send({
+                      from: "FlowPayDR <info@flowpaydr.com>",
+                      to: first.customer_email,
+                      subject: spanish
+                        ? "Recordatorio de reserva de grupo"
+                        : "Group Booking Reminder",
+                      html: groupHtml,
+                    });
+
+                    if (emailError) {
+                      console.error("Group email failed:", emailError);
+                    } else {
+                      const { error: trackingError } = await supabase
+                        .from("appointments")
+                        .update({ group_email_reminder_sent: true })
+                        .eq("group_id", groupId)
+                        .eq("status", "confirmed");
+
+                      emailComplete = !trackingError;
+
+                      if (trackingError) {
+                        console.error("Group email tracking failed:", trackingError);
+                      } else {
+                        console.log("Combined group email sent:", groupId);
+                      }
+                    }
+                  }
+                } catch (emailErr) {
+                  console.error("Group email exception:", emailErr);
+                }
+              }
+            }
+
+            // PUSH: one combined reminder to the group organizer.
+            let pushComplete = groupMembers.every(
+              member => member.group_push_reminder_sent === true
+            );
+
+            if (!pushComplete) {
+              try {
+                if (!first.secret_link) {
+                  throw new Error("Missing organizer appointment link");
+                }
+
+                const { data: tokens, error: tokenError } = await supabase
+                  .from("push_tokens")
+                  .select("subscription")
+                  .eq("user_id", first.secret_link)
+                  .eq("role", "customer");
+
+                if (tokenError) {
+                  throw tokenError;
+                }
+
+                const spanish =
+                  String(first.lang || "es").toUpperCase() === "ES";
+
+                const groupSummary = groupMembers.map((item) =>
+                  item.customer_name + ": " +
+                  item.service + " - " +
+                  formatWhatsAppTime(item.time)
+                ).join("; ");
+
+                const message = spanish
+                  ? "Recordatorio de tu reserva de grupo: " + groupSummary
+                  : "Your group booking reminder: " + groupSummary;
+
+                const organizerUrl = baseUrl +
+                  "/customer/" + encodeURIComponent(first.secret_link);
+
+                for (const token of tokens || []) {
+                  const pushResult = await sendPushToSubscription(token.subscription, {
+                    title: spanish
+                      ? "Recordatorio de reserva de grupo"
+                      : "Group Booking Reminder",
+                    message,
+                    url: organizerUrl,
+                    groupId,
+                    appointmentLinks,
+                  });
+
+                  if (!pushResult?.success && !pushResult?.expired) {
+                    throw new Error("Group push delivery was not confirmed");
+                  }
+                }
+
+                const { error: pushTrackingError } = await supabase
+                  .from("appointments")
+                  .update({ group_push_reminder_sent: true })
+                  .eq("group_id", groupId)
+                  .eq("status", "confirmed");
+
+                if (pushTrackingError) {
+                  throw pushTrackingError;
+                }
+
+                pushComplete = true;
+                console.log("Organizer group push processed:", groupId);
+              } catch (pushErr) {
+                pushComplete = false;
+                console.error("Organizer group push failed:", pushErr);
+              }
+            }
+            // Complete only after the group email and organizer push are processed.
+            if (emailComplete && pushComplete) {
+              const { error: finalUpdateError } = await supabase
+                .from("appointments")
+                .update({ reminder_sent: true })
+                .eq("group_id", groupId)
+                .eq("status", "confirmed");
+
+              if (finalUpdateError) {
+                console.error("Group completion update failed:", finalUpdateError);
+              } else {
+                console.log("Group reminders completed:", groupId);
+              }
+            } else {
+              console.log("Group reminders pending retry:", groupId);
+            }
+
+            continue;
+          }
+
           const apptTime =
             appt.time;
 
@@ -995,6 +1387,8 @@ if (appt.customer_email && resend) {
         whatsappAppointments
       ) {
         try {
+          // Group bookings receive one combined email and push reminder.
+          if (appt.group_id) continue;
           // ----------------------------------------------
           // BUSINESS / TOUR DETECTION
           // ----------------------------------------------

@@ -1030,6 +1030,7 @@ if (business?.is_blocked === true) {
                       <div className="md:col-span-2 pt-6 border-t border-gray-100">
                         <BusinessHoursStatus
                           hours={businessHours}
+                          timezone={business?.timezone || "America/Santo_Domingo"}
                           lang={lang}
                           brandColor={brandColor}
                         />
@@ -1377,8 +1378,8 @@ function renderStars(value) {
     .join("");
 }
 
-function BusinessHoursStatus({ hours, lang, brandColor }) {
-  const now = getDominicanDateParts();
+function BusinessHoursStatus({ hours, lang, brandColor, timezone }) {
+  const now = getDominicanDateParts(timezone);
   const today = hours.find((item) => Number(item.day_of_week) === now.dayOfWeek);
   const tomorrowDay = (now.dayOfWeek + 1) % 7;
   const tomorrow = hours.find((item) => Number(item.day_of_week) === tomorrowDay);
@@ -1430,9 +1431,9 @@ function BusinessHoursStatus({ hours, lang, brandColor }) {
   );
 }
 
-function getDominicanDateParts() {
+function getDominicanDateParts(timezone = "America/Santo_Domingo") {
   const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Santo_Domingo",
+    timeZone: timezone,
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",

@@ -1,6 +1,48 @@
-const TIMEZONE = "America/Santo_Domingo";
+const DEFAULT_TIMEZONE = "America/Santo_Domingo";
 
-function getCalendarTimes(appointment) {
+function getUtcDate(date, time, timezone) {
+  const utcGuess = Date.parse(`${date}T${time}Z`);
+
+  if (!Number.isFinite(utcGuess)) {
+    throw new Error("Invalid appointment date");
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  });
+
+  const expected = `${date}T${time.slice(0, 5)}`;
+
+  // Check possible UTC offsets, including daylight-saving changes.
+  // Check larger offsets first to select the earliest repeated local time.
+  for (let offset = 14; offset >= -12; offset--) {
+    const candidate = new Date(utcGuess - offset * 3600000);
+
+    const parts = Object.fromEntries(
+      formatter.formatToParts(candidate)
+        .filter(part => part.type !== "literal")
+        .map(part => [part.type, part.value])
+    );
+
+    const actual =
+      `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+
+    if (actual === expected) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Invalid or nonexistent local appointment time");
+}
+
+function getCalendarTimes(appointment, timezone = DEFAULT_TIMEZONE) {
   const date = String(appointment.date || "");
   const time = String(appointment.time || "");
   const duration = Number(appointment.duration);
@@ -12,7 +54,7 @@ function getCalendarTimes(appointment) {
     throw new Error("Invalid appointment calendar details");
   }
 
-  const start = new Date(`${date}T${time}-04:00`);
+  const start = getUtcDate(date, time, timezone);
 
   if (Number.isNaN(start.getTime())) {
     throw new Error("Invalid appointment date");
@@ -35,7 +77,7 @@ function escapeICS(value) {
 }
 
 export function googleCalendarUrl(appointment, details = {}) {
-  const { start, end } = getCalendarTimes(appointment);
+  const { start, end } = getCalendarTimes(appointment, details.timezone || DEFAULT_TIMEZONE);
 
   const params = new URLSearchParams({
     action: "TEMPLATE",
@@ -43,14 +85,14 @@ export function googleCalendarUrl(appointment, details = {}) {
     dates: `${start}/${end}`,
     details: details.description || "",
     location: details.location || "",
-    ctz: TIMEZONE
+    ctz: details.timezone || DEFAULT_TIMEZONE
   });
 
   return `https://calendar.google.com/calendar/render?${params}`;
 }
 
 export function downloadAppointmentICS(appointment, details = {}) {
-  const { start, end } = getCalendarTimes(appointment);
+  const { start, end } = getCalendarTimes(appointment, details.timezone || DEFAULT_TIMEZONE);
 
   const content = [
     "BEGIN:VCALENDAR",

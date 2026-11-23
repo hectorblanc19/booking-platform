@@ -53,9 +53,9 @@ export default function ProviderDashboardPage() {
   // --------------------------------------------------
   // GET TODAY IN DOMINICAN REPUBLIC
   // --------------------------------------------------
-  function getDominicanToday() {
+  function getDominicanToday(timezone = "America/Santo_Domingo") {
     const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Santo_Domingo",
+      timeZone: timezone,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -263,7 +263,7 @@ export default function ProviderDashboardPage() {
         const { data: businessData, error: businessError } =
           await supabase
             .from("businesses")
-            .select("id, name")
+            .select("id, name, timezone")
             .eq("id", providerData.business_id)
             .maybeSingle();
 
@@ -363,12 +363,12 @@ export default function ProviderDashboardPage() {
   // TODAY'S APPOINTMENTS
   // --------------------------------------------------
   const todaysAppointments = useMemo(() => {
-    const today = getDominicanToday();
+    const today = getDominicanToday(business?.timezone);
 
     return appointments.filter(
       (appointment) => appointment.date === today
     );
-  }, [appointments]);
+  }, [appointments, business?.timezone]);
 
   // --------------------------------------------------
   // PROVIDER MAP
@@ -674,7 +674,7 @@ export default function ProviderDashboardPage() {
 
         {/* TODAY'S SCHEDULE */}
         <div className="bg-white border rounded-2xl shadow-sm p-6 mb-8">
-          <TodaysSchedule
+          <TodaysSchedule businessTimezone={business?.timezone || "America/Santo_Domingo"}
             t={text}
             lang={lang}
             todaysAppointments={todaysAppointments}
@@ -698,7 +698,7 @@ export default function ProviderDashboardPage() {
               : "View and manage your appointment history."}
           </p>
 
-          <AllAppointments
+          <AllAppointments businessTimezone={business?.timezone || "America/Santo_Domingo"}
             t={text}
             lang={lang}
             isBarberBusiness={false}

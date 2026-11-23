@@ -36,11 +36,12 @@ export default function AllAppointments({
   toggleBarberOpen,
   changeBarberPage,
   professionalMode = false,
+  businessTimezone = "America/Santo_Domingo",
 }) {  
 
 function getDominicanNow() {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Santo_Domingo",
+    timeZone: businessTimezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

@@ -2279,7 +2279,12 @@ const providerMap = Object.fromEntries(
   providers.map((p) => [p.id, p.name])
 );
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: businessTimezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+}).format(new Date());
   const todaysAppointments = appointments.filter((a) => a.date === today);
 
   function getDaysInMonth(date) {
@@ -3399,7 +3404,7 @@ if (!accessGranted) {
 
 {/* TODAY'S SCHEDULE */}
 {(activeTab === "inicio" || activeTab === "citas") && (
-<TodaysSchedule
+<TodaysSchedule businessTimezone={businessTimezone}
   t={t}
   lang={lang}
   todaysAppointments={todaysAppointments}
@@ -3436,7 +3441,7 @@ if (!accessGranted) {
 )}
      {/* ALL APPOINTMENTS */}
 {(activeTab === "inicio" || activeTab === "citas") && (
-<AllAppointments
+<AllAppointments businessTimezone={businessTimezone}
   t={t}
   lang={lang}
   isBarberBusiness={isBarberBusiness}

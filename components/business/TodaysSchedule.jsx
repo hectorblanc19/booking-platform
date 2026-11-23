@@ -10,6 +10,7 @@ export default function TodaysSchedule({
   isBarberBusiness,
   barberMap,
   providerMap,
+  businessTimezone = "America/Santo_Domingo",
 }) {
   const router = useRouter();
 
@@ -36,7 +37,7 @@ export default function TodaysSchedule({
   // CURRENT DATE + TIME IN DOMINICAN REPUBLIC
   function getDominicanNow() {
     const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Santo_Domingo",
+      timeZone: businessTimezone,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

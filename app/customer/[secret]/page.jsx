@@ -576,7 +576,8 @@ export default function CustomerSecretPage() {
     return {
       title: `${service} - ${business?.name || professional || "FlowPayDR"}`,
       description: `${lang === "es" ? "Profesional" : "Professional"}: ${professional}`,
-      location: business?.address || ""
+      location: business?.address || "",
+      timezone: business?.timezone || "America/Santo_Domingo"
     };
   }
 

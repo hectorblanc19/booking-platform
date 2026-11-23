@@ -178,6 +178,37 @@ async function sendGroupNotifications({
       `RD$ ${totalPrice.toFixed(2)}`)}
   `;
 
+  // Optional bank transfer for the group organizer.
+  let bankTransferEnabled = false;
+
+  const { data: bankSettings, error: bankError } = await supabase
+    .from("business_payment_settings")
+    .select("bank_transfer_enabled")
+    .eq("business_id", business.id)
+    .maybeSingle();
+
+  if (bankError) {
+    console.error("Group bank settings lookup:", bankError);
+  } else {
+    bankTransferEnabled = bankSettings?.bank_transfer_enabled === true;
+  }
+
+  const bankPaymentHtml =
+    bankTransferEnabled && ordered[0]?.secret_link
+      ? `<div style="text-align:center;margin-top:22px;">
+           <p style="font-size:13px;color:#666;">
+             ${spanish
+               ? "Si deseas pagar por transferencia bancaria, puedes hacerlo cuando quieras."
+               : "If you prefer to pay by bank transfer, you can do so at your convenience."}
+           </p>
+           ${button(
+             `${baseUrl}/payment/bank/${encodeURIComponent(ordered[0].secret_link)}?lang=${spanish ? "es" : "en"}`,
+             spanish ? "Pagar por transferencia bancaria" : "Pay by Bank Transfer",
+             "#1976d2"
+           )}
+         </div>`
+      : "";
+
   const results = [];
 
   if (customerEmail) {
@@ -198,7 +229,7 @@ async function sendGroupNotifications({
            )}</div>`
          : ""}
        <h3>${spanish ? "Citas del grupo" : "Group appointments"}</h3>
-       <table style="width:100%;border-collapse:collapse;">${appointmentRows}</table>`
+       <table style="width:100%;border-collapse:collapse;">${appointmentRows}</table>${bankPaymentHtml}`
     );
 
     results.push({

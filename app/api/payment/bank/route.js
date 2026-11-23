@@ -41,7 +41,7 @@ export async function POST(request) {
 
     const { data: appointment, error: appointmentError } = await admin
       .from("appointments")
-      .select("business_id, customer_name, date, lang, service, price, status")
+      .select("business_id, group_id, customer_name, date, lang, service, price, status")
       .eq("secret_link", token)
       .maybeSingle();
 
@@ -59,6 +59,41 @@ export async function POST(request) {
     )) {
       return json({ success: false, error: "Appointment is canceled." }, 400);
     }
+
+    // Calculate the combined amount for active group appointments.
+    let groupMembers = null;
+
+    if (appointment.group_id) {
+      const { data: members, error: groupError } = await admin
+        .from("appointments")
+        .select("customer_name, service, price, status")
+        .eq("group_id", appointment.group_id)
+        .eq("business_id", appointment.business_id);
+
+      if (groupError) {
+        console.error("Bank payment group lookup:", groupError);
+        return json({ success: false, error: "Unable to load group booking." }, 500);
+      }
+
+      groupMembers = (members || []).filter(
+        (member) =>
+          !["cancelled", "canceled"].includes(
+            String(member.status || "").toLowerCase()
+          )
+      );
+
+      if (!groupMembers.length) {
+        return json({ success: false, error: "No active group appointments." }, 400);
+      }
+    }
+
+    const paymentPrice = groupMembers
+      ? groupMembers.reduce((sum, member) => sum + Number(member.price || 0), 0)
+      : appointment.price;
+
+    const paymentService = groupMembers
+      ? groupMembers.map((member) => `${member.customer_name}: ${member.service}`).join(" | ")
+      : appointment.service;
 
     const { data: settings, error: settingsError } = await admin
       .from("business_payment_settings")
@@ -83,8 +118,16 @@ export async function POST(request) {
         customer_name: appointment.customer_name,
         date: appointment.date,
         lang: appointment.lang,
-        service: appointment.service,
-        price: appointment.price,
+        service: paymentService,
+        price: paymentPrice,
+        is_group: Boolean(groupMembers),
+        group_members: groupMembers
+          ? groupMembers.map(({ customer_name, service, price }) => ({
+              customer_name,
+              service,
+              price,
+            }))
+          : null,
         bank_name: settings.bank_name,
         account_holder: settings.account_holder,
         account_type: settings.account_type,

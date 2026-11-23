@@ -66,7 +66,35 @@ export default function BankPaymentPage() {
       currency: "DOP",
     }).format(Number(payment.price || 0));
 
-    const message = es
+    const groupDetails = payment.is_group && Array.isArray(payment.group_members)
+      ? payment.group_members
+          .map((member, index) =>
+            `${index + 1}. ${member.customer_name} - ${member.service}`
+          )
+          .join("\n")
+      : "";
+
+    const message = payment.is_group
+      ? es
+        ? `Hola, quiero enviar el comprobante de transferencia bancaria de mi reserva de grupo en FlowPayDR.
+
+Citas del grupo:
+${groupDetails}
+
+Fecha: ${payment.date}
+Total del grupo: ${amount}
+
+Te envío el comprobante de la transferencia para que puedas verificar el pago. Gracias.`
+        : `Hello, I would like to send the bank transfer receipt for my FlowPayDR group booking.
+
+Group appointments:
+${groupDetails}
+
+Date: ${payment.date}
+Group total: ${amount}
+
+Here is my bank transfer receipt.`
+      : es
       ? `Hola, quiero enviar el comprobante de transferencia bancaria de mi cita en FlowPayDR.
 
 Cliente: ${payment.customer_name}
@@ -123,7 +151,38 @@ Here is my bank transfer receipt.`;
 
         {payment && (
           <>
-            <p>{payment.service}</p>
+            {payment.is_group && Array.isArray(payment.group_members) ? (
+              <div>
+                <h3 style={{ marginBottom: 14 }}>
+                  {es ? "Citas del grupo" : "Group appointments"}
+                </h3>
+
+                {payment.group_members.map((member, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: "12px 0",
+                      borderBottom: "1px solid #444"
+                    }}
+                  >
+                    <strong>{index + 1}. {member.customer_name}</strong>
+                    <p style={{ margin: "6px 0" }}>{member.service}</p>
+                    <span style={{ color: "#e5b84a" }}>
+                      {new Intl.NumberFormat("es-DO", {
+                        style: "currency",
+                        currency: "DOP"
+                      }).format(Number(member.price || 0))}
+                    </span>
+                  </div>
+                ))}
+
+                <p style={{ marginTop: 18, fontWeight: "bold" }}>
+                  {es ? "Total del grupo" : "Group total"}
+                </p>
+              </div>
+            ) : (
+              <p>{payment.service}</p>
+            )}
 
             <h2 style={{ color: "#e5b84a", fontSize: 32 }}>
               {new Intl.NumberFormat("es-DO", {

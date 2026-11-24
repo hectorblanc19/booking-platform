@@ -249,6 +249,13 @@ const WHATSAPP_TEMPLATE_ES =
 const WHATSAPP_TEMPLATE_EN =
   "HX091df12c89d884d6e398e0d4fb826056";
 
+// Approved group WhatsApp reminder templates
+const WHATSAPP_GROUP_TEMPLATE_ES =
+  "HX0ad885b06492176d2a8fa27097dc0df1";
+
+const WHATSAPP_GROUP_TEMPLATE_EN =
+  "HX41c363e0aa3326aa0d34e5a170785121";
+
 // Tour reminder templates
 const WHATSAPP_TOUR_TEMPLATE_ES =
   "HXf03b16c0d65da7eb24a9a6852b4b20bc";
@@ -261,6 +268,20 @@ const WHATSAPP_TOUR_TEMPLATE_EN =
 // ======================================================
 
 
+function buildGroupWhatsAppDetails(appointments) {
+  return [...appointments]
+    .sort((a, b) =>
+      `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`)
+    )
+    .map((appt) => {
+      const time = formatWhatsAppTime(appt.time);
+      const name = String(appt.customer_name || "").trim();
+      const service = String(appt.service || "").trim();
+
+      return `${time} - ${name} - ${service}`;
+    })
+    .join("; ");
+}
 function buildGroupReminderHtml(appointments, businessName, lang = "es", professionalName = "") {
   const spanish = String(lang || "es").toLowerCase() !== "en";
   const ordered = [...appointments].sort((a, b) =>
@@ -1811,11 +1832,227 @@ if (appt.customer_email && resend) {
     // ⭐ FINAL DIAGNOSTIC RESPONSE
     // ==================================================
 
+    // GROUP WHATSAPP REMINDERS
+    // One combined message per group, sent to the organizer.
+    let groupWhatsAppSent = 0;
+    let groupWhatsAppSkipped = 0;
+    let groupWhatsAppFailed = 0;
+
+    try {
+      const { data: pendingGroupAppointments, error: groupQueryError } =
+        await supabase
+          .from("appointments")
+          .select("*")
+          .not("group_id", "is", null)
+          .eq("status", "confirmed")
+          .eq("group_whatsapp_reminder_sent", false)
+          .gte("date", getPreviousCalendarDate(currentDate))
+          .lte("date", getNextCalendarDate(getNextCalendarDate(currentDate)));
+
+      if (groupQueryError) {
+        throw groupQueryError;
+      }
+
+      const pendingGroupIds = [
+        ...new Set(
+          (pendingGroupAppointments || [])
+            .map((appt) => appt.group_id)
+            .filter(Boolean)
+        ),
+      ];
+
+      console.log(
+        "Pending group WhatsApp reminders:",
+        pendingGroupIds.length
+      );
+
+      for (const groupId of pendingGroupIds) {
+        let claimToken = null;
+        let groupClaimed = false;
+        try {
+          const { data: groupMembers, error: membersError } =
+            await supabase
+              .from("appointments")
+              .select("*")
+              .eq("group_id", groupId)
+              .eq("status", "confirmed")
+              .order("time", { ascending: true });
+
+          if (membersError) throw membersError;
+
+          if (!groupMembers?.length) {
+            groupWhatsAppSkipped++;
+            continue;
+          }
+
+          const first = groupMembers[0];
+
+          if (groupMembers.every(
+            (member) => member.group_whatsapp_reminder_sent === true
+          )) {
+            groupWhatsAppSkipped++;
+            continue;
+          }
+
+          const { data: groupBusiness, error: businessError } =
+            await supabase
+              .from("businesses")
+              .select("name, timezone")
+              .eq("id", first.business_id)
+              .maybeSingle();
+
+          if (businessError) throw businessError;
+          if (!groupBusiness?.name) {
+            throw new Error("Group business name not found");
+          }
+
+          const businessNow = getBusinessLocalDateTime(
+            groupBusiness.timezone || "America/Santo_Domingo"
+          );
+
+          const businessTomorrow =
+            getNextCalendarDate(businessNow.date);
+
+          const isReminderWindow =
+            businessNow.hour >= 20 && businessNow.hour <= 21;
+
+          if (
+            !isReminderWindow ||
+            groupMembers.some((member) => member.date !== businessTomorrow)
+          ) {
+            groupWhatsAppSkipped++;
+            continue;
+          }
+
+          const normalizedPhone = normalizeWhatsAppPhone(
+            first.customer_phone
+          );
+
+          if (!normalizedPhone) {
+            throw new Error("Group organizer WhatsApp number missing");
+          }
+
+          const english =
+            String(first.lang || "es").toLowerCase() === "en";
+
+          const organizerName =
+            String(first.group_organizer_name || "").trim() ||
+            (english ? "Customer" : "Cliente");
+
+          const contentSid = english
+            ? WHATSAPP_GROUP_TEMPLATE_EN
+            : WHATSAPP_GROUP_TEMPLATE_ES;
+
+          const variables = {
+            "1": organizerName,
+            "2": groupBusiness.name,
+            "3": formatWhatsAppDate(first.date),
+            "4": buildGroupWhatsAppDetails(groupMembers),
+          };
+
+          // Atomically claim this group before contacting Twilio.
+          claimToken = crypto.randomUUID();
+
+          const { data: claimed, error: claimError } =
+            await supabase.rpc("claim_group_whatsapp_reminder", {
+              p_group_id: groupId,
+              p_claim_token: claimToken,
+            });
+
+          if (claimError) throw claimError;
+
+          if (claimed === true) {
+            groupClaimed = true;
+          }
+
+          if (claimed !== true) {
+            groupWhatsAppSkipped++;
+            console.log("Group reminder already claimed:", groupId);
+            continue;
+          }
+          // Send one combined WhatsApp reminder to the organizer.
+          const result = await sendWhatsAppTemplate(
+            normalizedPhone,
+            contentSid,
+            variables
+          );
+
+          if (!result?.sid) {
+            throw new Error("Twilio did not return a message SID");
+          }
+
+          console.log(
+            "Group WhatsApp reminder accepted by Twilio:",
+            groupId,
+            result.sid
+          );
+
+          // Record Twilio acceptance using the original claim token.
+          const { data: accepted, error: acceptanceError } =
+            await supabase.rpc("accept_group_whatsapp_reminder", {
+              p_group_id: groupId,
+              p_claim_token: claimToken,
+              p_twilio_message_sid: result.sid,
+            });
+
+          if (acceptanceError) throw acceptanceError;
+
+          if (accepted !== true) {
+            throw new Error(
+              "Group WhatsApp delivery acceptance could not be recorded"
+            );
+          }
+          // Mark every confirmed appointment in this group as notified.
+          const { error: updateError } = await supabase
+            .from("appointments")
+            .update({ group_whatsapp_reminder_sent: true })
+            .eq("group_id", groupId)
+            .eq("status", "confirmed");
+
+          if (updateError) {
+            throw updateError;
+          }
+
+          groupWhatsAppSent++;
+        } catch (groupError) {
+          groupWhatsAppFailed++;
+          console.error("Group reminder failed:", groupId, groupError);
+
+          // A claimed delivery must not be retried automatically.
+          if (claimToken && groupClaimed) {
+            try {
+              const { error: uncertainError } = await supabase.rpc(
+                "mark_group_whatsapp_uncertain",
+                {
+                  p_group_id: groupId,
+                  p_claim_token: claimToken,
+                  p_error: String(groupError?.message || groupError),
+                }
+              );
+
+              if (uncertainError) {
+                console.error("Could not record uncertain delivery:", uncertainError);
+              }
+            } catch (trackingError) {
+              console.error("Group delivery tracking failed:", trackingError);
+            }
+          }
+        }
+      }
+
+    } catch (groupWhatsAppError) {
+      groupWhatsAppFailed++;
+      console.error(
+        "Group WhatsApp reminder processing error:",
+        groupWhatsAppError
+      );
+    }
     const allSectionsOk =
       emailPushStatus ===
         "ok" &&
       whatsappStatus ===
-        "ok";
+        "ok" &&
+      groupWhatsAppFailed === 0;
 
     const jobFinishedAt =
       new Date().toISOString();
@@ -1853,6 +2090,10 @@ if (appt.customer_email && resend) {
         whatsappSent,
         whatsappSkipped,
         whatsappFailed,
+
+        groupWhatsAppSent,
+        groupWhatsAppSkipped,
+        groupWhatsAppFailed,
 
         whatsappFailures,
 

@@ -761,6 +761,7 @@ export async function POST(req) {
         duration: member.duration,
         price: member.price,
         customer_name: member.name,
+        group_organizer_name: customer_name,
         customer_phone,
         customer_email: customer_email || null,
         notes: "",

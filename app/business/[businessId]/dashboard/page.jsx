@@ -169,6 +169,7 @@ const [savingProviderAvailability, setSavingProviderAvailability] =
 
 // BUSINESS SERVICES
 const [newServiceName, setNewServiceName] = useState("");
+const [newServiceCategory, setNewServiceCategory] = useState("");
 const [newServiceDescription, setNewServiceDescription] = useState("");
 const [newServicePrice, setNewServicePrice] = useState("");
 const [newServiceDuration, setNewServiceDuration] = useState("30");
@@ -178,6 +179,7 @@ const [savingService, setSavingService] = useState(false);
 // EDIT SERVICE
 const [editingServiceId, setEditingServiceId] = useState(null);
 const [editServiceName, setEditServiceName] = useState("");
+const [editServiceCategory, setEditServiceCategory] = useState("");
 const [editServiceDescription, setEditServiceDescription] = useState("");
 const [editServicePrice, setEditServicePrice] = useState("");
 const [editServiceDuration, setEditServiceDuration] = useState("");
@@ -1445,6 +1447,7 @@ async function addService() {
         business_id: businessId,
         provider_id: newServiceProviderId || null,
         name: newServiceName.trim(),
+        service_category: newServiceCategory.trim() || null,
         description: newServiceDescription.trim() || null,
         price: newServicePrice !== "" ? Number(newServicePrice) : null,
         duration: Number(newServiceDuration),
@@ -1473,6 +1476,7 @@ async function addService() {
   );
 
   setNewServiceName("");
+  setNewServiceCategory("");
   setNewServiceDescription("");
   setNewServicePrice("");
   setNewServiceDuration("30");
@@ -1490,6 +1494,7 @@ async function addService() {
 function startEditService(service) {
   setEditingServiceId(service.id);
   setEditServiceName(service.name || "");
+  setEditServiceCategory(service.service_category || "");
   setEditServiceDescription(service.description || "");
   setEditServicePrice(
     service.price !== null && service.price !== undefined
@@ -1504,6 +1509,7 @@ function startEditService(service) {
 function cancelEditService() {
   setEditingServiceId(null);
   setEditServiceName("");
+  setEditServiceCategory("");
   setEditServiceDescription("");
   setEditServicePrice("");
   setEditServiceDuration("");
@@ -1538,6 +1544,7 @@ async function updateService() {
     .from("business_services")
     .update({
       name: editServiceName.trim(),
+      service_category: editServiceCategory.trim() || null,
       description: editServiceDescription.trim() || null,
       price:
         editServicePrice !== ""
@@ -3187,6 +3194,8 @@ if (!accessGranted) {
     providers={providers}
 
     newServiceName={newServiceName}
+    newServiceCategory={newServiceCategory}
+    setNewServiceCategory={setNewServiceCategory}
     setNewServiceName={setNewServiceName}
     newServiceDescription={newServiceDescription}
     setNewServiceDescription={setNewServiceDescription}
@@ -3201,6 +3210,8 @@ if (!accessGranted) {
 
     editingServiceId={editingServiceId}
     editServiceName={editServiceName}
+    editServiceCategory={editServiceCategory}
+    setEditServiceCategory={setEditServiceCategory}
     setEditServiceName={setEditServiceName}
     editServiceDescription={editServiceDescription}
     setEditServiceDescription={setEditServiceDescription}

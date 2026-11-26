@@ -11,6 +11,7 @@ export default function BusinessProfilePage() {
   const [business, setBusiness] = useState(null);
   const [profile, setProfile] = useState(null);
   const [services, setServices] = useState([]);
+  const [selectedServiceCategory, setSelectedServiceCategory] = useState("Todos");
   const [providers, setProviders] = useState([]);
   const [gallery, setGallery] = useState([]);
   const [businessHours, setBusinessHours] = useState([]);
@@ -78,6 +79,7 @@ export default function BusinessProfilePage() {
             price,
             duration,
             provider_id,
+            service_category,
             is_active
           `)
           .eq("business_id", businessId)
@@ -308,6 +310,7 @@ if (business?.is_blocked === true) {
         (service.description || "").trim().toLowerCase(),
         service.price ?? "",
         service.duration ?? "",
+        (service.service_category || "").trim().toLowerCase(),
       ].join("|");
 
       if (!groups[key]) {
@@ -339,6 +342,27 @@ if (business?.is_blocked === true) {
   }));
 
   // ==================================================
+  // SERVICE CATEGORY FILTERS
+  const serviceCategories = [...new Set(
+    groupedServices
+      .map((service) => service.service_category?.trim())
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+
+  const effectiveServiceCategory =
+    selectedServiceCategory === "Todos" ||
+    serviceCategories.includes(selectedServiceCategory)
+      ? selectedServiceCategory
+      : "Todos";
+
+  const filteredServices =
+    effectiveServiceCategory === "Todos"
+      ? groupedServices
+      : groupedServices.filter(
+          (service) =>
+            service.service_category?.trim() === effectiveServiceCategory
+        );
+
   // CUSTOM SECTION ORDER
   // Hero stays fixed at the top. Final CTA and footer stay fixed below.
   // Existing profiles fall back to the original FlowPayDR order.
@@ -435,6 +459,34 @@ if (business?.is_blocked === true) {
                     </span>
                   </div>
             
+                  {serviceCategories.length > 0 && groupedServices.length >= 3 && (
+                    <div className="flex flex-wrap gap-2 mb-8">
+                      {["Todos", ...serviceCategories].map((category) => {
+                        const active = effectiveServiceCategory === category;
+
+                        return (
+                          <button
+                            key={category}
+                            type="button"
+                            onClick={() => setSelectedServiceCategory(category)}
+                            className={`px-4 py-2 rounded-full border text-sm font-medium transition-colors ${
+                              active
+                                ? "text-white"
+                                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                            }`}
+                            style={
+                              active
+                                ? { backgroundColor: brandColor, borderColor: brandColor }
+                                : undefined
+                            }
+                          >
+                            {category === "Todos" && lang === "en" ? "All" : category}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {groupedServices.length === 0 ? (
                     <EmptyState
                       text={
@@ -445,7 +497,7 @@ if (business?.is_blocked === true) {
                     />
                   ) : (
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {groupedServices.map((service) => (
+                      {filteredServices.map((service) => (
                         <article
                           key={service.id}
                           className={`bg-white border border-gray-100 p-6 ${themeStyles.card}`}

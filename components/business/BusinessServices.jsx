@@ -6,6 +6,8 @@ export default function BusinessServices({
   providers,
 
   newServiceName,
+  newServiceCategory,
+  setNewServiceCategory,
   setNewServiceName,
   newServiceDescription,
   setNewServiceDescription,
@@ -20,6 +22,8 @@ export default function BusinessServices({
 
   editingServiceId,
   editServiceName,
+  editServiceCategory,
+  setEditServiceCategory,
   setEditServiceName,
   editServiceDescription,
   setEditServiceDescription,
@@ -36,6 +40,10 @@ export default function BusinessServices({
   updateService,
   toggleServiceActive,
 }) {
+  const categories = [...new Set(
+    services.map((service) => service.service_category?.trim()).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+
   return (
     <section className="mb-12">
       <h2 className="text-2xl font-semibold mb-3">
@@ -44,6 +52,23 @@ export default function BusinessServices({
 
       {/* ADD SERVICE */}
       <div className="bg-white border rounded-xl shadow p-4 mb-4 space-y-3">
+        <div className="mb-3">
+          <label className="block text-sm font-medium mb-1">
+            {lang === "es" ? "Categoría del servicio (opcional)" : "Service category (optional)"}
+          </label>
+          <input
+            list="service-category-options"
+            className="border p-2 rounded w-full"
+            placeholder={lang === "es" ? "Ej. Uñas, Cejas, Pestañas" : "E.g. Nails, Brows, Lashes"}
+            value={newServiceCategory}
+            onChange={(e) => setNewServiceCategory(e.target.value)}
+          />
+          <datalist id="service-category-options">
+            {categories.map((category) => (
+              <option key={category} value={category} />
+            ))}
+          </datalist>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <input
             className="border p-2 rounded"
@@ -169,6 +194,18 @@ export default function BusinessServices({
               >
                 {editingServiceId === service.id ? (
                   <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        {lang === "es" ? "Categoría del servicio (opcional)" : "Service category (optional)"}
+                      </label>
+                      <input
+                        list="service-category-options"
+                        className="border p-2 rounded w-full"
+                        value={editServiceCategory}
+                        onChange={(e) => setEditServiceCategory(e.target.value)}
+                        placeholder={lang === "es" ? "Ej. Uñas" : "E.g. Nails"}
+                      />
+                    </div>
                     <input
                       className="border p-2 rounded w-full"
                       value={editServiceName}

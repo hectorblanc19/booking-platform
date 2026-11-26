@@ -23,6 +23,7 @@ export default function BusinessBookingPage() {
 
   // SERVICES
   const [services, setServices] = useState([]);
+  const [selectedServiceCategory, setSelectedServiceCategory] = useState("Todos");
   const [selectedService, setSelectedService] = useState(null);
   const [additionalServiceIds, setAdditionalServiceIds] = useState([]);
   const [groupBookingMode, setGroupBookingMode] = useState(false);
@@ -91,6 +92,34 @@ const [groupConfirmation, setGroupConfirmation] = useState(null);
       }
     }
   }
+  // SERVICE CATEGORY FILTERING
+  const bookingServiceCategories = [...new Set(
+    services
+      .map((service) => service.service_category?.trim())
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b));
+
+  const effectiveServiceCategory =
+    selectedServiceCategory === "Todos" ||
+    bookingServiceCategories.includes(selectedServiceCategory)
+      ? selectedServiceCategory
+      : "Todos";
+
+  const filteredBookingServices =
+    effectiveServiceCategory === "Todos"
+      ? services
+      : services.filter(
+          (service) =>
+            service.service_category?.trim() === effectiveServiceCategory
+        );
+
+  // Preserve the selected service when switching categories.
+  const primaryServiceOptions =
+    selectedService &&
+    !filteredBookingServices.some((service) => service.id === selectedService.id)
+      ? [selectedService, ...filteredBookingServices]
+      : filteredBookingServices;
+
   // APPOINTMENT FORM
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -1907,6 +1936,36 @@ if (business?.is_blocked === true) {
             )}
             {(!groupBookingMode || isTourBusiness) && (
               <>
+            {/* BOOKING CATEGORY BUTTONS */}
+            {!isTourBusiness &&
+              bookingServiceCategories.length > 0 &&
+              services.length >= 3 && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2">
+                    {["Todos", ...bookingServiceCategories].map((category) => {
+                      const active = effectiveServiceCategory === category;
+
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => setSelectedServiceCategory(category)}
+                          className={`px-4 py-2 rounded-full border text-sm font-medium ${
+                            active
+                              ? "bg-green-600 text-white border-green-600"
+                              : "bg-white text-gray-700 border-gray-300"
+                          }`}
+                        >
+                          {category === "Todos" && lang === "en"
+                            ? "All"
+                            : category}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
             {/* SERVICE */}
             <label className="block font-semibold mb-1">
               {lang === "es" ? "Servicio" : "Service"}
@@ -1925,7 +1984,7 @@ if (business?.is_blocked === true) {
                   : "Select a service"}
               </option>
 
-              {services.map((service) => (
+              {primaryServiceOptions.map((service) => (
                 <option
                   key={service.id}
                   value={service.id}

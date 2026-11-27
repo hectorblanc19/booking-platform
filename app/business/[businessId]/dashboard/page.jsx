@@ -2681,7 +2681,7 @@ if (!accessGranted) {
         ].filter(Boolean))
       ).sort().map((zone) => (
         <option key={zone} value={zone}>
-          {zone.replaceAll("_", " ")}
+          {zone === "America/Santo_Domingo" ? (lang === "es" ? "República Dominicana" : "Dominican Republic") : zone === "America/Santiago" ? "Santiago, Chile" : zone.replaceAll("_", " ")}
         </option>
       ))}
     </select>

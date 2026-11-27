@@ -1956,9 +1956,17 @@ if (business?.is_blocked === true) {
                               : "bg-white text-gray-700 border-gray-300"
                           }`}
                         >
-                          {category === "Todos" && lang === "en"
-                            ? "All"
-                            : category}
+                          {lang === "en"
+  ? ({
+      "Todos": "All",
+      "Cejas": "Eyebrows",
+      "Depilación": "Hair Removal",
+      "Maquillaje": "Makeup",
+      "Pestañas": "Eyelashes",
+      "Pies": "Feet",
+      "Uñas": "Nails",
+    }[category] || category)
+  : category}
                         </button>
                       );
                     })}
